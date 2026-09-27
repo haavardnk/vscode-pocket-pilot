@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  type Activity,
   editedPaths,
   plainMessage,
   projectDetail,
   projectSummary
 } from '../src/sessions/projection';
 import { request, SESSION_ID, snapshot } from './fixtures';
+
+const quiet: Activity = { statuses: new Map(), events: [], toolsOnly: false, settled: false };
 
 describe('projection', () => {
   it.each([
@@ -50,7 +53,7 @@ describe('projection', () => {
     );
   });
 
-  it('projects parts, queue and live events', () => {
+  it('projects parts, queue and activity', () => {
     const response = [
       { value: 'Looking at ' },
       { kind: 'inlineReference', inlineReference: { path: '/repo/a.ts' } },
@@ -72,11 +75,20 @@ describe('projection', () => {
     const root = snapshot([request('r0', 'old', 1), request('r1', 'go', 4, response)], {
       pendingRequests: [{ id: 'q1', kind: 'steering', request: { message: { text: 'faster' } } }]
     });
-    const live = [{ kind: 'message' as const, at: 1, text: 'hi', reasoning: null }];
-    const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, () => live);
+    const activity: Activity = {
+      statuses: new Map([['c1', 'running']]),
+      events: [
+        { type: 'message', at: 1, text: 'All green', reasoning: 'Check first' },
+        { type: 'toolStart', at: 2, callId: 'c1', name: 'run_in_terminal', args: null },
+        { type: 'toolStart', at: 3, callId: 'c2', name: 'grep_search', args: '{"query":"x"}' },
+        { type: 'message', at: 4, text: 'hidden while a tool runs', reasoning: null }
+      ],
+      toolsOnly: false,
+      settled: false
+    };
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, activity, []);
     expect(detail.totalRequests).toBe(2);
     expect(detail.queued).toEqual([{ id: 'q1', delivery: 'steering', text: 'faster' }]);
-    expect(detail.live).toEqual(live);
     expect(detail.requests).toHaveLength(1);
     expect(detail.requests[0]?.parts).toEqual([
       { kind: 'markdown', text: 'Looking at `a.ts` now.' },
@@ -87,9 +99,21 @@ describe('projection', () => {
         toolId: 'run_in_terminal',
         message: 'Run tests',
         detail: 'npm test',
-        awaitingConfirmation: true
+        awaitingConfirmation: true,
+        status: 'running'
       },
-      { kind: 'edit', path: '/repo/a.ts' }
+      { kind: 'edit', path: '/repo/a.ts' },
+      { kind: 'thinking', text: 'Check first', title: null },
+      { kind: 'markdown', text: 'All green' },
+      {
+        kind: 'tool',
+        callId: 'c2',
+        toolId: 'grep_search',
+        message: 'grep_search',
+        detail: '{"query":"x"}',
+        awaitingConfirmation: false,
+        status: 'running'
+      }
     ]);
     expect(detail.permission).toBe('default');
   });
@@ -105,14 +129,14 @@ describe('projection', () => {
       ])
     ]);
     expect(editedPaths(root)).toEqual(['/repo/a.ts', '/repo/b.ts']);
-    expect(projectDetail(root, projectSummary(root, 'file', 0), 1, () => []).editedFiles).toBe(2);
+    expect(projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []).editedFiles).toBe(2);
   });
 
   it('reads the session permission level', () => {
     const root = snapshot([request('r1', 'go', 1)], {
       inputState: { permissionLevel: 'autopilot' }
     });
-    expect(projectDetail(root, projectSummary(root, 'file', 0), 1, () => []).permission).toBe(
+    expect(projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []).permission).toBe(
       'autopilot'
     );
   });
@@ -171,7 +195,7 @@ describe('projection', () => {
     const requests = [request('r1', 'go', value, [part])];
     if (!latest) requests.push(request('r2', 'next', 1));
     const root = snapshot(requests);
-    const detail = projectDetail(root, projectSummary(root, 'file', 0), 2, () => []);
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 2, quiet, []);
     expect(detail.requests[0]?.parts[0]).toMatchObject({ state: expected });
   });
 
@@ -179,7 +203,7 @@ describe('projection', () => {
     const part = carousel({ isUsed: true, data: { shape: { selectedValue: 'round' } } });
     const root = snapshot([request('r1', 'go', 1, [part])]);
     expect(
-      projectDetail(root, projectSummary(root, 'file', 0), 1, () => []).requests[0]?.parts
+      projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []).requests[0]?.parts
     ).toEqual([
       {
         kind: 'questions',
@@ -203,13 +227,30 @@ describe('projection', () => {
     ]);
   });
 
-  it('omits live events for idle sessions and reports failures', () => {
+  it('omits activity for idle sessions and reports failures', () => {
     const failed = { ...request('r1', 'go', 3), result: { errorDetails: { message: 'Quota' } } };
     const root = snapshot([failed]);
-    const detail = projectDetail(root, projectSummary(root, 'file', 0), 10, () => {
-      throw new Error('should not read live events');
-    });
-    expect(detail.live).toEqual([]);
+    const activity: Activity = {
+      ...quiet,
+      events: [{ type: 'message', at: 1, text: 'late', reasoning: null }]
+    };
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 10, activity, []);
+    expect(detail.requests[0]?.parts).toEqual([]);
     expect(detail.requests[0]?.error).toBe('Quota');
+  });
+
+  it.each([
+    [false, 'pending'],
+    [true, 'complete']
+  ])('settles a pending request when the agent stopped: %s', (settled, expected) => {
+    const root = snapshot([request('r1', 'go', 0)]);
+    const detail = projectDetail(
+      root,
+      projectSummary(root, 'file', 0),
+      1,
+      { ...quiet, settled },
+      []
+    );
+    expect(detail.requests[0]?.state).toBe(expected);
   });
 });

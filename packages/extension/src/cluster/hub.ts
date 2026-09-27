@@ -1,18 +1,23 @@
-import type {
-  CodeQuery,
-  CodeResult,
-  Command,
-  PullRequestState,
-  ServerMessage,
-  SessionDetail,
-  SessionWatch,
-  WindowState
+import {
+  type CodeQuery,
+  type CodeResult,
+  type Command,
+  diffDetail,
+  type HookEvent,
+  type PullRequestState,
+  type ServerMessage,
+  type SessionDetail,
+  type SessionWatch,
+  type WindowState
 } from '@pocket-pilot/protocol';
+
+export const EMPTY_WINDOW = 'empty-';
 
 export interface WindowLink {
   watch(sessions: SessionWatch[]): void;
   run(command: Command): Promise<void>;
   query(query: CodeQuery): Promise<CodeResult>;
+  hook(event: HookEvent): Promise<void>;
 }
 
 export interface HubClient {
@@ -45,6 +50,7 @@ function trim(detail: SessionDetail | null, limit: number): SessionDetail | null
 export class Hub {
   private readonly windows = new Map<string, WindowEntry>();
   private readonly clients = new Map<HubClient, Subscription | null>();
+  private readonly sent = new Map<HubClient, SessionDetail | null>();
   private pullRequests: PullRequestState;
 
   constructor(
@@ -91,12 +97,7 @@ export class Hub {
     entry.details.set(sessionId, detail);
     for (const [client, subscription] of this.clients) {
       if (subscription?.windowId !== windowId || subscription.sessionId !== sessionId) continue;
-      client.send({
-        type: 'session',
-        windowId,
-        sessionId,
-        detail: trim(detail, subscription.limit)
-      });
+      this.sendDetail(client, windowId, sessionId, trim(detail, subscription.limit));
     }
   }
 
@@ -119,6 +120,7 @@ export class Hub {
   disconnect(client: HubClient): void {
     const subscription = this.clients.get(client);
     if (!this.clients.delete(client)) return;
+    this.sent.delete(client);
     if (subscription) this.syncWatches(subscription.windowId);
     this.events.clientsChanged?.(this.clients.size);
   }
@@ -127,26 +129,17 @@ export class Hub {
     if (!this.clients.has(client)) return;
     const previous = this.clients.get(client) ?? null;
     this.clients.set(client, next);
+    this.sent.delete(client);
     if (previous && previous.windowId !== next?.windowId) this.syncWatches(previous.windowId);
     if (!next) return;
     const entry = this.windows.get(next.windowId);
     if (!entry) {
-      client.send({
-        type: 'session',
-        windowId: next.windowId,
-        sessionId: next.sessionId,
-        detail: null
-      });
+      this.sendDetail(client, next.windowId, next.sessionId, null);
       return;
     }
     const cached = entry.details.get(next.sessionId);
     if (cached !== undefined) {
-      client.send({
-        type: 'session',
-        windowId: next.windowId,
-        sessionId: next.sessionId,
-        detail: trim(cached, next.limit)
-      });
+      this.sendDetail(client, next.windowId, next.sessionId, trim(cached, next.limit));
     }
     this.syncWatches(next.windowId);
   }
@@ -161,6 +154,31 @@ export class Hub {
     const entry = this.windows.get(query.windowId);
     if (!entry) throw new Error('Window is no longer open');
     return entry.link.query(query);
+  }
+
+  async hook(windowId: string | null, event: HookEvent): Promise<void> {
+    const targets = [...this.windows.values()].filter((entry) =>
+      windowId === null
+        ? entry.state.windowId.startsWith(EMPTY_WINDOW)
+        : entry.state.windowId === windowId
+    );
+    await Promise.all(targets.map((entry) => entry.link.hook(event)));
+  }
+
+  private sendDetail(
+    client: HubClient,
+    windowId: string,
+    sessionId: string,
+    detail: SessionDetail | null
+  ): void {
+    const previous = this.sent.get(client);
+    this.sent.set(client, detail);
+    if (previous && detail) {
+      const patch = diffDetail(previous, detail);
+      if (patch) client.send({ type: 'sessionPatch', windowId, sessionId, patch });
+      return;
+    }
+    client.send({ type: 'session', windowId, sessionId, detail });
   }
 
   private syncWatches(windowId: string): void {

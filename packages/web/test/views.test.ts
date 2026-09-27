@@ -208,7 +208,8 @@ describe('response parts', () => {
         toolId: 'run',
         message: 'Run',
         detail: null,
-        awaitingConfirmation
+        awaitingConfirmation,
+        status: 'running'
       }) as const;
     const request = (parts: SessionDetail['requests'][number]['parts']) => ({
       id: 'r',
@@ -229,8 +230,7 @@ describe('response parts', () => {
       editedFiles: 0,
       totalRequests: requests.length,
       requests,
-      queued: [],
-      live: []
+      queued: []
     });
     expect(pendingTool(detail([request([tool('a', false), tool('b', true)])]))?.callId).toBe('b');
     expect(pendingTool(detail([request([tool('a', true)]), request([])]))).toBeNull();

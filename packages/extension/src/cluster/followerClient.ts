@@ -30,9 +30,11 @@ export function connectFollower(
     if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
   };
 
-  const run = async (message: Extract<LeaderMessage, { type: 'command' }>): Promise<void> => {
+  const run = async (
+    message: Extract<LeaderMessage, { type: 'command' | 'hook' }>
+  ): Promise<void> => {
     try {
-      await window.run(message.command);
+      await (message.type === 'hook' ? window.hook(message.event) : window.run(message.command));
       send({ type: 'result', requestId: message.requestId, ok: true, error: null });
     } catch (error) {
       send({ type: 'result', requestId: message.requestId, ok: false, error: errorMessage(error) });

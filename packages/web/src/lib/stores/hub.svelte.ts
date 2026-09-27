@@ -1,11 +1,12 @@
-import type {
-  CodeQuery,
-  CodeResultFor,
-  Command,
-  PullRequestState,
-  ServerMessage,
-  SessionDetail,
-  WindowState
+import {
+  applyPatch,
+  type CodeQuery,
+  type CodeResultFor,
+  type Command,
+  type PullRequestState,
+  type ServerMessage,
+  type SessionDetail,
+  type WindowState
 } from '@pocket-pilot/protocol';
 
 import { type Connection, HubSocket, socketUrl } from '../api/socket';
@@ -148,9 +149,14 @@ class HubStore {
       this.pullRequests = message.state;
       return;
     }
-    if (message.type !== 'session') return;
+    if (message.type !== 'session' && message.type !== 'sessionPatch') return;
     const current = this.subscription;
     if (current?.windowId !== message.windowId || current.sessionId !== message.sessionId) return;
+    if (message.type === 'sessionPatch') {
+      if (this.detail) applyPatch(this.detail, message.patch);
+      else this.socket?.send({ type: 'subscribe', ...current });
+      return;
+    }
     this.detail = message.detail;
     this.detailMissing = message.detail === null;
   }

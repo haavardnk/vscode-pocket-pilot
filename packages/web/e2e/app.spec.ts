@@ -92,7 +92,7 @@ test.describe('paired', () => {
   test('approves a waiting tool', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     await expect(page.getByText('Allow tool?')).toBeVisible();
-    await expect(page.getByText('npm test -- --run')).toBeVisible();
+    await expect(page.getByRole('alert').getByText('npm test -- --run')).toBeVisible();
     await page.getByRole('button', { name: 'Allow' }).click();
     await expect(page.getByText('Tests passed.')).toBeVisible();
     await expect(page.getByText('All done.')).toBeVisible();
@@ -149,7 +149,15 @@ test.describe('paired', () => {
     await openSession(page, 'Fix flaky cluster test');
     await page.getByRole('textbox', { name: 'Message' }).fill('Try again');
     await page.getByRole('button', { name: 'Send' }).click();
+    await expect(page.getByLabel('Sending')).toHaveText('Try again');
+    const working = page.getByRole('main').getByRole('status');
+    await expect(working).toHaveText('Working');
+    const request = page.locator('article').last();
+    await expect(request.getByRole('img', { name: 'Running' })).toBeVisible();
+    await expect(page.getByLabel('Sending')).toHaveCount(0);
     await expect(page.getByText('Done: Try again')).toBeVisible();
+    await expect(request.getByRole('img', { name: 'Done' })).toBeVisible();
+    await expect(working).toHaveCount(0);
     await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('');
   });
 

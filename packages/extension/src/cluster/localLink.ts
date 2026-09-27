@@ -5,7 +5,8 @@ export function attachLocalWindow(hub: Hub, window: LocalWindow): Disposable {
   const link: WindowLink = {
     watch: (sessions) => window.setWatches(sessions),
     run: (command) => window.run(command),
-    query: (query) => window.query(query)
+    query: (query) => window.query(query),
+    hook: (event) => window.hook(event)
   };
   hub.addWindow(window.state(), link);
   const subscriptions = [

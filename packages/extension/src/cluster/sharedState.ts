@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { join } from 'node:path';
 
 import { createOnce } from '../storage/sharedFile';
@@ -25,4 +25,14 @@ export function sharedFiles(storage: string): SharedFiles {
 
 export function clusterSecret(storage: string): Promise<string> {
   return createOnce(join(storage, 'cluster-secret'), () => randomBytes(32).toString('base64url'));
+}
+
+export function hookSecret(storage: string): Promise<string> {
+  return createOnce(join(storage, 'hook-secret'), () => randomBytes(32).toString('base64url'));
+}
+
+export function sameSecret(expected: string, actual: string): boolean {
+  const a = Buffer.from(expected);
+  const b = Buffer.from(actual);
+  return a.length === b.length && timingSafeEqual(a, b);
 }

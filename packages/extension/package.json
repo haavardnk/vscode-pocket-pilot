@@ -175,6 +175,22 @@
           "default": 60,
           "minimum": 15,
           "description": "Pull request refresh interval while a phone is connected."
+        },
+        "pocketPilot.liveMirror": {
+          "type": "string",
+          "enum": [
+            "full",
+            "hooks",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Show prompts and tool calls the moment they happen, and stream the reply text while an agent is working.",
+            "Show prompts and tool calls the moment they happen. Reply text appears when VS Code writes its chat logs.",
+            "Only read the chat logs VS Code writes to disk. Updates can lag by up to a minute."
+          ],
+          "default": "full",
+          "scope": "machine",
+          "markdownDescription": "How closely the phone follows a running chat. `full` and `hooks` install a Copilot hook file at `~/.copilot/hooks/pocket-pilot.json` that reports prompts and tool calls to Pocket Pilot on `127.0.0.1`. `full` also exports the focused chat every few hundred milliseconds while an agent is working."
         }
       }
     }
@@ -182,7 +198,8 @@
   "scripts": {
     "build": "node scripts/build.js",
     "check": "tsc -p tsconfig.json",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies",
+    "vscode:uninstall": "node ./dist/uninstall.cjs"
   },
   "dependencies": {
     "@pocket-pilot/protocol": "0.1.0",

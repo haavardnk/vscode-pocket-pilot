@@ -1,4 +1,4 @@
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import {
   type CodeResult,
@@ -10,6 +10,7 @@ import {
 import type { WebSocket } from 'ws';
 
 import type { Hub, WindowLink } from './hub';
+import { sameSecret } from './sharedState';
 
 const REGISTER_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -20,12 +21,6 @@ interface Pending {
   settle: (reply: Reply) => void;
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
-}
-
-function sameSecret(expected: string, actual: string): boolean {
-  const a = Buffer.from(expected);
-  const b = Buffer.from(actual);
-  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function commandOutcome(reply: Reply): void {
@@ -74,7 +69,8 @@ export function acceptFollower(
     watch: (sessions) => send({ type: 'watch', sessions }),
     run: (command) =>
       request((requestId) => ({ type: 'command', requestId, command }), commandOutcome),
-    query: (query) => request((requestId) => ({ type: 'query', requestId, query }), queryOutcome)
+    query: (query) => request((requestId) => ({ type: 'query', requestId, query }), queryOutcome),
+    hook: (event) => request((requestId) => ({ type: 'hook', requestId, event }), commandOutcome)
   };
 
   const registerTimer = setTimeout(

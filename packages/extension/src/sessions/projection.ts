@@ -1,6 +1,5 @@
 import {
   type InteractionState,
-  type LiveEvent,
   type OptionValue,
   optionValueSchema,
   type PermissionLevel,
@@ -13,10 +12,12 @@ import {
   type ResponsePart,
   type SessionDetail,
   type SessionStatus,
-  type SessionSummary
+  type SessionSummary,
+  type ToolStatus
 } from '@pocket-pilot/protocol';
 
 import { asArray, asNumber, asRecord, asString, type JsonRecord, markdownText } from '../json';
+import type { TranscriptEvent } from './transcript';
 
 const TITLE_LENGTH = 80;
 const PREVIEW_LENGTH = 160;
@@ -25,9 +26,19 @@ const LINK = /\[([^\]]*)\]\(([^)\s]+)\)/g;
 
 export type LogSummary = Omit<SessionSummary, 'pinned' | 'archived'>;
 
+type ActivityPart = Extract<ResponsePart, { kind: 'tool' | 'thinking' | 'markdown' }>;
+
+export interface Activity {
+  statuses: ReadonlyMap<string, ToolStatus>;
+  events: readonly TranscriptEvent[];
+  toolsOnly: boolean;
+  settled: boolean;
+}
+
 interface PartContext {
   state: RequestState;
   latest: boolean;
+  statuses: ReadonlyMap<string, ToolStatus>;
 }
 
 function basename(path: string): string {
@@ -47,11 +58,23 @@ function clip(text: string, length: number): string {
   return flat.length > length ? `${flat.slice(0, length - 1)}…` : flat;
 }
 
+export function titleText(text: string): string {
+  return clip(text, TITLE_LENGTH) || 'New chat';
+}
+
+export function previewText(text: string): string | null {
+  return clip(text, PREVIEW_LENGTH) || null;
+}
+
 function requestsOf(root: unknown): JsonRecord[] {
   return asArray(asRecord(root).requests).map(asRecord);
 }
 
-function requestText(request: JsonRecord): string {
+export function lastRequestAt(root: unknown): number | null {
+  return asNumber(requestsOf(root).at(-1)?.timestamp);
+}
+
+export function requestText(request: JsonRecord): string {
   return asString(asRecord(request.message).text) ?? '';
 }
 
@@ -91,7 +114,7 @@ function titleOf(root: JsonRecord, requests: JsonRecord[]): string {
   const custom = asString(root.customTitle);
   if (custom) return custom;
   const first = requests[0];
-  return first ? clip(requestText(first), TITLE_LENGTH) || 'New chat' : 'New chat';
+  return first ? titleText(requestText(first)) : 'New chat';
 }
 
 export function projectSummary(root: unknown, id: string, modifiedAt: number): LogSummary {
@@ -110,7 +133,7 @@ export function projectSummary(root: unknown, id: string, modifiedAt: number): L
     modelId: sessionModel(session, last),
     modeId: sessionMode(session),
     requestCount: requests.length,
-    preview: last ? clip(requestText(last), PREVIEW_LENGTH) || null : null
+    preview: last ? previewText(requestText(last)) : null
   };
 }
 
@@ -217,7 +240,8 @@ function projectPart(part: JsonRecord, context: PartContext): ResponsePart | nul
         toolId: asString(part.toolId) ?? '',
         message: plainMessage(part.pastTenseMessage) || plainMessage(part.invocationMessage),
         detail: toolDetail(part.toolSpecificData),
-        awaitingConfirmation: awaitingInput && part.isConfirmed == null
+        awaitingConfirmation: awaitingInput && part.isConfirmed == null,
+        status: context.statuses.get(asString(part.toolCallId) ?? '') ?? 'done'
       };
     case 'textEditGroup':
     case 'notebookEditGroup': {
@@ -278,10 +302,11 @@ function mergeParts(parts: ResponsePart[]): ResponsePart[] {
   return merged;
 }
 
-function projectRequest(request: JsonRecord, latest: boolean): RequestView {
-  const state = requestState(request);
+function projectRequest(request: JsonRecord, latest: boolean, activity: Activity): RequestView {
+  const logged = requestState(request);
+  const state = latest && activity.settled && logged === 'pending' ? 'complete' : logged;
   const parts = asArray(request.response)
-    .map((part) => projectPart(asRecord(part), { state, latest }))
+    .map((part) => projectPart(asRecord(part), { state, latest, statuses: activity.statuses }))
     .filter((part): part is ResponsePart => part !== null);
   const error = asRecord(asRecord(request.result).errorDetails);
   return {
@@ -319,16 +344,77 @@ export function editedPaths(root: unknown): string[] {
   return [...new Set(paths)];
 }
 
+export function toolStatuses(events: readonly TranscriptEvent[]): Map<string, ToolStatus> {
+  const statuses = new Map<string, ToolStatus>();
+  for (const event of events) {
+    if (event.type === 'toolStart' && !statuses.has(event.callId)) {
+      statuses.set(event.callId, 'running');
+    }
+    if (event.type === 'toolEnd') statuses.set(event.callId, event.success ? 'done' : 'failed');
+  }
+  return statuses;
+}
+
+export function activityParts(
+  events: readonly TranscriptEvent[],
+  statuses: ReadonlyMap<string, ToolStatus>,
+  toolsOnly: boolean
+): ActivityPart[] {
+  const running = new Set<string>();
+  const parts: ActivityPart[] = [];
+  for (const event of events) {
+    if (event.type === 'toolStart') {
+      running.add(event.callId);
+      parts.push({
+        kind: 'tool',
+        callId: event.callId,
+        toolId: event.name,
+        message: event.name,
+        detail: event.args && clip(event.args, DETAIL_LENGTH),
+        awaitingConfirmation: false,
+        status: statuses.get(event.callId) ?? 'running'
+      });
+    } else if (event.type === 'toolEnd') {
+      running.delete(event.callId);
+    } else if (event.type === 'message' && running.size === 0 && !toolsOnly) {
+      const reasoning = event.reasoning?.trim();
+      if (reasoning) parts.push({ kind: 'thinking', text: reasoning, title: null });
+      if (event.text) parts.push({ kind: 'markdown', text: event.text });
+    }
+  }
+  return parts;
+}
+
+function withActivity(parts: ResponsePart[], activity: Activity): ResponsePart[] {
+  const tools = new Set(parts.flatMap((part) => (part.kind === 'tool' ? [part.callId] : [])));
+  const shown = parts
+    .map((part) => (part.kind === 'markdown' || part.kind === 'thinking' ? part.text : ''))
+    .join('\n');
+  const extra = activityParts(activity.events, activity.statuses, activity.toolsOnly).filter(
+    (part) => (part.kind === 'tool' ? !tools.has(part.callId) : !shown.includes(part.text.trim()))
+  );
+  return [...parts, ...extra];
+}
+
 export function projectDetail(
   root: unknown,
   summary: LogSummary,
   limit: number,
-  liveFor: (requestText: string) => LiveEvent[]
+  activity: Activity,
+  pending: RequestView[]
 ): SessionDetail {
   const session = asRecord(root);
   const requests = requestsOf(session);
-  const last = requests.at(-1);
+  const last = pending.length > 0 ? undefined : requests.at(-1);
+  const unlogged = pending.slice(-limit);
+  const shown = requests.slice(Math.max(0, requests.length - limit + unlogged.length));
   const active = summary.status === 'running' || summary.status === 'needsInput';
+  const views = shown.map((request) => {
+    const view = projectRequest(request, request === last, activity);
+    return request === last && active
+      ? { ...view, parts: withActivity(view.parts, activity) }
+      : view;
+  });
   return {
     id: summary.id,
     title: summary.title,
@@ -336,10 +422,9 @@ export function projectDetail(
     modelId: summary.modelId,
     modeId: summary.modeId,
     permission: sessionPermission(session),
-    totalRequests: requests.length,
+    totalRequests: requests.length + pending.length,
     editedFiles: editedPaths(session).length,
-    requests: requests.slice(-limit).map((request) => projectRequest(request, request === last)),
-    queued: projectQueued(session),
-    live: active && last ? liveFor(requestText(last)) : []
+    requests: [...views, ...unlogged],
+    queued: projectQueued(session)
   };
 }

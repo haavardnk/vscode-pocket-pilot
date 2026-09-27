@@ -1,3 +1,5 @@
+import { homedir } from 'node:os';
+
 import type { FSWatcher } from 'chokidar';
 import * as vscode from 'vscode';
 
@@ -7,8 +9,9 @@ import type { TunnelSecret } from './auth/tunnelSecret';
 import { Cluster, type Role } from './cluster/cluster';
 import { followLeader } from './cluster/followerClient';
 import { type Leader, startLeader } from './cluster/leader';
-import { sharedFiles } from './cluster/sharedState';
+import { hookSecret, sharedFiles } from './cluster/sharedState';
 import { errorMessage } from './errors';
+import { hookFileContent, hookFilePath, installHooks, removeHooks } from './hooks/hookFile';
 import { readSettings, type Settings } from './settings';
 import { type TunnelStatus, watchTunnelStatus } from './tunnel/status';
 import type { TunnelSettings } from './tunnel/tunnel';
@@ -73,6 +76,7 @@ export class PocketPilotService {
   settingsChanged(): Promise<void> {
     const previous = this.settings;
     this.settings = readSettings();
+    void this.syncHooks();
     if (!this.settings.enabled) return this.stop();
     if (!previous.enabled || !this.cluster) return this.start();
     if (
@@ -94,6 +98,17 @@ export class PocketPilotService {
     this.tunnelChanged.dispose();
   }
 
+  async syncHooks(): Promise<void> {
+    const file = hookFilePath(homedir());
+    const { enabled, liveMirror, port } = readSettings();
+    try {
+      if (!enabled || liveMirror === 'off') await removeHooks(file);
+      else await installHooks(file, hookFileContent(port, await hookSecret(this.storage)));
+    } catch (error) {
+      this.log.warn(`Cannot update the Copilot hook file: ${errorMessage(error)}`);
+    }
+  }
+
   private enqueue(task: () => Promise<void>): Promise<void> {
     this.queue = this.queue.then(task, task);
     return this.queue;
@@ -102,6 +117,7 @@ export class PocketPilotService {
   private async startNow(): Promise<void> {
     if (this.cluster) return;
     this.settings = readSettings();
+    await this.syncHooks();
     const report = (message: string): void => this.log.info(message);
     const window = new WindowAgent(this.context, report);
     await window.start();

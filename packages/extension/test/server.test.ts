@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { type IncomingHttpHeaders, type IncomingMessage, request } from 'node:http';
 import { type AddressInfo, createServer } from 'node:net';
@@ -5,10 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { authInfoSchema, type PullRequestState } from '@pocket-pilot/protocol';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
 import { Hub } from '../src/cluster/hub';
+import { HOOK_HEADER, hookFileContent } from '../src/hooks/hookFile';
 import { PushService } from '../src/push/pushService';
 import { PushStore } from '../src/push/pushStore';
 import { vapidKeys } from '../src/push/vapid';
@@ -16,6 +18,7 @@ import { type RunningServer, startServer, TOKEN_COOKIE } from '../src/server/app
 import { DeviceStore } from '../src/server/devices';
 import { PairingStore } from '../src/server/pairing';
 import { PhoneRegistry } from '../src/server/phones';
+import { HOOK_PATH } from '../src/server/tunnelTraffic';
 
 interface Response {
   status: number;
@@ -28,6 +31,7 @@ interface Fixture {
   port: number;
   tunnelPort: number;
   server: RunningServer;
+  hub: Hub;
   sent: string[];
 }
 
@@ -40,6 +44,7 @@ interface RequestOptions {
 
 const PUBLIC_HOST = 'abc.trycloudflare.com';
 const PUBLIC_ORIGIN = `https://${PUBLIC_HOST}`;
+const HOOK_SECRET = 'hook-secret';
 
 const noPullRequests: PullRequestState = {
   status: 'disabled',
@@ -48,6 +53,16 @@ const noPullRequests: PullRequestState = {
   pullRequests: []
 };
 
+function closedPort(): Promise<number> {
+  const probe = createServer();
+  return new Promise((resolve) =>
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as AddressInfo;
+      probe.close(() => resolve(port));
+    })
+  );
+}
+
 async function start(namedTunnel = false): Promise<Fixture> {
   const folder = await mkdtemp(join(tmpdir(), 'pocket-pilot-server-'));
   await writeFile(join(folder, 'index.html'), '<!doctype html><title>app</title>');
@@ -55,12 +70,14 @@ async function start(namedTunnel = false): Promise<Fixture> {
   const sent: string[] = [];
   const devices = new DeviceStore(join(folder, 'devices.json'), () => 30);
   const phones = new PhoneRegistry();
+  const hub = new Hub('1.0.0', noPullRequests);
   const server = await startServer({
     port: 0,
     namedTunnel,
     webRoot: folder,
     clusterSecret: 'secret',
-    hub: new Hub('1.0.0', noPullRequests),
+    hookSecret: HOOK_SECRET,
+    hub,
     devices,
     pairing: new PairingStore(join(folder, 'pairing.json')),
     phones,
@@ -81,7 +98,7 @@ async function start(namedTunnel = false): Promise<Fixture> {
   });
   await new Promise<void>((resolve) => server.tunnel.listen(0, '127.0.0.1', resolve));
   const { port: tunnelPort } = server.tunnel.address() as AddressInfo;
-  return { folder, port: server.port, tunnelPort, server, sent };
+  return { folder, port: server.port, tunnelPort, server, hub, sent };
 }
 
 async function cleanUp(fixture: Fixture): Promise<void> {
@@ -183,6 +200,87 @@ describe('server', () => {
       headers: viaTunnel()
     });
     expect(await refused(socket)).toBe(403);
+  });
+
+  it.each([
+    ['the hook secret', false, HOOK_SECRET, 204, 1],
+    ['a wrong secret', false, 'guess', 403, 0],
+    ['the tunnel', true, HOOK_SECRET, 403, 0]
+  ])('handles chat hooks sent with %s', async (_name, tunnel, secret, status, calls) => {
+    const window = { watch: vi.fn(), run: vi.fn(), query: vi.fn(), hook: vi.fn(async () => {}) };
+    fixture.hub.addWindow(
+      {
+        windowId: 'ws1',
+        name: 'ws1',
+        repositories: [],
+        folders: [],
+        sessions: [],
+        canOrganize: true,
+        agents: [],
+        models: []
+      },
+      window
+    );
+    const response = await send(fixture, HOOK_PATH, {
+      tunnel,
+      method: 'POST',
+      headers: {
+        ...(tunnel ? viaTunnel() : {}),
+        'content-type': 'application/json',
+        [HOOK_HEADER]: secret
+      },
+      body: JSON.stringify({
+        hook_event_name: 'Stop',
+        session_id: 's1',
+        timestamp: '2026-01-01T00:00:00.000Z',
+        transcript_path: '/u/workspaceStorage/ws1/GitHub.copilot-chat/transcripts/s1.jsonl'
+      })
+    });
+    fixture.hub.removeWindow('ws1', window);
+    expect(response.status).toBe(status);
+    expect(window.hook).toHaveBeenCalledTimes(calls);
+  });
+
+  it.skipIf(process.platform === 'win32').each([
+    ['a running server', HOOK_SECRET, 1],
+    ['a wrong secret', 'guess', 0],
+    ['a closed port', HOOK_SECRET, 0]
+  ])('runs the installed hook command against %s', async (name, secret, calls) => {
+    const window = { watch: vi.fn(), run: vi.fn(), query: vi.fn(), hook: vi.fn(async () => {}) };
+    fixture.hub.addWindow(
+      {
+        windowId: 'ws2',
+        name: 'ws2',
+        repositories: [],
+        folders: [],
+        sessions: [],
+        canOrganize: true,
+        agents: [],
+        models: []
+      },
+      window
+    );
+    const port = name === 'a closed port' ? await closedPort() : fixture.port;
+    const { hooks } = JSON.parse(hookFileContent(port, secret)) as {
+      hooks: Record<string, { command: string }[]>;
+    };
+    const output = await new Promise<string>((resolve, reject) => {
+      const child = execFile(
+        'sh',
+        ['-c', hooks.Stop?.[0]?.command ?? 'false'],
+        (error, stdout, stderr) => (error ? reject(error) : resolve(stdout + stderr))
+      );
+      child.stdin?.end(
+        JSON.stringify({
+          hook_event_name: 'Stop',
+          session_id: 's1',
+          transcript_path: "/u/workspaceStorage/ws2/it's here/s1.jsonl"
+        })
+      );
+    });
+    fixture.hub.removeWindow('ws2', window);
+    expect(output).toBe('');
+    expect(window.hook).toHaveBeenCalledTimes(calls);
   });
 
   it('refuses cross-origin pairing', async () => {

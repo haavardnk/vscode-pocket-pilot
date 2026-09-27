@@ -7,6 +7,9 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { forwardTo } from './forward';
 
 export const INTERNAL_PATH = '/internal';
+export const HOOK_PATH = '/internal/hook';
+
+const LOCAL_PATHS = new Set([INTERNAL_PATH, HOOK_PATH]);
 
 const INSTALL_FILES = new Set(['/manifest.webmanifest', '/sw.js', '/registerSW.js']);
 
@@ -24,7 +27,7 @@ export function tunnelTraffic(app: FastifyInstance, named: boolean): TunnelTraff
   app.addHook('onRequest', async (request, reply) => {
     const pathname = request.url.split('?')[0] ?? '';
     if (!carries(request)) {
-      if (pathname !== INTERNAL_PATH) return reply.code(404).send({ error: 'Not found' });
+      if (!LOCAL_PATHS.has(pathname)) return reply.code(404).send({ error: 'Not found' });
       return;
     }
     if (request.headers['x-forwarded-proto'] !== 'https')

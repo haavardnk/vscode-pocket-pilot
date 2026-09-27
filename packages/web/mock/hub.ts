@@ -1,11 +1,12 @@
-import type {
-  CodeQuery,
-  CodeResult,
-  Command,
-  PullRequestState,
-  ServerMessage,
-  SessionDetail,
-  WindowState
+import {
+  type CodeQuery,
+  type CodeResult,
+  type Command,
+  diffDetail,
+  type PullRequestState,
+  type ServerMessage,
+  type SessionDetail,
+  type WindowState
 } from '@pocket-pilot/protocol';
 
 import { MockCode } from './code.ts';
@@ -27,6 +28,7 @@ export class MockHub {
   private windows: MockWindow[] = [];
   private pullRequests: PullRequestState = initialPullRequests(Date.now());
   private readonly clients = new Set<MockClient>();
+  private readonly sent = new Map<MockClient, SessionDetail>();
   private readonly code = new MockCode();
   private timers: ReturnType<typeof setTimeout>[] = [];
   private nextId = 1;
@@ -47,6 +49,7 @@ export class MockHub {
     this.windows = initialWindows(now);
     this.pullRequests = initialPullRequests(now);
     this.code.reset();
+    this.sent.clear();
     for (const client of this.clients) {
       client.subscription = null;
       client.send(this.snapshot());
@@ -60,10 +63,12 @@ export class MockHub {
 
   disconnect(client: MockClient): void {
     this.clients.delete(client);
+    this.sent.delete(client);
   }
 
   subscribe(client: MockClient, subscription: MockClient['subscription']): void {
     client.subscription = subscription;
+    this.sent.delete(client);
     if (subscription) this.sendDetail(client);
   }
 
@@ -97,8 +102,7 @@ export class MockHub {
         editedFiles: 0,
         totalRequests: 0,
         requests: [],
-        queued: [],
-        live: []
+        queued: []
       });
       this.later(() => this.ask(window, id, command.text));
       return;
@@ -119,7 +123,7 @@ export class MockHub {
     }
     if (command.kind === 'send') {
       if (detail.status === 'idle' || detail.status === 'failed')
-        this.ask(window, detail.id, command.text);
+        this.later(() => this.ask(window, detail.id, command.text));
       else {
         detail.queued.push({
           id: this.id('queued'),
@@ -134,11 +138,12 @@ export class MockHub {
       const last = detail.requests.at(-1);
       if (last?.state === 'pending') last.state = 'cancelled';
       last?.parts.forEach((part) => {
-        if (part.kind === 'tool') part.awaitingConfirmation = false;
+        if (part.kind !== 'tool') return;
+        part.awaitingConfirmation = false;
+        if (part.status === 'running') part.status = 'failed';
       });
       detail.status = 'idle';
       detail.queued = [];
-      detail.live = [];
       this.changed(window, detail.id);
       return;
     }
@@ -147,6 +152,7 @@ export class MockHub {
       const tool = last?.parts.find((part) => part.kind === 'tool' && part.awaitingConfirmation);
       if (!last || tool?.kind !== 'tool') throw new Error('No tool is waiting');
       tool.awaitingConfirmation = false;
+      tool.status = command.decision === 'accept' ? 'done' : 'failed';
       last.parts.push({
         kind: 'markdown',
         text: command.decision === 'accept' ? 'Tests passed.' : 'Skipped the tool.'
@@ -217,13 +223,20 @@ export class MockHub {
       modelId: detail.modelId,
       state: 'pending',
       error: null,
-      parts: []
+      parts: [
+        {
+          kind: 'tool',
+          callId: this.id('call'),
+          toolId: 'read_file',
+          message: 'Read `README.md`',
+          detail: null,
+          awaitingConfirmation: false,
+          status: 'running'
+        }
+      ]
     });
     detail.totalRequests += 1;
     detail.status = 'running';
-    detail.live = [
-      { kind: 'tool', at: Date.now(), callId: this.id('call'), name: 'read_file', state: 'running' }
-    ];
     this.changed(window, sessionId);
     this.later(() => this.finish(window, sessionId, `Done: ${text}`));
   }
@@ -232,10 +245,12 @@ export class MockHub {
     const detail = window.details.get(sessionId);
     const last = detail?.requests.at(-1);
     if (!detail || last?.state !== 'pending') return;
+    last.parts.forEach((part) => {
+      if (part.kind === 'tool' && part.status === 'running') part.status = 'done';
+    });
     last.parts.push({ kind: 'markdown', text: reply });
     last.state = 'complete';
     detail.status = 'idle';
-    detail.live = [];
     this.changed(window, sessionId);
     const next = detail.queued.shift();
     if (next) this.ask(window, sessionId, next.text);
@@ -276,12 +291,21 @@ export class MockHub {
       (candidate) => candidate.state.windowId === subscription.windowId
     );
     const detail = window?.details.get(subscription.sessionId) ?? null;
-    client.send({
-      type: 'session',
-      windowId: subscription.windowId,
-      sessionId: subscription.sessionId,
-      detail: detail && trim(detail, subscription.limit)
-    });
+    const { windowId, sessionId } = subscription;
+    const previous = this.sent.get(client);
+    if (!detail) {
+      this.sent.delete(client);
+      client.send({ type: 'session', windowId, sessionId, detail: null });
+      return;
+    }
+    const next = structuredClone(trim(detail, subscription.limit));
+    this.sent.set(client, next);
+    if (!previous) {
+      client.send({ type: 'session', windowId, sessionId, detail: next });
+      return;
+    }
+    const patch = diffDetail(previous, next);
+    if (patch) client.send({ type: 'sessionPatch', windowId, sessionId, patch });
   }
 
   private broadcast(message: ServerMessage): void {

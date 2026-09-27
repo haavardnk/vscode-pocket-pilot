@@ -16,7 +16,6 @@
 
   import Composer from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
-  import LiveActivity from '../lib/components/LiveActivity.svelte';
   import ModelSheet from '../lib/components/ModelSheet.svelte';
   import ModeSheet from '../lib/components/ModeSheet.svelte';
   import PermissionSheet from '../lib/components/PermissionSheet.svelte';
@@ -39,6 +38,7 @@
   let sheet = $state<'mode' | 'model' | 'permission' | 'actions' | null>(null);
   let deciding = $state(false);
   let stopping = $state(false);
+  let echo = $state<{ text: string; after: string | null } | null>(null);
   let followBottom = true;
 
   const hostWindow = $derived(hub.windows.find((candidate) => candidate.windowId === windowId));
@@ -50,18 +50,36 @@
   const modelId = $derived(detail?.modelId ?? summary?.modelId ?? null);
   const tool = $derived(pendingTool(detail));
   const connected = $derived(hub.connection === 'open' && hostWindow !== undefined);
+  const echoing = $derived(
+    echo && detail && (detail.requests.at(-1)?.id ?? null) === echo.after ? echo.text : null
+  );
+  const tail = $derived.by(() => {
+    const last = detail?.requests.at(-1);
+    const part = last?.parts.at(-1);
+    return [
+      detail?.requests.length,
+      last?.parts.length,
+      part && 'text' in part ? part.text.length : 0,
+      detail?.queued.length,
+      echoing,
+      status
+    ].join();
+  });
 
   $effect(() => {
+    echo = null;
     hub.subscribe(windowId, sessionId);
     return () => hub.unsubscribe();
   });
 
   $effect.pre(() => {
+    void tail;
     if (!hub.detail || untrack(() => router.tab) !== 'chats') return;
     followBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 120;
   });
 
   $effect(() => {
+    void tail;
     if (!hub.detail || !followBottom || router.tab !== 'chats') return;
     scrollTo({ top: document.documentElement.scrollHeight });
   });
@@ -76,9 +94,14 @@
     }
   }
 
-  function send(text: string, delivery: Delivery | null): Promise<boolean> {
+  async function send(text: string, delivery: Delivery | null): Promise<boolean> {
     followBottom = true;
-    return run(() => hub.command({ kind: 'send', windowId, sessionId, text, delivery }));
+    if (delivery === null) echo = { text, after: detail?.requests.at(-1)?.id ?? null };
+    const sent = await run(() =>
+      hub.command({ kind: 'send', windowId, sessionId, text, delivery })
+    );
+    if (!sent) echo = null;
+    return sent;
   }
 
   async function stop(): Promise<void> {
@@ -202,7 +225,7 @@
           Load earlier ({detail.totalRequests - detail.requests.length})
         </button>
       {/if}
-      {#if detail.requests.length === 0}
+      {#if detail.requests.length === 0 && !echoing}
         <p class="p-10 text-center text-base-content/60">No messages yet.</p>
       {/if}
       {#each detail.requests as request (request.id)}
@@ -216,8 +239,15 @@
           onelicit={elicit}
         />
       {/each}
-      {#if status === 'running'}
-        <LiveActivity events={detail.live} />
+      {#if echoing}
+        <div class="chat-end chat opacity-60" aria-label="Sending">
+          <div class="chat-bubble chat-bubble-primary whitespace-pre-wrap">{echoing}</div>
+        </div>
+      {/if}
+      {#if status === 'running' || echoing}
+        <p class="flex items-center gap-2 text-sm text-base-content/60" role="status">
+          <span class="loading loading-xs loading-dots"></span>Working
+        </p>
       {/if}
     {/if}
   </main>

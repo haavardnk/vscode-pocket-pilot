@@ -67,6 +67,8 @@ export const questionAnswersSchema = z.record(z.string(), questionAnswerSchema);
 
 export const interactionStateSchema = z.enum(['pending', 'done', 'expired']);
 
+export const toolStatusSchema = z.enum(['running', 'done', 'failed']);
+
 export const responsePartSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('markdown'), text: z.string() }),
   z.object({ kind: z.literal('thinking'), text: z.string(), title: z.string().nullable() }),
@@ -76,7 +78,8 @@ export const responsePartSchema = z.discriminatedUnion('kind', [
     toolId: z.string(),
     message: z.string(),
     detail: z.string().nullable(),
-    awaitingConfirmation: z.boolean()
+    awaitingConfirmation: z.boolean(),
+    status: toolStatusSchema
   }),
   z.object({ kind: z.literal('edit'), path: z.string() }),
   z.object({ kind: z.literal('progress'), text: z.string() }),
@@ -121,22 +124,6 @@ export const queuedRequestSchema = z.object({
   text: z.string()
 });
 
-export const liveEventSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('message'),
-    at: z.number(),
-    text: z.string(),
-    reasoning: z.string().nullable()
-  }),
-  z.object({
-    kind: z.literal('tool'),
-    at: z.number(),
-    callId: z.string(),
-    name: z.string(),
-    state: z.enum(['running', 'succeeded', 'failed'])
-  })
-]);
-
 export const sessionDetailSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -147,8 +134,7 @@ export const sessionDetailSchema = z.object({
   totalRequests: z.number(),
   editedFiles: z.number(),
   requests: z.array(requestViewSchema),
-  queued: z.array(queuedRequestSchema),
-  live: z.array(liveEventSchema)
+  queued: z.array(queuedRequestSchema)
 });
 
 export const agentSchema = z.object({
@@ -235,11 +221,11 @@ export type Question = z.infer<typeof questionSchema>;
 export type QuestionAnswer = z.infer<typeof questionAnswerSchema>;
 export type QuestionAnswers = z.infer<typeof questionAnswersSchema>;
 export type InteractionState = z.infer<typeof interactionStateSchema>;
+export type ToolStatus = z.infer<typeof toolStatusSchema>;
 export type ResponsePart = z.infer<typeof responsePartSchema>;
 export type RequestView = z.infer<typeof requestViewSchema>;
 export type Delivery = z.infer<typeof deliverySchema>;
 export type QueuedRequest = z.infer<typeof queuedRequestSchema>;
-export type LiveEvent = z.infer<typeof liveEventSchema>;
 export type SessionDetail = z.infer<typeof sessionDetailSchema>;
 export type Agent = z.infer<typeof agentSchema>;
 export type ModelConfigKey = z.infer<typeof modelConfigKeySchema>;

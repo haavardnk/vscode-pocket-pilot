@@ -1,6 +1,6 @@
 **
-!dist/extension.cjs
-!dist/extension.cjs.LEGAL.txt
+!dist/*.cjs
+!dist/*.cjs.LEGAL.txt
 !media/**
 !package.json
 !README.md

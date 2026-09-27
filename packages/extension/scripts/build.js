@@ -9,8 +9,12 @@ const watch = process.argv.includes('--watch');
 const production = !watch && !process.argv.includes('--dev');
 
 const options = {
-  entryPoints: [join(root, 'src/extension.ts')],
-  outfile: join(root, 'dist/extension.cjs'),
+  entryPoints: {
+    extension: join(root, 'src/extension.ts'),
+    uninstall: join(root, 'src/uninstall.ts')
+  },
+  outdir: join(root, 'dist'),
+  outExtension: { '.js': '.cjs' },
   bundle: true,
   platform: 'node',
   format: 'cjs',

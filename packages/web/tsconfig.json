@@ -4,8 +4,7 @@
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
     "types": ["node", "vite/client"],
     "allowJs": true,
-    "checkJs": true,
-    "allowImportingTsExtensions": true
+    "checkJs": true
   },
   "include": [
     "src/**/*.ts",

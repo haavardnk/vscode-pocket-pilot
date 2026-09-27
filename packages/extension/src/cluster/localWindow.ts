@@ -2,6 +2,7 @@ import type {
   CodeQuery,
   CodeResult,
   Command,
+  HookEvent,
   SessionDetail,
   SessionWatch,
   WindowState
@@ -19,6 +20,7 @@ export interface LocalWindow {
   setWatches(watches: readonly SessionWatch[]): void;
   run(command: Command): Promise<void>;
   query(query: CodeQuery): Promise<CodeResult>;
+  hook(event: HookEvent): Promise<void>;
   readonly onDidChangeState: Subscribe<WindowState>;
   readonly onDidChangeSession: Subscribe<{ sessionId: string; detail: SessionDetail | null }>;
 }

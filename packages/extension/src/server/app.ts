@@ -15,19 +15,23 @@ import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 
 import { acceptFollower } from '../cluster/followerLink';
 import type { Hub } from '../cluster/hub';
-import { LOOPBACK } from '../cluster/sharedState';
+import { LOOPBACK, sameSecret } from '../cluster/sharedState';
+import { errorMessage } from '../errors';
+import { parseHook } from '../hooks/hookEvent';
+import { HOOK_HEADER } from '../hooks/hookFile';
 import type { DeviceStore } from './devices';
 import type { PairingStore } from './pairing';
 import type { PhoneRegistry } from './phones';
 import { acceptPhone } from './phoneSocket';
 import { type PushEndpoint, registerPushRoutes } from './pushRoutes';
-import { INTERNAL_PATH, tunnelTraffic } from './tunnelTraffic';
+import { HOOK_PATH, INTERNAL_PATH, tunnelTraffic } from './tunnelTraffic';
 
 export const TOKEN_COOKIE = 'pocket_pilot_token';
 
 const MAX_PAYLOAD = 16 * 1024 * 1024;
 const MAX_COOKIE_DAYS = 400;
 const AUTH_RATE_LIMIT = { max: 10, timeWindow: '1 minute' };
+const HOOK_WAIT_MS = 1500;
 
 export interface PasswordCheck {
   enabled(): Promise<boolean>;
@@ -39,6 +43,7 @@ export interface ServerOptions {
   namedTunnel: boolean;
   webRoot: string;
   clusterSecret: string;
+  hookSecret: string;
   hub: Hub;
   devices: DeviceStore;
   pairing: PairingStore;
@@ -208,6 +213,26 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     scope.get(INTERNAL_PATH, { websocket: true }, (socket) =>
       acceptFollower(socket, hub, options.clusterSecret, report)
     );
+    scope.post(HOOK_PATH, { bodyLimit: MAX_PAYLOAD }, async (request, reply) => {
+      const secret = request.headers[HOOK_HEADER];
+      if (typeof secret !== 'string' || !sameSecret(options.hookSecret, secret)) {
+        return reply.code(403).send({ error: 'Forbidden' });
+      }
+      const hook = parseHook(request.body);
+      if (hook) {
+        let timer: NodeJS.Timeout | undefined;
+        await Promise.race([
+          hub
+            .hook(hook.windowId, hook.event)
+            .catch((error: unknown) => report(`Chat hook failed: ${errorMessage(error)}`)),
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, HOOK_WAIT_MS);
+          })
+        ]);
+        clearTimeout(timer);
+      }
+      return reply.code(204).send();
+    });
   });
 
   await app.register(fastifyStatic, {

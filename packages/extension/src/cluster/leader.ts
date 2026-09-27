@@ -15,7 +15,7 @@ import { startTunnel, type TunnelSettings } from '../tunnel/tunnel';
 import { Hub } from './hub';
 import { attachLocalWindow } from './localLink';
 import type { LocalWindow } from './localWindow';
-import { clusterSecret, sharedFiles } from './sharedState';
+import { clusterSecret, hookSecret, sharedFiles } from './sharedState';
 
 export interface LeaderOptions {
   window: LocalWindow;
@@ -73,6 +73,7 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
     namedTunnel: !!options.tunnel.named,
     webRoot: options.webRoot,
     clusterSecret: secret,
+    hookSecret: await hookSecret(options.storage),
     hub,
     devices,
     pairing: new PairingStore(files.pairing),

@@ -8,6 +8,7 @@ import type {
   CodeQuery,
   CodeResult,
   Command,
+  HookEvent,
   ServerMessage,
   SessionDetail,
   SessionWatch,
@@ -20,7 +21,8 @@ import { Cluster, type Role } from '../src/cluster/cluster';
 import { followLeader } from '../src/cluster/followerClient';
 import { type Leader, startLeader } from '../src/cluster/leader';
 import type { Disposable, LocalWindow } from '../src/cluster/localWindow';
-import { sharedFiles } from '../src/cluster/sharedState';
+import { hookSecret, sharedFiles } from '../src/cluster/sharedState';
+import { HOOK_HEADER } from '../src/hooks/hookFile';
 import { PairingStore } from '../src/server/pairing';
 
 const PUBLIC_HOST = 'abc.trycloudflare.com';
@@ -29,6 +31,7 @@ const TUNNEL_HEADERS = { host: PUBLIC_HOST, 'x-forwarded-proto': 'https' };
 
 class FakeWindow implements LocalWindow {
   readonly commands: Command[] = [];
+  readonly hooks: HookEvent[] = [];
   watches: readonly SessionWatch[] = [];
   private readonly sessionListeners = new Set<
     (value: { sessionId: string; detail: SessionDetail | null }) => void
@@ -58,6 +61,11 @@ class FakeWindow implements LocalWindow {
     return command.kind === 'setMode'
       ? Promise.reject(new Error('Unknown agent'))
       : Promise.resolve();
+  }
+
+  hook(event: HookEvent): Promise<void> {
+    this.hooks.push(event);
+    return Promise.resolve();
   }
 
   query(query: CodeQuery): Promise<CodeResult> {
@@ -263,6 +271,26 @@ describe('cluster', () => {
       { type: 'result', requestId: 'b', ok: false, error: 'Unknown agent' }
     ]);
     expect(second.commands.map((command) => command.kind)).toEqual(['stop', 'setMode']);
+
+    const hooked = await fetch(`http://127.0.0.1:${port}/internal/hook`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [HOOK_HEADER]: await hookSecret(storage)
+      },
+      body: JSON.stringify({
+        hook_event_name: 'UserPromptSubmit',
+        session_id: 's1',
+        timestamp: '2026-01-01T00:00:00.000Z',
+        transcript_path: '/u/workspaceStorage/second/GitHub.copilot-chat/transcripts/s1.jsonl',
+        prompt: 'go'
+      })
+    });
+    expect(hooked.status).toBe(204);
+    expect(second.hooks).toEqual([
+      { kind: 'prompt', sessionId: 's1', at: Date.UTC(2026, 0, 1), prompt: 'go' }
+    ]);
+    expect(first.hooks).toEqual([]);
 
     for (const [requestId, kind] of [
       ['c', 'tree'],

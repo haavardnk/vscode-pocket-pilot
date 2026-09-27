@@ -45,8 +45,7 @@ const detail = (parts: ResponsePart[]): SessionDetail => ({
   requests: [
     { id: 'r', timestamp: 0, message: 'go', modelId: null, state: 'needsInput', error: null, parts }
   ],
-  queued: [],
-  live: []
+  queued: []
 });
 
 describe('interactions', () => {

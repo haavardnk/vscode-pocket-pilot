@@ -1,9 +1,10 @@
 <script lang="ts">
+  import CircleCheck from '@lucide/svelte/icons/circle-check';
   import CircleHelp from '@lucide/svelte/icons/circle-help';
+  import CircleX from '@lucide/svelte/icons/circle-x';
   import FilePen from '@lucide/svelte/icons/file-pen';
   import ShieldAlert from '@lucide/svelte/icons/shield-alert';
-  import Wrench from '@lucide/svelte/icons/wrench';
-  import type { QuestionAnswers, RequestView } from '@pocket-pilot/protocol';
+  import type { QuestionAnswers, RequestView, ResponsePart } from '@pocket-pilot/protocol';
 
   import { baseName } from '../code/paths';
   import { mergeMarkdown } from '../hub/views';
@@ -35,6 +36,26 @@
 </script>
 
 <article class="flex flex-col gap-3" data-request={request.id}>
+  {#snippet tool(part: Extract<ResponsePart, { kind: 'tool' }>)}
+    {#if part.status === 'running'}
+      <span
+        class="loading mt-0.5 loading-xs shrink-0 loading-spinner"
+        role="img"
+        aria-label="Running"
+      ></span>
+    {:else if part.status === 'failed'}
+      <span class="mt-0.5 shrink-0 text-error" role="img" aria-label="Failed">
+        <CircleX class="size-4" />
+      </span>
+    {:else}
+      <span class="mt-0.5 shrink-0 text-success" role="img" aria-label="Done">
+        <CircleCheck class="size-4" />
+      </span>
+    {/if}
+    <div class="markdown min-w-0 flex-1" {@attach markdown(part.message || part.toolId)}></div>
+    {#if part.awaitingConfirmation}<span class="badge shrink-0 badge-sm badge-warning">Waiting</span
+      >{/if}
+  {/snippet}
   {#if request.message}
     <div class="chat-end chat">
       <div class="chat-bubble chat-bubble-primary whitespace-pre-wrap">{request.message}</div>
@@ -51,13 +72,19 @@
         <div class="collapse-content whitespace-pre-wrap text-base-content/80">{part.text}</div>
       </details>
     {:else if part.kind === 'tool'}
-      <div class="flex items-start gap-2 text-sm text-base-content/70">
-        <Wrench class="mt-0.5 size-4 shrink-0" />
-        <div class="markdown min-w-0" {@attach markdown(part.message || part.toolId)}></div>
-        {#if part.awaitingConfirmation}<span class="badge shrink-0 badge-sm badge-warning"
-            >Waiting</span
-          >{/if}
-      </div>
+      {#if part.detail}
+        <details class="text-sm text-base-content/70">
+          <summary class="flex cursor-pointer list-none items-start gap-2"
+            >{@render tool(part)}</summary
+          >
+          <pre
+            class="mt-1 ml-6 max-h-48 overflow-auto rounded-field bg-base-200 px-2 py-1 text-xs whitespace-pre-wrap"><code
+              >{part.detail}</code
+            ></pre>
+        </details>
+      {:else}
+        <div class="flex items-start gap-2 text-sm text-base-content/70">{@render tool(part)}</div>
+      {/if}
     {:else if part.kind === 'edit'}
       <a
         class="flex max-w-full items-center gap-2 self-start text-sm text-base-content/70 hover:text-primary"

@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import type {
   Agent,
   CodeQuery,
   CodeResult,
   Command,
+  HookEvent,
   Model,
   Repository,
   SessionDetail,
@@ -17,6 +18,7 @@ import * as vscode from 'vscode';
 
 import { agentFolders, agentUri } from './agents/agentFolders';
 import { AgentSource } from './agents/agentSource';
+import { EMPTY_WINDOW } from './cluster/hub';
 import { CodeService } from './code/codeService';
 import { type CodeFolder, codeFolder } from './code/folders';
 import { LanguageIndex } from './code/languageIndex';
@@ -28,9 +30,12 @@ import { ModelSource } from './models/modelSource';
 import { type ChatPaths, chatPaths } from './paths';
 import { EditingSessions } from './sessions/editingState';
 import { FlagStore } from './sessions/flagStore';
+import { LiveMirror } from './sessions/liveMirror';
 import { SessionStore } from './sessions/sessionStore';
+import { liveMirrorMode, SECTION } from './settings';
 
 const PUBLISH_DELAY_MS = 100;
+const EXPORT_COMMAND = 'workbench.action.chat.export';
 
 export interface SessionUpdate {
   sessionId: string;
@@ -49,6 +54,7 @@ export class WindowAgent implements vscode.Disposable {
   private readonly modelSource: ModelSource;
   private readonly controller: Controller;
   private readonly code: CodeService;
+  private readonly mirror: LiveMirror;
   private readonly paths: ChatPaths;
   private readonly detailQueues = new Map<string, Promise<void>>();
   private watches = new Map<string, number>();
@@ -69,7 +75,7 @@ export class WindowAgent implements vscode.Disposable {
     this.paths = chatPaths(context);
     this.windowId = context.storageUri
       ? basename(dirname(context.storageUri.fsPath))
-      : `empty-${randomUUID()}`;
+      : `${EMPTY_WINDOW}${randomUUID()}`;
     this.store = new SessionStore(
       { sessions: this.paths.sessions, transcripts: this.paths.transcripts },
       report
@@ -78,6 +84,24 @@ export class WindowAgent implements vscode.Disposable {
     this.agentSource = new AgentSource(agentUri(this.paths), report);
     const settings = new ModelSettingsFile(this.paths.modelSettings);
     this.modelSource = new ModelSource(this.paths.debugLogs, settings, report);
+    this.mirror = new LiveMirror({
+      file: context.storageUri
+        ? join(context.storageUri.fsPath, 'live-export.json')
+        : join(context.globalStorageUri.fsPath, `live-export-${this.windowId}.json`),
+      exportTo: async (file) => {
+        await vscode.commands.executeCommand(EXPORT_COMMAND, vscode.Uri.file(file));
+      },
+      active: () =>
+        this.store
+          .summaries()
+          .some(
+            (summary) =>
+              this.watches.has(summary.id) &&
+              (summary.status === 'running' || summary.status === 'needsInput')
+          ),
+      apply: (root, at) => this.store.applyExport(root, at),
+      report
+    });
     const languages = new LanguageIndex();
     const sessionChanges = new SessionChanges({
       folders: () => this.folders,
@@ -107,6 +131,7 @@ export class WindowAgent implements vscode.Disposable {
       { dispose: () => this.agentSource.dispose() },
       { dispose: () => this.store.dispose() },
       { dispose: () => this.flags.dispose() },
+      { dispose: () => this.mirror.dispose() },
       { dispose: () => clearTimeout(this.publishTimer) },
       this.modelSource.onDidChange(() => void this.refreshModels()),
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
@@ -117,6 +142,7 @@ export class WindowAgent implements vscode.Disposable {
         if (event.affectsConfiguration('chat.agentFilesLocations')) {
           this.agentSource.setFolders(agentFolders(this.paths));
         }
+        if (event.affectsConfiguration(`${SECTION}.liveMirror`)) void this.refreshMirror();
       })
     );
     this.agentSource.onDidChange(() => void this.refreshAgents());
@@ -131,7 +157,8 @@ export class WindowAgent implements vscode.Disposable {
       this.flags.start(),
       this.refreshAgents(),
       this.refreshModels(),
-      this.refreshRepositories()
+      this.refreshRepositories(),
+      this.refreshMirror()
     ]);
   }
 
@@ -155,17 +182,24 @@ export class WindowAgent implements vscode.Disposable {
     const changed = [...next].filter(([sessionId, limit]) => this.watches.get(sessionId) !== limit);
     this.watches = next;
     for (const [sessionId] of changed) this.pushDetail(sessionId);
+    this.mirror.wake();
   }
 
-  run(command: Command): Promise<void> {
+  async run(command: Command): Promise<void> {
     if ('sessionId' in command && !this.store.summaries().some((s) => s.id === command.sessionId)) {
-      return Promise.reject(new Error('Unknown session'));
+      throw new Error('Unknown session');
     }
-    return this.controller.run(command);
+    await this.controller.run(command);
+    this.mirror.poke();
   }
 
   query(query: CodeQuery): Promise<CodeResult> {
     return this.code.query(query);
+  }
+
+  async hook(event: HookEvent): Promise<void> {
+    await this.store.hook(event);
+    this.mirror.poke();
   }
 
   dispose(): void {
@@ -173,6 +207,7 @@ export class WindowAgent implements vscode.Disposable {
   }
 
   private onSessionChange(sessionId: string | null): void {
+    this.mirror.wake();
     if (sessionId === null) {
       this.schedulePublish();
       for (const watched of this.watches.keys()) this.pushDetail(watched);
@@ -222,6 +257,11 @@ export class WindowAgent implements vscode.Disposable {
     if (!models || version !== this.versions.models) return;
     this.models = models;
     this.schedulePublish();
+  }
+
+  private async refreshMirror(): Promise<void> {
+    const commands = await vscode.commands.getCommands(true);
+    this.mirror.setEnabled(liveMirrorMode() === 'full' && commands.includes(EXPORT_COMMAND));
   }
 
   private async refreshRepositories(): Promise<void> {

@@ -151,6 +151,15 @@ export function initialWindows(now: number): MockWindow[] {
                   kind: 'markdown',
                   text: 'Starting with the **session list**.\n\n```ts\nconst sessions = [];\n```'
                 },
+                {
+                  kind: 'tool',
+                  callId: 'c0',
+                  toolId: 'read_file',
+                  message: 'Read `App.svelte`',
+                  detail: null,
+                  awaitingConfirmation: false,
+                  status: 'done'
+                },
                 { kind: 'edit', path: '/repo/packages/web/src/App.svelte' },
                 {
                   kind: 'tool',
@@ -158,28 +167,13 @@ export function initialWindows(now: number): MockWindow[] {
                   toolId: 'run_in_terminal',
                   message: 'Run `npm test`',
                   detail: 'npm test -- --run',
-                  awaitingConfirmation: true
+                  awaitingConfirmation: true,
+                  status: 'running'
                 }
               ]
             }
           ],
-          queued: [],
-          live: [
-            {
-              kind: 'tool',
-              at: now - 2 * MINUTE,
-              callId: 'c0',
-              name: 'read_file',
-              state: 'succeeded'
-            },
-            {
-              kind: 'tool',
-              at: now - MINUTE,
-              callId: 'c1',
-              name: 'run_in_terminal',
-              state: 'running'
-            }
-          ]
+          queued: []
         },
         {
           id: 's2',
@@ -203,8 +197,7 @@ export function initialWindows(now: number): MockWindow[] {
               ]
             }
           ],
-          queued: [],
-          live: []
+          queued: []
         },
         {
           id: 's4',
@@ -273,8 +266,7 @@ export function initialWindows(now: number): MockWindow[] {
               ]
             }
           ],
-          queued: [],
-          live: []
+          queued: []
         },
         {
           id: 's5',
@@ -296,8 +288,7 @@ export function initialWindows(now: number): MockWindow[] {
               parts: [{ kind: 'markdown', text: 'Bumped Svelte and Vite.' }]
             }
           ],
-          queued: [],
-          live: []
+          queued: []
         }
       ],
       now,
@@ -349,8 +340,7 @@ export function initialWindows(now: number): MockWindow[] {
               ]
             }
           ],
-          queued: [],
-          live: []
+          queued: []
         }
       ],
       now - 40 * MINUTE

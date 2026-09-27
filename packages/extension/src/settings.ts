@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 
 export const SECTION = 'pocketPilot';
 
+export type LiveMirrorMode = 'full' | 'hooks' | 'off';
+
 export interface Settings {
   enabled: boolean;
   port: number;
@@ -9,6 +11,12 @@ export interface Settings {
   expireDays: number;
   pullRequestsEnabled: boolean;
   pollSeconds: number;
+  liveMirror: LiveMirrorMode;
+}
+
+export function liveMirrorMode(): LiveMirrorMode {
+  const mode = vscode.workspace.getConfiguration(SECTION).get<string>('liveMirror', 'full');
+  return mode === 'hooks' || mode === 'off' ? mode : 'full';
 }
 
 export function readSettings(): Settings {
@@ -19,7 +27,8 @@ export function readSettings(): Settings {
     cloudflaredPath: config.get<string>('tunnel.cloudflaredPath', '').trim(),
     expireDays: config.get<number>('devices.expireDays', 30),
     pullRequestsEnabled: config.get<boolean>('pullRequests.enabled', true),
-    pollSeconds: Math.max(15, config.get<number>('pullRequests.pollSeconds', 60))
+    pollSeconds: Math.max(15, config.get<number>('pullRequests.pollSeconds', 60)),
+    liveMirror: liveMirrorMode()
   };
 }
 

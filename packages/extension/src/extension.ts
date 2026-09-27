@@ -96,6 +96,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   if (readSettings().enabled) {
     pilot.start().catch((error: unknown) => log.error(`Start failed: ${errorMessage(error)}`));
+  } else {
+    void pilot.syncHooks();
   }
 }
 

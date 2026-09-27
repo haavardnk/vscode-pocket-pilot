@@ -6,7 +6,7 @@ import {
   modelConfigKeySchema,
   permissionLevelSchema,
   questionAnswersSchema
-} from './domain';
+} from './domain.ts';
 
 const sessionTarget = { windowId: z.string(), sessionId: z.string() };
 

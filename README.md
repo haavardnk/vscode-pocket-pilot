@@ -90,6 +90,7 @@ offers a password tab next to the code tab.
 | `pocketPilot.devices.expireDays`       | `30`    | Forget devices unused this long. `0` keeps them.         |
 | `pocketPilot.pullRequests.enabled`     | `true`  | Load open pull requests for the open repositories.       |
 | `pocketPilot.pullRequests.pollSeconds` | `60`    | How often pull requests refresh while a phone is open.   |
+| `pocketPilot.liveMirror`               | `full`  | How closely the phone follows a running chat. See below. |
 
 Server settings are machine scoped, so they never sync to another computer. Every window must use
 the same port.
@@ -105,6 +106,29 @@ window takes over within a few seconds and the phone reconnects on its own.
 The tab bar stays at the bottom on every screen, including inside a chat, and hides while the
 keyboard is open. Each tab keeps the screen you left it on, with its scroll position and any
 half-written message. Tapping the tab you are already on goes back to its first screen.
+
+## Sending messages
+
+VS Code only takes input into a chat it is showing, so sending, stopping or approving from the
+phone opens that chat in an editor tab in VS Code when it is not already open.
+
+A message sent from the phone shows up right away while VS Code picks it up.
+
+## Following a chat live
+
+The phone shows a chat the way the VS Code chat view does: your message as soon as it is sent,
+each tool call as it starts and finishes, and the reply and thinking as they stream in.
+
+Pocket Pilot adds a Copilot hook file, `~/.copilot/hooks/pocket-pilot.json`, that tells it when a
+prompt is sent, a tool runs, or a reply ends. It removes the file when Pocket Pilot stops or is
+uninstalled. The streaming text comes from exporting the chat that is focused in its VS Code
+window while it runs. Other chats update at each tool call and when the reply ends.
+
+`pocketPilot.liveMirror` picks the sources:
+
+- `full` (default): hooks and streaming.
+- `hooks`: hooks only. Tool calls and final replies still arrive at once, without streaming text.
+- `off`: neither. Chats update when VS Code saves them to disk, about once a minute.
 
 ## Pinned and archived chats
 
@@ -190,6 +214,8 @@ notification** to check delivery. Tapping a notification opens that chat.
 - The optional password is stored as a scrypt hash in VS Code secret storage, never in settings.
 - Anyone who can pair a phone can run agents in your workspace. Treat a pairing code like a
   password.
+- The Copilot hook command posts to Pocket Pilot on loopback only, with a random secret stored in
+  the hook file. The file is readable only by your user account.
 - Push notifications carry the chat title and the window name. They are encrypted end to end
   between VS Code and the phone, and go only to the push services of Apple, Google, Mozilla and
   Microsoft.

@@ -1,14 +1,26 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
-import type { PermissionLevel, SessionDetail } from '@pocket-pilot/protocol';
+import type { HookEvent, PermissionLevel, SessionDetail } from '@pocket-pilot/protocol';
 import type { FSWatcher } from 'chokidar';
 
 import { watchTargets } from '../fsWatch';
+import { asArray, asNumber, asRecord, asString, type JsonRecord } from '../json';
 import { LineTailer } from './lineTailer';
 import { applyLogEntry, parseLogEntry } from './mutationLog';
-import { editedPaths, type LogSummary, projectDetail, projectSummary } from './projection';
-import { TranscriptBuffer } from './transcript';
+import {
+  type Activity,
+  editedPaths,
+  lastRequestAt,
+  type LogSummary,
+  projectDetail,
+  projectSummary,
+  requestState,
+  requestText,
+  toolStatuses
+} from './projection';
+import { matchesRequest, TranscriptBuffer, type TranscriptTurn } from './transcript';
+import { type LogMark, pendingTurns, unloggedTurns, withUnlogged } from './unloggedTurns';
 
 const HOT_SESSIONS = 8;
 const DEBOUNCE_MS = 150;
@@ -21,18 +33,113 @@ export interface SessionFolders {
   transcripts: string | null;
 }
 
+interface Exported {
+  requests: JsonRecord[];
+  at: number;
+  summary: LogSummary;
+}
+
 interface SessionEntry {
   id: string;
   log: LineTailer;
   root: unknown;
   summary: LogSummary | null;
+  mark: LogMark;
   transcript: LineTailer | null;
   events: TranscriptBuffer;
+  unlogged: TranscriptTurn[];
   reading: Promise<void>;
+  requestIds: Set<string>;
+  hookedAt: number | null;
+  stoppedAt: number | null;
+  exported: Exported | null;
   permission: { level: PermissionLevel; at: number } | null;
 }
 
 type Listener = (sessionId: string | null) => void;
+
+function requestsOf(root: unknown): JsonRecord[] {
+  return asArray(asRecord(root).requests).map(asRecord);
+}
+
+function asksQuestions(request: JsonRecord): boolean {
+  return asArray(request.response).some((part) => {
+    const record = asRecord(part);
+    return record.kind === 'questionCarousel' && record.isUsed !== true;
+  });
+}
+
+function exportedRequest(
+  request: JsonRecord,
+  at: number,
+  waiting: ReadonlyMap<string, boolean>
+): JsonRecord {
+  const state = asRecord(request.modelState);
+  const completedAt = asNumber(state.completedAt);
+  if (state.value !== 2 || completedAt === null || completedAt < at) return request;
+  const id = asString(request.requestId);
+  const needsInput = asksQuestions(request) || (id !== null && waiting.get(id) === false);
+  return { ...request, modelState: { value: needsInput ? 4 : 0 } };
+}
+
+function waitingRequests(root: unknown): Map<string, boolean> {
+  return new Map(
+    requestsOf(root).flatMap((request) => {
+      const id = asString(request.requestId);
+      return id !== null && requestState(request) === 'needsInput'
+        ? [[id, asksQuestions(request)] as const]
+        : [];
+    })
+  );
+}
+
+function rootOf(entry: SessionEntry): unknown {
+  return entry.exported
+    ? { ...asRecord(entry.root), requests: entry.exported.requests }
+    : entry.root;
+}
+
+function markOf(entry: SessionEntry): LogMark {
+  if (!entry.exported) return entry.mark;
+  return {
+    writtenAt: entry.exported.at,
+    lastRequestAt: lastRequestAt({ requests: entry.exported.requests })
+  };
+}
+
+function settledOf(entry: SessionEntry): boolean {
+  if (entry.stoppedAt === null) return false;
+  return entry.stoppedAt > (entry.unlogged.at(-1)?.at ?? markOf(entry).writtenAt);
+}
+
+function emptySummary(id: string, at: number): LogSummary {
+  return {
+    id,
+    title: 'New chat',
+    createdAt: at,
+    updatedAt: at,
+    status: 'idle',
+    lastRequestState: null,
+    modelId: null,
+    modeId: null,
+    requestCount: 0,
+    preview: null
+  };
+}
+
+function summaryOf(entry: SessionEntry): LogSummary | null {
+  const base =
+    entry.exported?.summary ??
+    entry.summary ??
+    (entry.hookedAt === null ? null : emptySummary(entry.id, entry.hookedAt));
+  if (!base) return null;
+  const settled = settledOf(entry);
+  const logged: LogSummary =
+    settled && base.status === 'running'
+      ? { ...base, status: 'idle', lastRequestState: 'complete' }
+      : base;
+  return withUnlogged(logged, entry.unlogged, settled);
+}
 
 export class SessionStore {
   private readonly entries = new Map<string, SessionEntry>();
@@ -54,7 +161,10 @@ export class SessionStore {
 
   summaries(): LogSummary[] {
     return [...this.entries.values()]
-      .flatMap((entry) => (entry.summary && entry.summary.requestCount > 0 ? [entry.summary] : []))
+      .flatMap((entry) => {
+        const summary = summaryOf(entry);
+        return summary && summary.requestCount > 0 ? [summary] : [];
+      })
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
@@ -79,13 +189,20 @@ export class SessionStore {
 
   async detail(sessionId: string, limit: number): Promise<SessionDetail | null> {
     const entry = this.entries.get(sessionId);
-    if (!entry?.summary) return null;
+    if (!entry || !summaryOf(entry)) return null;
     if (entry.root === undefined) await this.readLog(entry);
-    if (!this.entries.has(sessionId) || !entry.summary) return null;
+    if (!this.entries.has(sessionId)) return null;
     this.touch(entry);
     await this.readTranscript(entry);
-    const detail = projectDetail(entry.root, entry.summary, limit, (text) =>
-      entry.events.liveFor(text)
+    const summary = summaryOf(entry);
+    if (!summary) return null;
+    const activity = this.activity(entry);
+    const detail = projectDetail(
+      rootOf(entry),
+      summary,
+      limit,
+      activity,
+      pendingTurns(entry.unlogged, summary.modelId, activity.statuses, activity.settled)
     );
     const expected = entry.permission;
     return {
@@ -106,11 +223,55 @@ export class SessionStore {
 
   async editedPaths(sessionId: string): Promise<string[] | null> {
     const entry = this.entries.get(sessionId);
-    if (!entry?.summary) return null;
+    if (!entry || !summaryOf(entry)) return null;
     if (entry.root === undefined) await this.readLog(entry);
     if (!this.entries.has(sessionId)) return null;
     this.touch(entry);
-    return editedPaths(entry.root);
+    return editedPaths(rootOf(entry));
+  }
+
+  async hook(event: HookEvent): Promise<void> {
+    if (!this.entries.has(event.sessionId) && this.folders.transcripts === null) return;
+    const entry = this.entryFor(event.sessionId);
+    entry.hookedAt ??= event.at;
+    const before = JSON.stringify(summaryOf(entry));
+    await this.readTranscript(entry);
+    entry.events.hook(event);
+    if (event.kind === 'prompt') entry.stoppedAt = null;
+    if (event.kind === 'stop') entry.stoppedAt = event.at;
+    entry.unlogged = unloggedTurns(entry.events.turns(), markOf(entry));
+    this.touch(entry);
+    this.emit(entry.id);
+    if (JSON.stringify(summaryOf(entry)) !== before) this.emit(null);
+  }
+
+  applyExport(root: unknown, at: number): void {
+    const exported = requestsOf(root);
+    const last = exported.at(-1);
+    if (!last) return;
+    const entry = this.exportTarget(exported, requestText(last));
+    if (!entry || entry.mark.writtenAt >= at) return;
+    const waiting = waitingRequests(entry.root);
+    const requests = exported.map((request) => exportedRequest(request, at, waiting));
+    const before = JSON.stringify(summaryOf(entry));
+    const summary = projectSummary(
+      { ...asRecord(entry.root), requests },
+      entry.id,
+      entry.summary?.updatedAt ?? entry.hookedAt ?? at
+    );
+    const cold = entry.root === undefined && entry.summary;
+    entry.exported = {
+      requests,
+      at,
+      summary: cold ? { ...summary, title: cold.title, modeId: cold.modeId } : summary
+    };
+    for (const request of requests) {
+      const id = asString(request.requestId);
+      if (id) entry.requestIds.add(id);
+    }
+    entry.unlogged = unloggedTurns(entry.events.turns(), markOf(entry));
+    this.emit(entry.id);
+    if (JSON.stringify(summaryOf(entry)) !== before) this.emit(null);
   }
 
   dispose(): void {
@@ -157,7 +318,7 @@ export class SessionStore {
     const isTranscript =
       this.folders.transcripts !== null && path.startsWith(this.folders.transcripts);
     if (isTranscript) {
-      if (this.entries.has(sessionId)) this.emit(sessionId);
+      void this.refreshTranscript(sessionId);
       return;
     }
     if (event === 'unlink') {
@@ -183,18 +344,51 @@ export class SessionStore {
       log: new LineTailer(join(this.folders.sessions, sessionId + LOG_SUFFIX)),
       root: undefined,
       summary: null,
+      mark: { writtenAt: 0, lastRequestAt: null },
       transcript: null,
       events: new TranscriptBuffer(),
+      unlogged: [],
       reading: Promise.resolve(),
+      requestIds: new Set(),
+      hookedAt: null,
+      stoppedAt: null,
+      exported: null,
       permission: null
     };
     this.entries.set(sessionId, created);
     return created;
   }
 
+  private activity(entry: SessionEntry): Activity {
+    const turns = entry.events.turns();
+    const last = requestsOf(rootOf(entry)).at(-1);
+    const turn = last ? entry.events.turnFor(requestText(last)) : undefined;
+    const { writtenAt } = markOf(entry);
+    return {
+      statuses: toolStatuses(turns.flatMap((candidate) => candidate.events)),
+      events: turn?.events.filter((event) => event.at > writtenAt) ?? [],
+      toolsOnly: entry.exported !== null,
+      settled: settledOf(entry)
+    };
+  }
+
+  private exportTarget(requests: JsonRecord[], text: string): SessionEntry | null {
+    const ids = requests.flatMap((request) => asString(request.requestId) ?? []);
+    const entries = [...this.entries.values()];
+    const known = entries.filter((entry) => ids.some((id) => entry.requestIds.has(id)));
+    const candidates =
+      known.length > 0
+        ? known
+        : entries.filter((entry) =>
+            entry.events.turns().some((turn) => matchesRequest(turn.content, text))
+          );
+    const updated = (entry: SessionEntry): number => summaryOf(entry)?.updatedAt ?? 0;
+    return candidates.sort((a, b) => updated(b) - updated(a))[0] ?? null;
+  }
+
   private async refresh(sessionId: string, notify: boolean): Promise<void> {
     const entry = this.entryFor(sessionId);
-    const before = JSON.stringify(entry.summary);
+    const before = JSON.stringify(summaryOf(entry));
     await this.readLog(entry);
     if (!this.entries.has(sessionId)) {
       if (notify) this.emit(null);
@@ -203,7 +397,17 @@ export class SessionStore {
     this.touch(entry);
     if (!notify) return;
     this.emit(sessionId);
-    if (JSON.stringify(entry.summary) !== before) this.emit(null);
+    if (JSON.stringify(summaryOf(entry)) !== before) this.emit(null);
+  }
+
+  private async refreshTranscript(sessionId: string): Promise<void> {
+    const entry = this.entries.get(sessionId);
+    if (!entry) return;
+    const before = JSON.stringify(summaryOf(entry));
+    await this.readTranscript(entry);
+    if (!this.entries.has(sessionId)) return;
+    this.emit(sessionId);
+    if (JSON.stringify(summaryOf(entry)) !== before) this.emit(null);
   }
 
   private readLog(entry: SessionEntry): Promise<void> {
@@ -218,7 +422,7 @@ export class SessionStore {
   private async applyLog(entry: SessionEntry): Promise<void> {
     const read = await entry.log.read();
     if (!read) {
-      this.entries.delete(entry.id);
+      if (entry.hookedAt === null) this.entries.delete(entry.id);
       return;
     }
     let root = read.reset ? undefined : entry.root;
@@ -239,7 +443,14 @@ export class SessionStore {
       () => Date.now()
     );
     entry.summary = root === undefined ? null : projectSummary(root, entry.id, modified);
+    entry.mark = { writtenAt: modified, lastRequestAt: lastRequestAt(root) };
+    for (const request of requestsOf(root)) {
+      const id = asString(request.requestId);
+      if (id) entry.requestIds.add(id);
+    }
+    if (entry.exported && modified >= entry.exported.at) entry.exported = null;
     if (entry.permission && modified >= entry.permission.at) entry.permission = null;
+    entry.unlogged = unloggedTurns(entry.events.turns(), markOf(entry));
   }
 
   private readTranscript(entry: SessionEntry): Promise<void> {
@@ -258,6 +469,7 @@ export class SessionStore {
     if (!read) return;
     if (read.reset) entry.events.clear();
     entry.events.append(read.lines);
+    entry.unlogged = unloggedTurns(entry.events.turns(), markOf(entry));
   }
 
   private touch(entry: SessionEntry): void {
@@ -269,6 +481,7 @@ export class SessionStore {
       if (!cold) continue;
       cold.root = undefined;
       cold.log = new LineTailer(cold.log.path);
+      if (cold.unlogged.length > 0) continue;
       cold.transcript = null;
       cold.events.clear();
     }
