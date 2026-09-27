@@ -1,18 +1,36 @@
 <script lang="ts">
   import CircleHelp from '@lucide/svelte/icons/circle-help';
   import FilePen from '@lucide/svelte/icons/file-pen';
+  import ShieldAlert from '@lucide/svelte/icons/shield-alert';
   import Wrench from '@lucide/svelte/icons/wrench';
-  import type { RequestView } from '@pocket-pilot/protocol';
+  import type { QuestionAnswers, RequestView } from '@pocket-pilot/protocol';
 
   import { mergeMarkdown } from '../hub/views';
   import { markdown } from '../markdown';
+  import QuestionCard from './QuestionCard.svelte';
 
-  const { request }: { request: RequestView } = $props();
+  interface Props {
+    request: RequestView;
+    disabled: boolean;
+    onanswer: (resolveId: string, answers: QuestionAnswers | null) => Promise<boolean>;
+    onconfirm: (button: string) => Promise<boolean>;
+    onelicit: () => Promise<boolean>;
+  }
+
+  const { request, disabled, onanswer, onconfirm, onelicit }: Props = $props();
+
+  let acting = $state(false);
 
   const parts = $derived(mergeMarkdown(request.parts));
 
   function fileName(path: string): string {
     return path.split(/[\\/]/).at(-1) ?? path;
+  }
+
+  async function act(action: () => Promise<boolean>): Promise<void> {
+    acting = true;
+    await action();
+    acting = false;
   }
 </script>
 
@@ -47,10 +65,63 @@
       </div>
     {:else if part.kind === 'progress'}
       <p class="text-sm text-base-content/60 italic">{part.text}</p>
+    {:else if part.kind === 'questions'}
+      <QuestionCard {part} {disabled} {onanswer} />
+    {:else if part.kind === 'confirmation'}
+      <div
+        role={part.state === 'pending' ? 'alert' : undefined}
+        class={[
+          'alert flex flex-col items-stretch gap-2 alert-soft text-sm',
+          part.state === 'pending' ? 'alert-warning' : 'alert-info'
+        ]}
+      >
+        <p class="flex items-center gap-2 font-medium">
+          <CircleHelp class="size-4 shrink-0" />{part.title}
+        </p>
+        {#if part.message}<div class="markdown" {@attach markdown(part.message)}></div>{/if}
+        {#if part.state === 'pending'}
+          <div class="flex gap-2">
+            {#each part.buttons as button, index (button)}
+              <button
+                class={['btn flex-1 btn-sm', index === 0 && 'btn-primary']}
+                disabled={disabled || acting}
+                onclick={() => void act(() => onconfirm(button))}
+              >
+                {button}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {:else}
-      <div class={['alert alert-soft text-sm', part.answered ? 'alert-info' : 'alert-warning']}>
-        <CircleHelp class="size-4 shrink-0" />
-        <div class="markdown" {@attach markdown(part.text)}></div>
+      <div
+        role={part.state === 'pending' ? 'alert' : undefined}
+        class={[
+          'alert flex flex-col items-stretch gap-2 alert-soft text-sm',
+          part.state === 'pending' ? 'alert-warning' : 'alert-info'
+        ]}
+      >
+        <p class="flex items-center gap-2 font-medium">
+          <ShieldAlert class="size-4 shrink-0" />{part.title}
+        </p>
+        {#if part.message}<div class="markdown" {@attach markdown(part.message)}></div>{/if}
+        {#if part.state === 'pending'}
+          <button
+            class="btn btn-primary btn-sm"
+            disabled={disabled || acting}
+            onclick={() => void act(onelicit)}
+          >
+            Allow
+          </button>
+        {:else}
+          <p class="text-xs text-base-content/60">
+            {part.state === 'accepted'
+              ? 'Allowed'
+              : part.state === 'rejected'
+                ? 'Declined'
+                : 'No longer waiting'}
+          </p>
+        {/if}
       </div>
     {/if}
   {/each}

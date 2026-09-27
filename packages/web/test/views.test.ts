@@ -171,7 +171,14 @@ describe('response parts', () => {
 
   it('finds the tool waiting in the latest request only', () => {
     const tool = (callId: string, awaitingConfirmation: boolean) =>
-      ({ kind: 'tool', callId, toolId: 'run', message: 'Run', awaitingConfirmation }) as const;
+      ({
+        kind: 'tool',
+        callId,
+        toolId: 'run',
+        message: 'Run',
+        detail: null,
+        awaitingConfirmation
+      }) as const;
     const request = (parts: SessionDetail['requests'][number]['parts']) => ({
       id: 'r',
       timestamp: 0,
@@ -187,6 +194,7 @@ describe('response parts', () => {
       status: 'running',
       modelId: null,
       modeId: null,
+      permission: 'default',
       totalRequests: requests.length,
       requests,
       queued: [],

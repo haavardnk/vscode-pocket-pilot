@@ -82,6 +82,7 @@ export class MockHub {
         status: 'idle',
         modelId: command.modelId,
         modeId: command.modeId ?? 'agent',
+        permission: 'default',
         totalRequests: 0,
         requests: [],
         queued: [],
@@ -130,6 +131,53 @@ export class MockHub {
       this.later(() => this.finish(window, detail.id, 'All done.'));
       return;
     }
+    if (command.kind === 'answerQuestions') {
+      const last = detail.requests.at(-1);
+      const part = last?.parts.find(
+        (candidate) => candidate.kind === 'questions' && candidate.resolveId === command.resolveId
+      );
+      if (!last || part?.kind !== 'questions' || part.state !== 'pending') {
+        throw new Error('The questions are no longer waiting');
+      }
+      part.state = 'done';
+      part.answers = command.answers;
+      last.state = 'pending';
+      detail.status = 'running';
+      this.changed(window, detail.id);
+      this.later(() =>
+        this.finish(
+          window,
+          detail.id,
+          command.answers ? 'Thanks, planning now.' : 'Going with defaults.'
+        )
+      );
+      return;
+    }
+    if (command.kind === 'confirm') {
+      const part = detail.requests
+        .at(-1)
+        ?.parts.find(
+          (candidate) => candidate.kind === 'confirmation' && candidate.state === 'pending'
+        );
+      if (part?.kind !== 'confirmation' || !part.buttons.includes(command.button)) {
+        throw new Error('Nothing is waiting for confirmation');
+      }
+      part.state = 'done';
+      this.ask(window, detail.id, `${command.button}: "${part.title}"`);
+      return;
+    }
+    if (command.kind === 'acceptElicitation') {
+      const part = detail.requests
+        .at(-1)
+        ?.parts.find(
+          (candidate) => candidate.kind === 'elicitation' && candidate.state === 'pending'
+        );
+      if (part?.kind !== 'elicitation') throw new Error('Nothing is waiting for approval');
+      part.state = 'accepted';
+      this.changed(window, detail.id);
+      return;
+    }
+    if (command.kind === 'setPermission') detail.permission = command.level;
     if (command.kind === 'setMode') detail.modeId = command.modeId;
     if (command.kind === 'setModel') detail.modelId = command.modelId;
     this.changed(window, detail.id);

@@ -6,7 +6,9 @@
     ConfigValue,
     Delivery,
     Model,
-    ModelConfigOption
+    ModelConfigOption,
+    PermissionLevel,
+    QuestionAnswers
   } from '@pocket-pilot/protocol';
 
   import Composer from '../lib/components/Composer.svelte';
@@ -14,6 +16,7 @@
   import LiveActivity from '../lib/components/LiveActivity.svelte';
   import ModelSheet from '../lib/components/ModelSheet.svelte';
   import ModeSheet from '../lib/components/ModeSheet.svelte';
+  import PermissionSheet from '../lib/components/PermissionSheet.svelte';
   import RequestItem from '../lib/components/RequestItem.svelte';
   import StatusBadge from '../lib/components/StatusBadge.svelte';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
@@ -28,7 +31,7 @@
 
   const { windowId, sessionId }: Props = $props();
 
-  let sheet = $state<'mode' | 'model' | null>(null);
+  let sheet = $state<'mode' | 'model' | 'permission' | null>(null);
   let deciding = $state(false);
   let stopping = $state(false);
   let followBottom = true;
@@ -83,6 +86,27 @@
     deciding = true;
     await run(() => hub.command({ kind: 'toolDecision', windowId, sessionId, decision }));
     deciding = false;
+  }
+
+  function answer(resolveId: string, answers: QuestionAnswers | null): Promise<boolean> {
+    followBottom = true;
+    return run(() =>
+      hub.command({ kind: 'answerQuestions', windowId, sessionId, resolveId, answers })
+    );
+  }
+
+  function confirm(button: string): Promise<boolean> {
+    followBottom = true;
+    return run(() => hub.command({ kind: 'confirm', windowId, sessionId, button }));
+  }
+
+  function elicit(): Promise<boolean> {
+    return run(() => hub.command({ kind: 'acceptElicitation', windowId, sessionId }));
+  }
+
+  function selectPermission(level: PermissionLevel): void {
+    sheet = null;
+    void run(() => hub.command({ kind: 'setPermission', windowId, sessionId, level }));
   }
 
   function selectMode(agent: Agent): void {
@@ -159,7 +183,13 @@
         <p class="p-10 text-center text-base-content/60">No messages yet.</p>
       {/if}
       {#each detail.requests as request (request.id)}
-        <RequestItem {request} />
+        <RequestItem
+          {request}
+          disabled={!connected}
+          onanswer={answer}
+          onconfirm={confirm}
+          onelicit={elicit}
+        />
       {/each}
       {#if status === 'running'}
         <LiveActivity events={detail.live} />
@@ -191,6 +221,12 @@
               <span class="font-medium">Allow tool?</span>
               {tool.message || tool.toolId}
             </p>
+            {#if tool.detail}
+              <pre
+                class="max-h-32 overflow-auto rounded-field bg-base-100/60 px-2 py-1 text-xs whitespace-pre-wrap"><code
+                  >{tool.detail}</code
+                ></pre>
+            {/if}
             <div class="flex gap-2">
               <button
                 class="btn flex-1 btn-primary btn-sm"
@@ -214,9 +250,11 @@
           disabled={!connected}
           agentLabel={agentLabel(hostWindow.agents, modeId)}
           modelLabel={modelLabel(hostWindow.models, modelId)}
+          permission={detail.permission}
           placeholder={busy ? 'Steer or queue a message' : 'Message'}
           onmode={() => (sheet = 'mode')}
           onmodel={() => (sheet = 'model')}
+          onpermission={() => (sheet = 'permission')}
           onsend={send}
         />
       </div>
@@ -234,6 +272,12 @@
       current={modelId}
       onselect={selectModel}
       onconfig={configure}
+      onclose={() => (sheet = null)}
+    />
+    <PermissionSheet
+      open={sheet === 'permission'}
+      current={detail.permission}
+      onselect={selectPermission}
       onclose={() => (sheet = null)}
     />
   {/if}

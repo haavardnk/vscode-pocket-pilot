@@ -143,9 +143,11 @@
           disabled={hub.connection !== 'open'}
           agentLabel={agentLabel(target.agents, modeId)}
           modelLabel={modelLabel(target.models, modelId)}
+          permission={null}
           placeholder="What should the agent do?"
           onmode={() => (sheet = 'mode')}
           onmodel={() => (sheet = 'model')}
+          onpermission={null}
           onsend={start}
         />
       </div>

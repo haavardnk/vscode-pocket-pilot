@@ -3,21 +3,37 @@
   import Bot from '@lucide/svelte/icons/bot';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import Cpu from '@lucide/svelte/icons/cpu';
-  import type { Delivery } from '@pocket-pilot/protocol';
+  import Shield from '@lucide/svelte/icons/shield';
+  import ShieldOff from '@lucide/svelte/icons/shield-off';
+  import type { Delivery, PermissionLevel } from '@pocket-pilot/protocol';
+
+  import { PERMISSIONS } from '../hub/permissions';
 
   interface Props {
     busy: boolean;
     disabled: boolean;
     agentLabel: string;
     modelLabel: string;
+    permission: PermissionLevel | null;
     placeholder: string;
     onmode: () => void;
     onmodel: () => void;
+    onpermission: (() => void) | null;
     onsend: (text: string, delivery: Delivery | null) => Promise<boolean>;
   }
 
-  const { busy, disabled, agentLabel, modelLabel, placeholder, onmode, onmodel, onsend }: Props =
-    $props();
+  const {
+    busy,
+    disabled,
+    agentLabel,
+    modelLabel,
+    permission,
+    placeholder,
+    onmode,
+    onmodel,
+    onpermission,
+    onsend
+  }: Props = $props();
 
   let text = $state('');
   let delivery = $state<Delivery>('queued');
@@ -50,11 +66,30 @@
     <button type="button" class="btn gap-1 btn-ghost font-normal btn-xs" onclick={onmode}>
       <Bot class="size-3.5" />{agentLabel}<ChevronDown class="size-3" />
     </button>
-    <button type="button" class="btn min-w-0 gap-1 btn-ghost font-normal btn-xs" onclick={onmodel}>
+    <button
+      type="button"
+      class="btn min-w-0 shrink gap-1 btn-ghost font-normal btn-xs"
+      onclick={onmodel}
+    >
       <Cpu class="size-3.5 shrink-0" /><span class="truncate">{modelLabel}</span><ChevronDown
         class="size-3 shrink-0"
       />
     </button>
+    {#if permission && onpermission}
+      <button
+        type="button"
+        class={[
+          'btn gap-1 btn-ghost font-normal btn-xs',
+          permission !== 'default' && 'text-warning'
+        ]}
+        aria-label={`Approvals: ${PERMISSIONS[permission].label}`}
+        onclick={onpermission}
+      >
+        {#if permission === 'default'}<Shield class="size-3.5" />{:else}<ShieldOff
+            class="size-3.5"
+          />{/if}{PERMISSIONS[permission].short}<ChevronDown class="size-3" />
+      </button>
+    {/if}
     {#if busy}
       <div class="join ml-auto" role="radiogroup" aria-label="Delivery">
         <button

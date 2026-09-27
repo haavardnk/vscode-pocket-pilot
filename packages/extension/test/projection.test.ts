@@ -55,11 +55,12 @@ describe('projection', () => {
         toolCallId: 'c1',
         toolId: 'run_in_terminal',
         invocationMessage: { value: 'Run tests' },
+        toolSpecificData: { kind: 'terminal', commandLine: { original: ' npm test ' } },
         isConfirmed: null,
         isComplete: true
       },
       { kind: 'textEditGroup', uri: { path: '/repo/a.ts' } },
-      { kind: 'textEditGroup', uri: { path: '/repo/a.ts' } },
+      { kind: 'textEditGroup', uri: { fsPath: '/repo/a.ts', path: '/repo/a.ts' } },
       { kind: 'undoStop' }
     ];
     const root = snapshot([request('r0', 'old', 1), request('r1', 'go', 4, response)], {
@@ -79,9 +80,106 @@ describe('projection', () => {
         callId: 'c1',
         toolId: 'run_in_terminal',
         message: 'Run tests',
+        detail: 'npm test',
         awaitingConfirmation: true
       },
       { kind: 'edit', path: '/repo/a.ts' }
+    ]);
+    expect(detail.permission).toBe('default');
+  });
+
+  it('reads the session permission level', () => {
+    const root = snapshot([request('r1', 'go', 1)], {
+      inputState: { permissionLevel: 'autopilot' }
+    });
+    expect(projectDetail(root, projectSummary(root, 'file', 0), 1, () => []).permission).toBe(
+      'autopilot'
+    );
+  });
+
+  const carousel = (extra: object) => ({
+    kind: 'questionCarousel',
+    resolveId: 'q1',
+    allowSkip: true,
+    questions: [
+      {
+        id: 'shape',
+        type: 'singleSelect',
+        title: 'Shape',
+        message: 'Pick one',
+        options: [{ id: 'a', label: 'Round', value: 'round' }],
+        defaultValue: 'round'
+      },
+      { id: 'broken', type: 'slider' }
+    ],
+    ...extra
+  });
+
+  it.each([
+    ['pending while the request waits', 4, true, carousel({}), 'pending'],
+    ['expired once the request ended', 1, true, carousel({}), 'expired'],
+    ['done when answered', 1, true, carousel({ isUsed: true }), 'done'],
+    [
+      'pending for the latest confirmation',
+      1,
+      true,
+      { kind: 'confirmation', title: 'Continue?', buttons: ['Continue', 'Pause'] },
+      'pending'
+    ],
+    [
+      'expired for an older confirmation',
+      1,
+      false,
+      { kind: 'confirmation', title: 'Continue?', buttons: ['Continue'] },
+      'expired'
+    ],
+    [
+      'pending for a waiting elicitation',
+      4,
+      true,
+      { kind: 'elicitationSerialized', title: { value: 'Run outside?' }, state: 'pending' },
+      'pending'
+    ],
+    [
+      'accepted for a resolved elicitation',
+      1,
+      true,
+      { kind: 'elicitationSerialized', title: { value: 'Run outside?' }, state: 'accepted' },
+      'accepted'
+    ]
+  ])('marks interaction %s', (_name, value, latest, part, expected) => {
+    const requests = [request('r1', 'go', value, [part])];
+    if (!latest) requests.push(request('r2', 'next', 1));
+    const root = snapshot(requests);
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 2, () => []);
+    expect(detail.requests[0]?.parts[0]).toMatchObject({ state: expected });
+  });
+
+  it('projects questions and recorded answers', () => {
+    const part = carousel({ isUsed: true, data: { shape: { selectedValue: 'round' } } });
+    const root = snapshot([request('r1', 'go', 1, [part])]);
+    expect(
+      projectDetail(root, projectSummary(root, 'file', 0), 1, () => []).requests[0]?.parts
+    ).toEqual([
+      {
+        kind: 'questions',
+        resolveId: 'q1',
+        allowSkip: true,
+        state: 'done',
+        questions: [
+          {
+            id: 'shape',
+            type: 'singleSelect',
+            title: 'Shape',
+            message: 'Pick one',
+            options: [{ id: 'a', label: 'Round', value: 'round' }],
+            defaultValue: 'round',
+            allowFreeformInput: true,
+            required: false
+          }
+        ],
+        answers: { shape: { selectedValue: 'round' } }
+      }
     ]);
   });
 

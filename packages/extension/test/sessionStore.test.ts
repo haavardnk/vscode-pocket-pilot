@@ -33,6 +33,27 @@ describe('SessionStore', () => {
     await rm(folder, { recursive: true, force: true });
   });
 
+  it('holds a phone permission change until the log is written', async () => {
+    await store.start();
+    const permission = async (): Promise<string | undefined> =>
+      (await store.detail(SESSION_ID, 1))?.permission;
+
+    store.expectPermission(SESSION_ID, 'autopilot');
+    expect(await permission()).toBe('autopilot');
+
+    const logged = new Promise<void>((resolve) => {
+      store.onDidChange((sessionId) => {
+        if (sessionId === SESSION_ID) resolve();
+      });
+    });
+    await appendFile(
+      join(sessions, `${SESSION_ID}.jsonl`),
+      logLines({ kind: 1, k: ['inputState', 'permissionLevel'], v: 'autoApprove' })
+    );
+    await logged;
+    expect(await permission()).toBe('autoApprove');
+  });
+
   it('lists non-empty sessions and follows appended mutations', async () => {
     await store.start();
     expect(store.summaries().map((summary) => [summary.title, summary.status])).toEqual([

@@ -27,6 +27,7 @@ function detail(count: number): SessionDetail {
     status: 'idle',
     modelId: null,
     modeId: null,
+    permission: 'default',
     totalRequests: count,
     requests: Array.from({ length: count }, (_, index) => ({
       id: `r${index}`,

@@ -149,6 +149,7 @@ export interface PendingTool {
   callId: string;
   toolId: string;
   message: string;
+  detail: string | null;
 }
 
 export function pendingTool(detail: SessionDetail | null): PendingTool | null {
@@ -157,6 +158,6 @@ export function pendingTool(detail: SessionDetail | null): PendingTool | null {
     (candidate) => candidate.kind === 'tool' && candidate.awaitingConfirmation
   );
   return part?.kind === 'tool'
-    ? { callId: part.callId, toolId: part.toolId, message: part.message }
+    ? { callId: part.callId, toolId: part.toolId, message: part.message, detail: part.detail }
     : null;
 }

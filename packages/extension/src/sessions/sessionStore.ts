@@ -1,7 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
-import type { SessionDetail, SessionSummary } from '@pocket-pilot/protocol';
+import type { PermissionLevel, SessionDetail, SessionSummary } from '@pocket-pilot/protocol';
 import type { FSWatcher } from 'chokidar';
 
 import { watchTargets } from '../fsWatch';
@@ -13,6 +13,7 @@ import { TranscriptBuffer } from './transcript';
 const HOT_SESSIONS = 8;
 const DEBOUNCE_MS = 150;
 const MTIME_SLACK_MS = 2000;
+const PERMISSION_OVERLAY_MS = 120_000;
 const LOG_SUFFIX = '.jsonl';
 
 export interface SessionFolders {
@@ -28,6 +29,7 @@ interface SessionEntry {
   transcript: LineTailer | null;
   events: TranscriptBuffer;
   reading: Promise<void>;
+  permission: { level: PermissionLevel; at: number } | null;
 }
 
 type Listener = (sessionId: string | null) => void;
@@ -82,7 +84,24 @@ export class SessionStore {
     if (!this.entries.has(sessionId) || !entry.summary) return null;
     this.touch(entry);
     await this.readTranscript(entry);
-    return projectDetail(entry.root, entry.summary, limit, (text) => entry.events.liveFor(text));
+    const detail = projectDetail(entry.root, entry.summary, limit, (text) =>
+      entry.events.liveFor(text)
+    );
+    const expected = entry.permission;
+    return {
+      ...detail,
+      permission:
+        expected && Date.now() - expected.at < PERMISSION_OVERLAY_MS
+          ? expected.level
+          : detail.permission
+    };
+  }
+
+  expectPermission(sessionId: string, level: PermissionLevel): void {
+    const entry = this.entries.get(sessionId);
+    if (!entry) return;
+    entry.permission = { level, at: Date.now() };
+    this.emit(sessionId);
   }
 
   dispose(): void {
@@ -157,7 +176,8 @@ export class SessionStore {
       summary: null,
       transcript: null,
       events: new TranscriptBuffer(),
-      reading: Promise.resolve()
+      reading: Promise.resolve(),
+      permission: null
     };
     this.entries.set(sessionId, created);
     return created;
@@ -210,6 +230,7 @@ export class SessionStore {
       () => Date.now()
     );
     entry.summary = root === undefined ? null : projectSummary(root, entry.id, modified);
+    if (entry.permission && modified >= entry.permission.at) entry.permission = null;
   }
 
   private readTranscript(entry: SessionEntry): Promise<void> {

@@ -28,6 +28,37 @@ export const requestStateSchema = z.enum([
   'needsInput'
 ]);
 
+export const permissionLevelSchema = z.enum(['default', 'autoApprove', 'autopilot']);
+
+export const optionValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+
+export const questionSchema = z.object({
+  id: z.string(),
+  type: z.enum(['text', 'singleSelect', 'multiSelect']),
+  title: z.string(),
+  message: z.string().nullable(),
+  options: z.array(z.object({ id: z.string(), label: z.string(), value: optionValueSchema })),
+  defaultValue: z.union([optionValueSchema, z.array(optionValueSchema)]).nullable(),
+  allowFreeformInput: z.boolean(),
+  required: z.boolean()
+});
+
+export const questionAnswerSchema = z.union([
+  z.string().max(10_000),
+  z.strictObject({
+    selectedValues: z.array(optionValueSchema).max(100),
+    freeformValue: z.string().max(10_000).optional()
+  }),
+  z.strictObject({
+    selectedValue: optionValueSchema.optional(),
+    freeformValue: z.string().max(10_000).optional()
+  })
+]);
+
+export const questionAnswersSchema = z.record(z.string(), questionAnswerSchema);
+
+export const interactionStateSchema = z.enum(['pending', 'done', 'expired']);
+
 export const responsePartSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('markdown'), text: z.string() }),
   z.object({ kind: z.literal('thinking'), text: z.string(), title: z.string().nullable() }),
@@ -36,11 +67,32 @@ export const responsePartSchema = z.discriminatedUnion('kind', [
     callId: z.string(),
     toolId: z.string(),
     message: z.string(),
+    detail: z.string().nullable(),
     awaitingConfirmation: z.boolean()
   }),
   z.object({ kind: z.literal('edit'), path: z.string() }),
   z.object({ kind: z.literal('progress'), text: z.string() }),
-  z.object({ kind: z.literal('question'), text: z.string(), answered: z.boolean() })
+  z.object({
+    kind: z.literal('questions'),
+    resolveId: z.string().nullable(),
+    allowSkip: z.boolean(),
+    state: interactionStateSchema,
+    questions: z.array(questionSchema),
+    answers: questionAnswersSchema.nullable()
+  }),
+  z.object({
+    kind: z.literal('confirmation'),
+    title: z.string(),
+    message: z.string(),
+    buttons: z.array(z.string()),
+    state: interactionStateSchema
+  }),
+  z.object({
+    kind: z.literal('elicitation'),
+    title: z.string(),
+    message: z.string(),
+    state: z.enum(['pending', 'accepted', 'rejected', 'expired'])
+  })
 ]);
 
 export const requestViewSchema = z.object({
@@ -83,6 +135,7 @@ export const sessionDetailSchema = z.object({
   status: sessionStatusSchema,
   modelId: z.string().nullable(),
   modeId: z.string().nullable(),
+  permission: permissionLevelSchema,
   totalRequests: z.number(),
   requests: z.array(requestViewSchema),
   queued: z.array(queuedRequestSchema),
@@ -164,6 +217,12 @@ export type Repository = z.infer<typeof repositorySchema>;
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 export type RequestState = z.infer<typeof requestStateSchema>;
+export type PermissionLevel = z.infer<typeof permissionLevelSchema>;
+export type OptionValue = z.infer<typeof optionValueSchema>;
+export type Question = z.infer<typeof questionSchema>;
+export type QuestionAnswer = z.infer<typeof questionAnswerSchema>;
+export type QuestionAnswers = z.infer<typeof questionAnswersSchema>;
+export type InteractionState = z.infer<typeof interactionStateSchema>;
 export type ResponsePart = z.infer<typeof responsePartSchema>;
 export type RequestView = z.infer<typeof requestViewSchema>;
 export type Delivery = z.infer<typeof deliverySchema>;

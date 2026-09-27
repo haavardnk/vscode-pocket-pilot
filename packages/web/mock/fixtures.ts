@@ -120,6 +120,7 @@ export function initialWindows(now: number): MockWindow[] {
           status: 'running',
           modelId: 'copilot/claude-opus',
           modeId: 'agent',
+          permission: 'default',
           totalRequests: 1,
           requests: [
             {
@@ -141,6 +142,7 @@ export function initialWindows(now: number): MockWindow[] {
                   callId: 'c1',
                   toolId: 'run_in_terminal',
                   message: 'Run `npm test`',
+                  detail: 'npm test -- --run',
                   awaitingConfirmation: true
                 }
               ]
@@ -170,6 +172,7 @@ export function initialWindows(now: number): MockWindow[] {
           status: 'idle',
           modelId: 'copilot/gpt-5',
           modeId: 'file:///repo/.github/agents/reviewer.agent.md',
+          permission: 'default',
           totalRequests: 1,
           requests: [
             {
@@ -181,6 +184,75 @@ export function initialWindows(now: number): MockWindow[] {
               error: null,
               parts: [
                 { kind: 'markdown', text: 'The follower retried before the leader was listening.' }
+              ]
+            }
+          ],
+          queued: [],
+          live: []
+        },
+        {
+          id: 's4',
+          title: 'Plan the release',
+          status: 'needsInput',
+          modelId: 'copilot/claude-opus',
+          modeId: 'agent',
+          permission: 'autoApprove',
+          totalRequests: 1,
+          requests: [
+            {
+              id: 'r4',
+              timestamp: now - 10 * MINUTE,
+              message: 'Plan the 0.2 release.',
+              modelId: 'copilot/claude-opus',
+              state: 'needsInput',
+              error: null,
+              parts: [
+                { kind: 'markdown', text: 'A few choices before I start.' },
+                {
+                  kind: 'questions',
+                  resolveId: 'carousel-1',
+                  allowSkip: true,
+                  state: 'pending',
+                  questions: [
+                    {
+                      id: 'channel',
+                      type: 'singleSelect',
+                      title: 'Release channel',
+                      message: 'Where should the build go?',
+                      options: [
+                        { id: 'stable', label: 'Stable', value: 'stable' },
+                        { id: 'preview', label: 'Preview', value: 'preview' }
+                      ],
+                      defaultValue: 'stable',
+                      allowFreeformInput: false,
+                      required: true
+                    },
+                    {
+                      id: 'targets',
+                      type: 'multiSelect',
+                      title: 'Platforms',
+                      message: null,
+                      options: [
+                        { id: 'mac', label: 'macOS', value: 'mac' },
+                        { id: 'linux', label: 'Linux', value: 'linux' }
+                      ],
+                      defaultValue: null,
+                      allowFreeformInput: true,
+                      required: false
+                    },
+                    {
+                      id: 'notes',
+                      type: 'text',
+                      title: 'Release notes',
+                      message: null,
+                      options: [],
+                      defaultValue: null,
+                      allowFreeformInput: true,
+                      required: false
+                    }
+                  ],
+                  answers: null
+                }
               ]
             }
           ],
@@ -211,6 +283,7 @@ export function initialWindows(now: number): MockWindow[] {
           status: 'idle',
           modelId: 'copilot/claude-opus',
           modeId: 'agent',
+          permission: 'default',
           totalRequests: 1,
           requests: [
             {
@@ -220,7 +293,16 @@ export function initialWindows(now: number): MockWindow[] {
               modelId: 'copilot/claude-opus',
               state: 'complete',
               error: null,
-              parts: [{ kind: 'markdown', text: 'Demosaic is now 2x faster.' }]
+              parts: [
+                { kind: 'markdown', text: 'Demosaic is now 2x faster.' },
+                {
+                  kind: 'confirmation',
+                  title: 'Continue to iterate?',
+                  message: 'Copilot has been working on this problem for a while.',
+                  buttons: ['Continue', 'Pause'],
+                  state: 'pending'
+                }
+              ]
             }
           ],
           queued: [],

@@ -1,11 +1,20 @@
-import type { Agent, Command, Model } from '@pocket-pilot/protocol';
+import type { Agent, Command, Model, PermissionLevel, SessionDetail } from '@pocket-pilot/protocol';
 import * as vscode from 'vscode';
 
 import type { ModelSettingsFile } from '../models/modelSettings';
+import {
+  answersError,
+  confirmationPrompt,
+  pendingQuestions,
+  PERMISSION_COMMANDS,
+  requirePendingElicitation
+} from './interactions';
 
 export interface ControllerSources {
   models: () => Promise<Model[]>;
   agents: () => Promise<Agent[]>;
+  detail: (sessionId: string) => Promise<SessionDetail | null>;
+  expectPermission: (sessionId: string, level: PermissionLevel) => void;
   settings: ModelSettingsFile;
 }
 
@@ -44,12 +53,44 @@ export class Controller {
         await this.selectModel(await this.requireModel(command.modelId));
         return;
       case 'toolDecision':
+        await this.focus(command.sessionId);
         await vscode.commands.executeCommand(
           command.decision === 'accept'
             ? 'workbench.action.chat.acceptTool'
             : 'workbench.action.chat.skipTool',
           { sessionResource: sessionResource(command.sessionId) }
         );
+        return;
+      case 'answerQuestions': {
+        const part = pendingQuestions(
+          await this.sources.detail(command.sessionId),
+          command.resolveId
+        );
+        const error = answersError(part, command.answers);
+        if (error) throw new Error(error);
+        await vscode.commands.executeCommand(
+          '_chat.notifyQuestionCarouselAnswer',
+          command.resolveId,
+          command.answers ?? undefined
+        );
+        return;
+      }
+      case 'confirm': {
+        const prompt = confirmationPrompt(
+          await this.sources.detail(command.sessionId),
+          command.button
+        );
+        await this.submit(command.sessionId, prompt);
+        return;
+      }
+      case 'acceptElicitation':
+        requirePendingElicitation(await this.sources.detail(command.sessionId));
+        await this.focus(command.sessionId);
+        await vscode.commands.executeCommand('workbench.action.chat.acceptElicitation');
+        return;
+      case 'setPermission':
+        await this.submit(command.sessionId, PERMISSION_COMMANDS[command.level]);
+        this.sources.expectPermission(command.sessionId, command.level);
         return;
       case 'newSession': {
         if (command.modeId) await this.requireAgent(command.modeId);
@@ -84,6 +125,11 @@ export class Controller {
 
   private async focus(sessionId: string): Promise<void> {
     await vscode.commands.executeCommand('vscode.open', sessionResource(sessionId));
+  }
+
+  private async submit(sessionId: string, text: string): Promise<void> {
+    await this.focus(sessionId);
+    await vscode.commands.executeCommand('workbench.action.chat.submit', { inputValue: text });
   }
 
   private async requireAgent(modeId: string): Promise<void> {

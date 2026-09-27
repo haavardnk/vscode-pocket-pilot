@@ -9,6 +9,9 @@ Cloudflare tunnel. From the phone you can:
 - follow a running request as it streams, including tool calls and file edits
 - send a message, queue one behind the running request, or steer it
 - stop a request, and allow or skip a tool that waits for confirmation
+- answer the questions an agent asks, and reply to its confirmations and approval requests
+- choose how much the agent may do without asking: default approvals, bypass approvals or
+  autopilot
 - switch agent and model, and change thinking effort or context size
 - start a new chat in any open window
 - see open pull requests with check, review and merge status
@@ -92,6 +95,24 @@ the same port.
 Every VS Code window runs Pocket Pilot. One of them wins the port and becomes the leader; the
 others connect to it over loopback and report their chats. When the leader window closes, another
 window takes over within a few seconds and the phone reconnects on its own.
+
+## Answering the agent
+
+When an agent stops to ask something, the chat on the phone shows it where it happened:
+
+- **Questions** appear as a form with the agent's choices. Submit the answers, or skip them when
+  the agent allows it.
+- **Confirmations** such as "Continue to iterate?" show their buttons. Tapping one sends the same
+  reply as the button in VS Code. The buttons in VS Code stay visible afterwards.
+- **Approval requests** outside tool calls can be allowed from the phone. To decline one, stop the
+  request or send a new message.
+
+The approvals button under the message box sets the chat's approval level. Bypass approvals runs
+every tool without asking, and autopilot also lets the agent answer its own questions. Both ask
+for confirmation on the phone first. The phone changes the level through the `/autoApprove`,
+`/autopilot` and `/disableAutoApprove` chat commands. When an organization policy turns off global
+auto approval, VS Code removes those commands, so the change reaches the agent as a plain message
+instead; leave the level alone on such machines.
 
 ## Security
 

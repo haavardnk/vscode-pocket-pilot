@@ -72,10 +72,44 @@ test.describe('paired', () => {
   test('approves a waiting tool', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     await expect(page.getByText('Allow tool?')).toBeVisible();
+    await expect(page.getByText('npm test -- --run')).toBeVisible();
     await page.getByRole('button', { name: 'Allow' }).click();
     await expect(page.getByText('Tests passed.')).toBeVisible();
     await expect(page.getByText('All done.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Stop' })).toHaveCount(0);
+  });
+
+  test('answers the questions the agent asks', async ({ page }) => {
+    await openSession(page, 'Plan the release');
+    const card = page.getByRole('region', { name: 'Questions from the agent' });
+    await expect(card.getByRole('radio', { name: 'Stable' })).toBeChecked();
+    await card.getByRole('radio', { name: 'Preview' }).check();
+    await card.getByRole('checkbox', { name: 'Linux' }).check();
+    await card.getByRole('textbox', { name: 'Release notes' }).fill('Faster sync');
+    await card.getByRole('button', { name: 'Submit answers' }).click();
+    await expect(page.getByText('Thanks, planning now.')).toBeVisible();
+    await expect(card.getByText('Preview', { exact: true })).toBeVisible();
+    await expect(card.getByText('Faster sync')).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Submit answers' })).toHaveCount(0);
+  });
+
+  test('answers a confirmation', async ({ page }) => {
+    await openSession(page, 'Tune the RAW pipeline');
+    await expect(page.getByText('Continue to iterate?')).toBeVisible();
+    await page.getByRole('button', { name: 'Pause' }).click();
+    await expect(page.getByText('Done: Pause: "Continue to iterate?"')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
+  });
+
+  test('changes the approval level after a warning', async ({ page }) => {
+    await openSession(page, 'Fix flaky cluster test');
+    await page.getByRole('button', { name: 'Approvals: Default approvals' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Approvals' });
+    await sheet.getByRole('button', { name: /^Bypass approvals/ }).click();
+    await expect(sheet.getByText('Turn on Bypass approvals?')).toBeVisible();
+    await sheet.getByRole('button', { name: 'Turn on' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Approvals: Bypass approvals' })).toBeVisible();
   });
 
   test('queues a message while the agent runs and stops it', async ({ page }) => {

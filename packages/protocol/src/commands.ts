@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
-import { configValueSchema, deliverySchema, modelConfigKeySchema } from './domain';
+import {
+  configValueSchema,
+  deliverySchema,
+  modelConfigKeySchema,
+  permissionLevelSchema,
+  questionAnswersSchema
+} from './domain';
 
 const sessionTarget = { windowId: z.string(), sessionId: z.string() };
 
@@ -18,6 +24,23 @@ export const commandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('toolDecision'),
     ...sessionTarget,
     decision: z.enum(['accept', 'skip'])
+  }),
+  z.object({
+    kind: z.literal('answerQuestions'),
+    ...sessionTarget,
+    resolveId: z.string().min(1),
+    answers: questionAnswersSchema.nullable()
+  }),
+  z.object({
+    kind: z.literal('confirm'),
+    ...sessionTarget,
+    button: z.string().min(1)
+  }),
+  z.object({ kind: z.literal('acceptElicitation'), ...sessionTarget }),
+  z.object({
+    kind: z.literal('setPermission'),
+    ...sessionTarget,
+    level: permissionLevelSchema
   }),
   z.object({
     kind: z.literal('newSession'),

@@ -68,6 +68,8 @@ export class WindowAgent implements vscode.Disposable {
     this.controller = new Controller({
       models: () => Promise.resolve(this.models),
       agents: () => Promise.resolve(this.agents),
+      detail: (sessionId) => this.store.detail(sessionId, 1),
+      expectPermission: (sessionId, level) => this.store.expectPermission(sessionId, level),
       settings
     });
     this.subscriptions.push(
