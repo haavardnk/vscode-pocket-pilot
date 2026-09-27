@@ -207,7 +207,13 @@ describe('server', () => {
     ['a wrong secret', false, 'guess', 403, 0],
     ['the tunnel', true, HOOK_SECRET, 403, 0]
   ])('handles chat hooks sent with %s', async (_name, tunnel, secret, status, calls) => {
-    const window = { watch: vi.fn(), run: vi.fn(), query: vi.fn(), hook: vi.fn(async () => {}) };
+    const window = {
+      watch: vi.fn(),
+      watchTerminals: vi.fn(),
+      run: vi.fn(),
+      query: vi.fn(),
+      hook: vi.fn(async () => {})
+    };
     fixture.hub.addWindow(
       {
         windowId: 'ws1',
@@ -215,6 +221,7 @@ describe('server', () => {
         repositories: [],
         folders: [],
         sessions: [],
+        terminals: [],
         canOrganize: true,
         agents: [],
         models: []
@@ -246,7 +253,13 @@ describe('server', () => {
     ['a wrong secret', 'guess', 0],
     ['a closed port', HOOK_SECRET, 0]
   ])('runs the installed hook command against %s', async (name, secret, calls) => {
-    const window = { watch: vi.fn(), run: vi.fn(), query: vi.fn(), hook: vi.fn(async () => {}) };
+    const window = {
+      watch: vi.fn(),
+      watchTerminals: vi.fn(),
+      run: vi.fn(),
+      query: vi.fn(),
+      hook: vi.fn(async () => {})
+    };
     fixture.hub.addWindow(
       {
         windowId: 'ws2',
@@ -254,6 +267,7 @@ describe('server', () => {
         repositories: [],
         folders: [],
         sessions: [],
+        terminals: [],
         canOrganize: true,
         agents: [],
         models: []

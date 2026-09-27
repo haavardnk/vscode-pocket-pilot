@@ -67,6 +67,7 @@ export function acceptFollower(
 
   const link: WindowLink = {
     watch: (sessions) => send({ type: 'watch', sessions }),
+    watchTerminals: (terminalIds) => send({ type: 'watchTerminals', terminalIds }),
     run: (command) =>
       request((requestId) => ({ type: 'command', requestId, command }), commandOutcome),
     query: (query) => request((requestId) => ({ type: 'query', requestId, query }), queryOutcome),
@@ -99,6 +100,14 @@ export function acceptFollower(
     }
     if (message.type === 'session') {
       hub.sessionUpdate(windowId, message.sessionId, message.detail);
+      return;
+    }
+    if (message.type === 'terminal') {
+      hub.terminalUpdate(windowId, message.terminalId, message.detail);
+      return;
+    }
+    if (message.type === 'terminalPatch') {
+      hub.terminalPatch(windowId, message.terminalId, message.patch);
       return;
     }
     const waiting = pending.get(message.requestId);

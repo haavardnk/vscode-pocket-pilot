@@ -1,4 +1,5 @@
 import {
+  applyTerminalPatch,
   type CodeQuery,
   type CodeResult,
   type Command,
@@ -8,6 +9,8 @@ import {
   type ServerMessage,
   type SessionDetail,
   type SessionWatch,
+  type TerminalDetail,
+  type TerminalPatch,
   type WindowState
 } from '@pocket-pilot/protocol';
 
@@ -15,6 +18,7 @@ export const EMPTY_WINDOW = 'empty-';
 
 export interface WindowLink {
   watch(sessions: SessionWatch[]): void;
+  watchTerminals(terminalIds: string[]): void;
   run(command: Command): Promise<void>;
   query(query: CodeQuery): Promise<CodeResult>;
   hook(event: HookEvent): Promise<void>;
@@ -35,11 +39,18 @@ interface Subscription {
   limit: number;
 }
 
+export interface TerminalWatch {
+  windowId: string;
+  terminalId: string;
+}
+
 interface WindowEntry {
   link: WindowLink;
   state: WindowState;
   details: Map<string, SessionDetail | null>;
   watched: string;
+  terminals: Map<string, TerminalDetail | null>;
+  watchedTerminals: string;
 }
 
 function trim(detail: SessionDetail | null, limit: number): SessionDetail | null {
@@ -51,6 +62,7 @@ export class Hub {
   private readonly windows = new Map<string, WindowEntry>();
   private readonly clients = new Map<HubClient, Subscription | null>();
   private readonly sent = new Map<HubClient, SessionDetail | null>();
+  private readonly terminalWatches = new Map<HubClient, TerminalWatch>();
   private pullRequests: PullRequestState;
 
   constructor(
@@ -70,9 +82,17 @@ export class Hub {
   }
 
   addWindow(state: WindowState, link: WindowLink): void {
-    this.windows.set(state.windowId, { link, state, details: new Map(), watched: '' });
+    this.windows.set(state.windowId, {
+      link,
+      state,
+      details: new Map(),
+      watched: '',
+      terminals: new Map(),
+      watchedTerminals: ''
+    });
     this.broadcast({ type: 'window', window: state });
     this.syncWatches(state.windowId);
+    this.syncTerminalWatches(state.windowId);
     this.events.windowsChanged?.();
   }
 
@@ -101,6 +121,24 @@ export class Hub {
     }
   }
 
+  terminalUpdate(windowId: string, terminalId: string, detail: TerminalDetail | null): void {
+    const entry = this.windows.get(windowId);
+    if (!entry) return;
+    entry.terminals.set(terminalId, detail);
+    for (const client of this.terminalClients(windowId, terminalId)) {
+      client.send({ type: 'terminal', windowId, terminalId, detail });
+    }
+  }
+
+  terminalPatch(windowId: string, terminalId: string, patch: TerminalPatch): void {
+    const detail = this.windows.get(windowId)?.terminals.get(terminalId);
+    if (!detail) return;
+    applyTerminalPatch(detail, patch);
+    for (const client of this.terminalClients(windowId, terminalId)) {
+      client.send({ type: 'terminalPatch', windowId, terminalId, patch });
+    }
+  }
+
   setPullRequests(state: PullRequestState): void {
     this.pullRequests = state;
     this.broadcast({ type: 'pullRequests', state });
@@ -122,6 +160,9 @@ export class Hub {
     if (!this.clients.delete(client)) return;
     this.sent.delete(client);
     if (subscription) this.syncWatches(subscription.windowId);
+    const terminal = this.terminalWatches.get(client);
+    this.terminalWatches.delete(client);
+    if (terminal) this.syncTerminalWatches(terminal.windowId);
     this.events.clientsChanged?.(this.clients.size);
   }
 
@@ -142,6 +183,23 @@ export class Hub {
       this.sendDetail(client, next.windowId, next.sessionId, trim(cached, next.limit));
     }
     this.syncWatches(next.windowId);
+  }
+
+  watchTerminal(client: HubClient, next: TerminalWatch | null): void {
+    if (!this.clients.has(client)) return;
+    const previous = this.terminalWatches.get(client);
+    if (next) this.terminalWatches.set(client, next);
+    else this.terminalWatches.delete(client);
+    if (previous && previous.windowId !== next?.windowId) {
+      this.syncTerminalWatches(previous.windowId);
+    }
+    if (!next) return;
+    const entry = this.windows.get(next.windowId);
+    const cached = entry?.terminals.get(next.terminalId);
+    if (!entry || cached !== undefined) {
+      client.send({ type: 'terminal', ...next, detail: cached ?? null });
+    }
+    this.syncTerminalWatches(next.windowId);
   }
 
   async command(command: Command): Promise<void> {
@@ -200,6 +258,31 @@ export class Hub {
       if (!limits.has(sessionId)) entry.details.delete(sessionId);
     }
     entry.link.watch(sessions);
+  }
+
+  private terminalClients(windowId: string, terminalId: string): HubClient[] {
+    return [...this.terminalWatches]
+      .filter(([, watch]) => watch.windowId === windowId && watch.terminalId === terminalId)
+      .map(([client]) => client);
+  }
+
+  private syncTerminalWatches(windowId: string): void {
+    const entry = this.windows.get(windowId);
+    if (!entry) return;
+    const terminalIds = [
+      ...new Set(
+        [...this.terminalWatches.values()]
+          .filter((watch) => watch.windowId === windowId)
+          .map((watch) => watch.terminalId)
+      )
+    ].sort();
+    const key = JSON.stringify(terminalIds);
+    if (key === entry.watchedTerminals) return;
+    entry.watchedTerminals = key;
+    for (const terminalId of entry.terminals.keys()) {
+      if (!terminalIds.includes(terminalId)) entry.terminals.delete(terminalId);
+    }
+    entry.link.watchTerminals(terminalIds);
   }
 
   private broadcast(message: ServerMessage): void {

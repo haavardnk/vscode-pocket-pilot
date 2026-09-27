@@ -35,6 +35,13 @@ export interface SessionSections {
   archived: SessionEntry[];
 }
 
+export interface TerminalTarget {
+  windowId: string;
+  windowName: string;
+  folderId: string | null;
+  name: string;
+}
+
 function lastActivity(window: WindowState): number {
   return Math.max(0, ...window.sessions.map((session) => session.updatedAt));
 }
@@ -122,6 +129,14 @@ export function windowsForRepository(
   key: string
 ): WindowState[] {
   return windowsIn(windows, groups, key).toSorted((a, b) => lastActivity(b) - lastActivity(a));
+}
+
+export function terminalTargets(windows: WindowState[]): TerminalTarget[] {
+  return windows.flatMap(({ windowId, name: windowName, folders }): TerminalTarget[] =>
+    folders.length === 0
+      ? [{ windowId, windowName, folderId: null, name: windowName }]
+      : folders.map((folder) => ({ windowId, windowName, folderId: folder.id, name: folder.name }))
+  );
 }
 
 export function pullRequestsFor(state: PullRequestState, key: string): PullRequest[] {

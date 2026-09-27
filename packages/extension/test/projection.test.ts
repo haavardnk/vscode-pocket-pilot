@@ -100,7 +100,8 @@ describe('projection', () => {
         message: 'Run tests',
         detail: 'npm test',
         awaitingConfirmation: true,
-        status: 'running'
+        status: 'running',
+        terminal: null
       },
       { kind: 'edit', path: '/repo/a.ts' },
       { kind: 'thinking', text: 'Check first', title: null },
@@ -112,7 +113,8 @@ describe('projection', () => {
         message: 'grep_search',
         detail: '{"query":"x"}',
         awaitingConfirmation: false,
-        status: 'running'
+        status: 'running',
+        terminal: null
       }
     ]);
     expect(detail.permission).toBe('default');

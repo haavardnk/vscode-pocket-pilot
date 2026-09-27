@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { terminalRefSchema, terminalSummarySchema } from './terminal.ts';
+
 export const repositorySchema = z.object({
   key: z.string(),
   label: z.string(),
@@ -79,7 +81,8 @@ export const responsePartSchema = z.discriminatedUnion('kind', [
     message: z.string(),
     detail: z.string().nullable(),
     awaitingConfirmation: z.boolean(),
-    status: toolStatusSchema
+    status: toolStatusSchema,
+    terminal: terminalRefSchema.nullable()
   }),
   z.object({ kind: z.literal('edit'), path: z.string() }),
   z.object({ kind: z.literal('progress'), text: z.string() }),
@@ -177,6 +180,7 @@ export const windowStateSchema = z.object({
   repositories: z.array(repositorySchema),
   folders: z.array(workspaceFolderSchema),
   sessions: z.array(sessionSummarySchema),
+  terminals: z.array(terminalSummarySchema),
   canOrganize: z.boolean(),
   agents: z.array(agentSchema),
   models: z.array(modelSchema)

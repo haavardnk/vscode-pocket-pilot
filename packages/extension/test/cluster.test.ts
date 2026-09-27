@@ -20,7 +20,7 @@ import WebSocket from 'ws';
 import { Cluster, type Role } from '../src/cluster/cluster';
 import { followLeader } from '../src/cluster/followerClient';
 import { type Leader, startLeader } from '../src/cluster/leader';
-import type { Disposable, LocalWindow } from '../src/cluster/localWindow';
+import type { Disposable, LocalWindow, TerminalUpdate } from '../src/cluster/localWindow';
 import { hookSecret, sharedFiles } from '../src/cluster/sharedState';
 import { HOOK_HEADER } from '../src/hooks/hookFile';
 import { PairingStore } from '../src/server/pairing';
@@ -33,9 +33,11 @@ class FakeWindow implements LocalWindow {
   readonly commands: Command[] = [];
   readonly hooks: HookEvent[] = [];
   watches: readonly SessionWatch[] = [];
+  terminalWatches: readonly string[] = [];
   private readonly sessionListeners = new Set<
     (value: { sessionId: string; detail: SessionDetail | null }) => void
   >();
+  private readonly terminalListeners = new Set<(value: TerminalUpdate) => void>();
 
   constructor(readonly windowId: string) {}
 
@@ -46,6 +48,7 @@ class FakeWindow implements LocalWindow {
       repositories: [],
       folders: [],
       sessions: [],
+      terminals: [],
       canOrganize: true,
       agents: [],
       models: []
@@ -54,6 +57,10 @@ class FakeWindow implements LocalWindow {
 
   setWatches(watches: readonly SessionWatch[]): void {
     this.watches = watches;
+  }
+
+  setTerminalWatches(terminalIds: readonly string[]): void {
+    this.terminalWatches = terminalIds;
   }
 
   run(command: Command): Promise<void> {
@@ -85,6 +92,15 @@ class FakeWindow implements LocalWindow {
 
   emitSession(sessionId: string, detail: SessionDetail | null): void {
     for (const listener of this.sessionListeners) listener({ sessionId, detail });
+  }
+
+  onDidChangeTerminal = (listener: (value: TerminalUpdate) => void): Disposable => {
+    this.terminalListeners.add(listener);
+    return { dispose: () => this.terminalListeners.delete(listener) };
+  };
+
+  emitTerminal(update: TerminalUpdate): void {
+    for (const listener of this.terminalListeners) listener(update);
   }
 }
 
@@ -247,6 +263,34 @@ describe('cluster', () => {
     await waitFor(() => second.watches.length === 1);
     second.emitSession('s1', null);
     await waitFor(() => client.messages.some((message) => message.type === 'session'));
+
+    client.socket.send(
+      JSON.stringify({ type: 'watchTerminal', windowId: 'second', terminalId: 't1' })
+    );
+    await waitFor(() => second.terminalWatches.length === 1);
+    second.emitTerminal({ terminalId: 't1', detail: { id: 't1', dropped: 0, executions: [] } });
+    second.emitTerminal({ terminalId: 't1', patch: { dropped: 1, executions: [] } });
+    await waitFor(() => client.messages.some((message) => message.type === 'terminalPatch'));
+    expect(
+      client.messages.filter(
+        (message) => message.type === 'terminal' || message.type === 'terminalPatch'
+      )
+    ).toEqual([
+      {
+        type: 'terminal',
+        windowId: 'second',
+        terminalId: 't1',
+        detail: { id: 't1', dropped: 0, executions: [] }
+      },
+      {
+        type: 'terminalPatch',
+        windowId: 'second',
+        terminalId: 't1',
+        patch: { dropped: 1, executions: [] }
+      }
+    ]);
+    client.socket.send(JSON.stringify({ type: 'unwatchTerminal' }));
+    await waitFor(() => second.terminalWatches.length === 0);
 
     client.socket.send(
       JSON.stringify({

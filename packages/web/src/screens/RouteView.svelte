@@ -10,6 +10,7 @@
   import SessionChangesScreen from './SessionChangesScreen.svelte';
   import SessionDiffScreen from './SessionDiffScreen.svelte';
   import SessionScreen from './SessionScreen.svelte';
+  import TerminalScreen from './TerminalScreen.svelte';
 
   interface Props {
     route: Route;
@@ -27,6 +28,14 @@
   <SessionScreen windowId={route.windowId} sessionId={route.sessionId} />
 {:else if route.name === 'new'}
   <NewSessionScreen />
+{:else if route.name === 'terminal'}
+  {#key hash}
+    <TerminalScreen
+      windowId={route.windowId}
+      terminalId={route.terminalId}
+      executionId={route.executionId}
+    />
+  {/key}
 {:else if route.name === 'folder'}
   {#key hash}
     <FolderScreen

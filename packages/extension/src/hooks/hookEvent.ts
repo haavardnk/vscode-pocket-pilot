@@ -58,6 +58,11 @@ export function editPaths(toolName: string, input: unknown): string[] {
   return [...new Set(paths.filter((path) => path !== null))];
 }
 
+export function terminalCommand(toolName: string, input: unknown): string | null {
+  if (toolName !== 'run_in_terminal') return null;
+  return asString(asRecord(typeof input === 'string' ? parseJson(input) : input).command);
+}
+
 function hookEvent(payload: z.infer<typeof payloadSchema>): HookEvent | null {
   const sessionId = payload.session_id;
   const at = Date.parse(payload.timestamp ?? '') || Date.now();
@@ -73,7 +78,8 @@ function hookEvent(payload: z.infer<typeof payloadSchema>): HookEvent | null {
         at,
         callId,
         toolName: payload.tool_name ?? '',
-        paths: editPaths(payload.tool_name ?? '', payload.tool_input)
+        paths: editPaths(payload.tool_name ?? '', payload.tool_input),
+        command: terminalCommand(payload.tool_name ?? '', payload.tool_input)
       };
     case 'PostToolUse':
       return callId ? { kind: 'toolEnd', sessionId, at, callId } : null;

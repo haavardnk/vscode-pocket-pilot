@@ -202,13 +202,14 @@
     "vscode:uninstall": "node ./dist/uninstall.cjs"
   },
   "dependencies": {
-    "@pocket-pilot/protocol": "0.1.0",
     "@fastify/cookie": "^11.1.2",
     "@fastify/helmet": "^13.1.1",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/static": "^10.1.5",
     "@fastify/websocket": "^11.3.1",
     "@octokit/graphql": "^9.0.5",
+    "@pocket-pilot/protocol": "0.1.0",
+    "@xterm/headless": "^6.0.0",
     "chokidar": "^5.0.0",
     "diff": "^9.0.0",
     "fastify": "^5.12.5",

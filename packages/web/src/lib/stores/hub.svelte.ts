@@ -1,11 +1,13 @@
 import {
   applyPatch,
+  applyTerminalPatch,
   type CodeQuery,
   type CodeResultFor,
   type Command,
   type PullRequestState,
   type ServerMessage,
   type SessionDetail,
+  type TerminalDetail,
   type WindowState
 } from '@pocket-pilot/protocol';
 
@@ -20,6 +22,11 @@ interface Subscription {
   windowId: string;
   sessionId: string;
   limit: number;
+}
+
+interface TerminalWatch {
+  windowId: string;
+  terminalId: string;
 }
 
 const EMPTY_PULL_REQUESTS: PullRequestState = {
@@ -38,10 +45,13 @@ class HubStore {
   detail = $state<SessionDetail | null>(null);
   detailMissing = $state(false);
   limit = $state(PAGE_SIZE);
+  terminal = $state<TerminalDetail | null>(null);
+  terminalMissing = $state(false);
   private storedRepository = $state<string | null>(localStorage.getItem(REPOSITORY_KEY));
   groups = $derived(repositoryGroups(this.windows));
   repository = $derived(resolveRepository(this.groups, this.storedRepository));
   private subscription: Subscription | null = null;
+  private terminalWatch: TerminalWatch | null = null;
   private socket: HubSocket | null = null;
 
   start(onRejected: () => void): void {
@@ -53,6 +63,9 @@ class HubStore {
         if (state !== 'open') return;
         this.reportPresence();
         if (this.subscription) this.socket?.send({ type: 'subscribe', ...this.subscription });
+        if (this.terminalWatch) {
+          this.socket?.send({ type: 'watchTerminal', ...this.terminalWatch });
+        }
       },
       rejected: onRejected
     });
@@ -70,6 +83,8 @@ class HubStore {
     this.windows = [];
     this.detail = null;
     this.subscription = null;
+    this.terminal = null;
+    this.terminalWatch = null;
   }
 
   selectRepository(key: string): void {
@@ -100,6 +115,23 @@ class HubStore {
     this.detail = null;
     this.detailMissing = false;
     this.socket?.send({ type: 'unsubscribe' });
+  }
+
+  watchTerminal(windowId: string, terminalId: string): void {
+    const current = this.terminalWatch;
+    if (current?.windowId === windowId && current.terminalId === terminalId) return;
+    this.terminal = null;
+    this.terminalMissing = false;
+    this.terminalWatch = { windowId, terminalId };
+    this.socket?.send({ type: 'watchTerminal', ...this.terminalWatch });
+  }
+
+  unwatchTerminal(): void {
+    if (!this.terminalWatch) return;
+    this.terminalWatch = null;
+    this.terminal = null;
+    this.terminalMissing = false;
+    this.socket?.send({ type: 'unwatchTerminal' });
   }
 
   refreshPullRequests(): void {
@@ -149,6 +181,10 @@ class HubStore {
       this.pullRequests = message.state;
       return;
     }
+    if (message.type === 'terminal' || message.type === 'terminalPatch') {
+      this.applyTerminal(message);
+      return;
+    }
     if (message.type !== 'session' && message.type !== 'sessionPatch') return;
     const current = this.subscription;
     if (current?.windowId !== message.windowId || current.sessionId !== message.sessionId) return;
@@ -159,6 +195,20 @@ class HubStore {
     }
     this.detail = message.detail;
     this.detailMissing = message.detail === null;
+  }
+
+  private applyTerminal(
+    message: Extract<ServerMessage, { type: 'terminal' | 'terminalPatch' }>
+  ): void {
+    const current = this.terminalWatch;
+    if (current?.windowId !== message.windowId || current.terminalId !== message.terminalId) return;
+    if (message.type === 'terminalPatch') {
+      if (this.terminal) applyTerminalPatch(this.terminal, message.patch);
+      else this.socket?.send({ type: 'watchTerminal', ...current });
+      return;
+    }
+    this.terminal = message.detail;
+    this.terminalMissing = message.detail === null;
   }
 }
 

@@ -23,6 +23,7 @@ function windowState(windowId: string): WindowState {
     repositories: [],
     folders: [],
     sessions: [],
+    terminals: [],
     canOrganize: true,
     agents: [],
     models: []
@@ -52,11 +53,14 @@ function detail(count: number): SessionDetail {
   };
 }
 
-function link(): WindowLink & { watches: SessionWatch[][] } {
+function link(): WindowLink & { watches: SessionWatch[][]; terminalWatches: string[][] } {
   const watches: SessionWatch[][] = [];
+  const terminalWatches: string[][] = [];
   return {
     watches,
+    terminalWatches,
     watch: (sessions) => watches.push(sessions),
+    watchTerminals: (terminalIds) => terminalWatches.push(terminalIds),
     run: vi.fn(() => Promise.resolve()),
     query: vi.fn(() => Promise.reject(new Error('No code'))),
     hook: vi.fn(() => Promise.resolve())
@@ -141,6 +145,57 @@ describe('Hub', () => {
       ['patch', 2, 1],
       ['session', 3]
     ]);
+  });
+
+  it('caches watched terminals and fans out their patches', () => {
+    const hub = new Hub('1.0.0', noPullRequests);
+    const window = link();
+    hub.addWindow(windowState('w1'), window);
+    const first = client();
+    const second = client();
+    hub.connect(first);
+    hub.connect(second);
+    hub.watchTerminal(first, { windowId: 'w1', terminalId: 't1' });
+    expect(window.terminalWatches.at(-1)).toEqual(['t1']);
+    hub.terminalUpdate('w1', 't1', { id: 't1', dropped: 0, executions: [] });
+    const execution = {
+      id: 'e1',
+      command: 'ls',
+      cwd: null,
+      startedAt: 1,
+      endedAt: null,
+      exitCode: null,
+      sessionId: null,
+      callId: null,
+      alternate: false,
+      dropped: 0,
+      tail: [],
+      append: [[{ text: 'a.ts', fg: null, bg: null, flags: 0 }]]
+    };
+    hub.terminalPatch('w1', 't1', { dropped: 0, executions: [execution] });
+    hub.watchTerminal(second, { windowId: 'w1', terminalId: 't1' });
+    hub.watchTerminal(first, { windowId: 'gone', terminalId: 't1' });
+    const terminalMessages = (phone: { messages: ServerMessage[] }): ServerMessage[] =>
+      phone.messages.filter(
+        (message) => message.type === 'terminal' || message.type === 'terminalPatch'
+      );
+    expect(terminalMessages(first).map((message) => message.type)).toEqual([
+      'terminal',
+      'terminalPatch',
+      'terminal'
+    ]);
+    expect(terminalMessages(first).at(-1)).toEqual({
+      type: 'terminal',
+      windowId: 'gone',
+      terminalId: 't1',
+      detail: null
+    });
+    const cached = terminalMessages(second)[0];
+    expect(cached?.type === 'terminal' && cached.detail?.executions[0]?.lines).toEqual(
+      execution.append
+    );
+    hub.disconnect(second);
+    expect(window.terminalWatches.at(-1)).toEqual([]);
   });
 
   it('routes hooks to their window or to every empty window', async () => {

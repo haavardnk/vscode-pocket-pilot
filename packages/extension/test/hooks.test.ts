@@ -33,7 +33,30 @@ describe('chat hooks', () => {
           at,
           callId: 'call_1',
           toolName: 'create_file',
-          paths: ['/w/a.ts']
+          paths: ['/w/a.ts'],
+          command: null
+        }
+      }
+    ],
+    [
+      'a terminal tool',
+      {
+        ...payload,
+        hook_event_name: 'PreToolUse',
+        tool_name: 'run_in_terminal',
+        tool_use_id: 'call_2',
+        tool_input: { command: 'npm test', mode: 'sync' }
+      },
+      {
+        windowId: 'w1',
+        event: {
+          kind: 'toolStart',
+          sessionId: 's1',
+          at,
+          callId: 'call_2',
+          toolName: 'run_in_terminal',
+          paths: [],
+          command: 'npm test'
         }
       }
     ],

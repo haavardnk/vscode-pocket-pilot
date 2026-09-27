@@ -3,12 +3,14 @@
   import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
   import MessagesSquare from '@lucide/svelte/icons/messages-square';
   import Settings from '@lucide/svelte/icons/settings';
+  import SquareTerminal from '@lucide/svelte/icons/square-terminal';
 
   import type { Tab } from '../routing';
   import { router } from '../stores/router.svelte';
 
   const tabs: { name: Tab; label: string; icon: typeof Settings }[] = [
     { name: 'chats', label: 'Chats', icon: MessagesSquare },
+    { name: 'terminals', label: 'Terminals', icon: SquareTerminal },
     { name: 'code', label: 'Code', icon: CodeXml },
     { name: 'pullRequests', label: 'Pull requests', icon: GitPullRequest },
     { name: 'settings', label: 'Settings', icon: Settings }

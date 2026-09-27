@@ -18,6 +18,8 @@ Cloudflare tunnel. From the phone you can:
 - browse the open workspace folders and read files with syntax highlighting
 - review uncommitted changes, keep or undo the files a chat edited, and see what each message
   changed
+- follow the terminals of every window, including the ones an agent runs commands in, type
+  into them, open new ones and kill them
 - get a notification when an agent finishes, needs input or fails
 - see open pull requests with check, review and merge status
 
@@ -187,6 +189,32 @@ The phone can only read files inside the open workspace folders. It follows symb
 when they stay inside the folder. A chat's diff can also show a file outside the workspace when
 the agent edited one.
 
+## Terminals
+
+The **Terminals** tab lists the open terminals of every window, grouped by window. Each row
+shows the command that is running, or the working directory when the terminal is idle, and marks
+terminals that have exited or whose last command failed. Terminals an agent created carry a robot
+icon and the title of their chat.
+
+- A terminal shows each command with its output, colours and exit status. The newest output
+  stays in view while you are at the bottom.
+- Type a command and tap send to run it. The keys above the box send Ctrl+C, Ctrl+D, Tab, Escape,
+  the arrow keys and Enter without running anything, for answering prompts or stopping a command.
+- A tool call that ran in a terminal has an **Open terminal** link that jumps to that command's
+  output. The terminal's header links back to its chat.
+- The button in the header kills the terminal after you confirm.
+- The **+** button opens a new terminal in a workspace folder of any window.
+
+Output comes from VS Code shell integration, so there are limits:
+
+- Only commands that start after Pocket Pilot is running show up, and only in shells with shell
+  integration. A terminal without it says so and still takes input.
+- Text typed into a running program is not echoed back unless the program prints it.
+- Full-screen programs such as `vim` or `top` show their current screen, not a history.
+- Each terminal keeps its last 50 commands and 5,000 lines of output.
+- An agent's command is linked to its tool call by the command text, so two identical commands
+  started within a minute of each other can swap links.
+
 ## Notifications
 
 Turn on **Notify this device** under **Settings** to get a push notification when an agent
@@ -218,8 +246,8 @@ notification** to check delivery. Tapping a notification opens that chat.
 - Devices get a random token in a `Secure`, `HttpOnly`, `SameSite=Strict` cookie. Only a SHA-256
   hash of the token is stored.
 - The optional password is stored as a scrypt hash in VS Code secret storage, never in settings.
-- Anyone who can pair a phone can run agents in your workspace. Treat a pairing code like a
-  password.
+- Anyone who can pair a phone can run agents in your workspace, and can run any command in its
+  terminals. Treat a pairing code like a password.
 - The Copilot hook command posts to Pocket Pilot on loopback only, with a random secret stored in
   the hook file. The file is readable only by your user account.
 - Push notifications carry the chat title and the window name. They are encrypted end to end

@@ -241,7 +241,8 @@ function projectPart(part: JsonRecord, context: PartContext): ResponsePart | nul
         message: plainMessage(part.pastTenseMessage) || plainMessage(part.invocationMessage),
         detail: toolDetail(part.toolSpecificData),
         awaitingConfirmation: awaitingInput && part.isConfirmed == null,
-        status: context.statuses.get(asString(part.toolCallId) ?? '') ?? 'done'
+        status: context.statuses.get(asString(part.toolCallId) ?? '') ?? 'done',
+        terminal: null
       };
     case 'textEditGroup':
     case 'notebookEditGroup': {
@@ -372,7 +373,8 @@ export function activityParts(
         message: event.name,
         detail: event.args && clip(event.args, DETAIL_LENGTH),
         awaitingConfirmation: false,
-        status: statuses.get(event.callId) ?? 'running'
+        status: statuses.get(event.callId) ?? 'running',
+        terminal: null
       });
     } else if (event.type === 'toolEnd') {
       running.delete(event.callId);

@@ -17,7 +17,8 @@ import {
   repositoryGroups,
   resolveRepository,
   sessionEntries,
-  sessionSections
+  sessionSections,
+  terminalTargets
 } from '../src/lib/hub/views';
 import { pairCode, parseRoute, type Route, routeHash } from '../src/lib/routing';
 
@@ -51,6 +52,7 @@ function window(windowId: string, keys: string[], sessions: SessionSummary[]): W
     repositories: keys.map((key) => ({ key, label: key.split('/').at(-1) ?? key, github: null })),
     folders: [],
     sessions,
+    terminals: [],
     canOrganize: true,
     agents: [],
     models: []
@@ -119,6 +121,26 @@ describe('repositoryGroups', () => {
     expect(
       [pinned, recent, archived].map((entries) => entries.map((entry) => entry.session.id))
     ).toEqual([['pinned'], ['recent'], ['archived', 'both']]);
+  });
+});
+
+describe('terminalTargets', () => {
+  it('offers each folder, or the window itself when it has none', () => {
+    const windows = [
+      {
+        ...window('w1', [], []),
+        folders: [
+          { id: 'f1', name: 'app' },
+          { id: 'f2', name: 'lib' }
+        ]
+      },
+      window('w2', [], [])
+    ];
+    expect(terminalTargets(windows)).toEqual([
+      { windowId: 'w1', windowName: 'w1', folderId: 'f1', name: 'app' },
+      { windowId: 'w1', windowName: 'w1', folderId: 'f2', name: 'lib' },
+      { windowId: 'w2', windowName: 'w2', folderId: null, name: 'w2' }
+    ]);
   });
 });
 
@@ -209,7 +231,8 @@ describe('response parts', () => {
         message: 'Run',
         detail: null,
         awaitingConfirmation,
-        status: 'running'
+        status: 'running',
+        terminal: null
       }) as const;
     const request = (parts: SessionDetail['requests'][number]['parts']) => ({
       id: 'r',
@@ -245,6 +268,9 @@ describe('routing', () => {
     ['#/settings', { name: 'settings' }],
     ['#/new', { name: 'new' }],
     ['#/code', { name: 'code' }],
+    ['#/terminals', { name: 'terminals' }],
+    ['#/terminal/w/t', { name: 'terminal', windowId: 'w', terminalId: 't', executionId: null }],
+    ['#/terminal/w', { name: 'chats' }],
     ['#/session/w%2F1/s%201', { name: 'session', windowId: 'w/1', sessionId: 's 1' }],
     ['#/session/w1', { name: 'chats' }],
     ['#/tree/w/f', { name: 'folder', windowId: 'w', folderId: 'f', tab: 'files', path: '' }],
@@ -268,7 +294,9 @@ describe('routing', () => {
       path: '/Users/me/a/b.ts',
       requestId: null
     },
-    { name: 'sessionDiff', windowId: 'w', sessionId: 's', path: '/a b.ts', requestId: 'r1' }
+    { name: 'sessionDiff', windowId: 'w', sessionId: 's', path: '/a b.ts', requestId: 'r1' },
+    { name: 'terminal', windowId: 'w/1', terminalId: 't 1', executionId: null },
+    { name: 'terminal', windowId: 'w', terminalId: 't', executionId: 'e#1' }
   ])('round-trips $name routes', (route) => {
     expect(parseRoute(routeHash(route))).toEqual(route);
   });

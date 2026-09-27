@@ -1,16 +1,18 @@
 export type FolderTab = 'files' | 'changes';
 
-export type Tab = 'chats' | 'pullRequests' | 'code' | 'settings';
+export type Tab = 'chats' | 'pullRequests' | 'code' | 'terminals' | 'settings';
 
-export const TABS: Tab[] = ['chats', 'pullRequests', 'code', 'settings'];
+export const TABS: Tab[] = ['chats', 'pullRequests', 'code', 'terminals', 'settings'];
 
 export type Route =
   | { name: 'chats' }
   | { name: 'pullRequests' }
   | { name: 'code' }
+  | { name: 'terminals' }
   | { name: 'settings' }
   | { name: 'new' }
   | { name: 'session'; windowId: string; sessionId: string }
+  | { name: 'terminal'; windowId: string; terminalId: string; executionId: string | null }
   | { name: 'folder'; windowId: string; folderId: string; tab: FolderTab; path: string }
   | { name: 'file'; windowId: string; folderId: string; path: string }
   | { name: 'gitDiff'; windowId: string; folderId: string; path: string }
@@ -26,6 +28,7 @@ export type Route =
 const STATIC: Record<string, Route> = {
   prs: { name: 'pullRequests' },
   code: { name: 'code' },
+  terminals: { name: 'terminals' },
   settings: { name: 'settings' },
   new: { name: 'new' }
 };
@@ -37,6 +40,8 @@ export function parseRoute(hash: string): Route {
   switch (head) {
     case 'session':
       return { name: 'session', windowId: first, sessionId: second };
+    case 'terminal':
+      return { name: 'terminal', windowId: first, terminalId: second, executionId: third || null };
     case 'tree':
       return { name: 'folder', windowId: first, folderId: second, tab: 'files', path: third };
     case 'changes':
@@ -76,11 +81,16 @@ export function routeHash(route: Route): string {
     case 'pullRequests':
       return '#/prs';
     case 'code':
+    case 'terminals':
     case 'settings':
     case 'new':
       return `#/${route.name}`;
     case 'session':
       return hashOf('session', route.windowId, route.sessionId);
+    case 'terminal':
+      return route.executionId
+        ? hashOf('terminal', route.windowId, route.terminalId, route.executionId)
+        : hashOf('terminal', route.windowId, route.terminalId);
     case 'folder':
       return route.tab === 'changes'
         ? hashOf('changes', route.windowId, route.folderId)
@@ -105,8 +115,11 @@ export function tabOf(route: Route): Tab {
     case 'chats':
     case 'pullRequests':
     case 'code':
+    case 'terminals':
     case 'settings':
       return route.name;
+    case 'terminal':
+      return 'terminals';
     case 'new':
     case 'session':
     case 'sessionChanges':

@@ -396,7 +396,8 @@ describe('code queries', () => {
       at: at + 10,
       callId: 'c1',
       toolName: 'replace_string_in_file',
-      paths: [docs]
+      paths: [docs],
+      command: null
     });
     await writeFile(docs, '# Demo\nMore\n');
     const result = await query({

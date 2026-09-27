@@ -180,6 +180,7 @@ server.on('upgrade', (request, socket, head) => {
   sockets.handleUpgrade(request, socket, head, (ws) => {
     const client: MockClient = {
       subscription: null,
+      terminal: null,
       send: (message) => ws.send(JSON.stringify(message))
     };
     hub.connect(client);
@@ -188,6 +189,8 @@ server.on('upgrade', (request, socket, head) => {
       if (message.type === 'presence') return;
       if (message.type === 'subscribe') hub.subscribe(client, message);
       else if (message.type === 'unsubscribe') hub.subscribe(client, null);
+      else if (message.type === 'watchTerminal') hub.watchTerminal(client, message);
+      else if (message.type === 'unwatchTerminal') hub.watchTerminal(client, null);
       else if (message.type === 'refreshPullRequests') hub.refreshPullRequests();
       else if (message.type === 'query') {
         try {

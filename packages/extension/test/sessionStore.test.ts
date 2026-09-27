@@ -144,7 +144,8 @@ describe('SessionStore', () => {
         at: at + 1,
         callId: 'c',
         toolName: 'grep',
-        paths: []
+        paths: [],
+        command: null
       }
     ];
     for (const event of hooks) await store.hook(event);
@@ -167,7 +168,8 @@ describe('SessionStore', () => {
             message: 'grep',
             detail: null,
             awaitingConfirmation: false,
-            status: 'running'
+            status: 'running',
+            terminal: null
           }
         ]
       ]

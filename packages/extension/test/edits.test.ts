@@ -115,7 +115,8 @@ describe('live edits', () => {
       at,
       callId: 'c1',
       toolName: 'create_file',
-      paths: ['/a.ts']
+      paths: ['/a.ts'],
+      command: null
     });
     const span = live.span('s1', request);
     expect(span ? [...span.files.keys()] : null).toEqual(paths);
@@ -131,7 +132,8 @@ describe('live edits', () => {
       at,
       callId: 'c1',
       toolName: 'create_file',
-      paths: ['/a.ts', '/b.ts']
+      paths: ['/a.ts', '/b.ts'],
+      command: null
     });
     files.set('/a.ts', 'second');
     await live.hook({ kind: 'prompt', sessionId: 's1', at: at + 10_000, prompt: 'Two' });
@@ -141,7 +143,8 @@ describe('live edits', () => {
       at: at + 10_000,
       callId: 'c2',
       toolName: 'create_file',
-      paths: ['/a.ts']
+      paths: ['/a.ts'],
+      command: null
     });
     files.set('/a.ts', 'third');
     const span = live.span('s1', { message: 'One', timestamp: at, until: at + 10_000 });

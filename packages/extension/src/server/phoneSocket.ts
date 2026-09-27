@@ -57,6 +57,14 @@ export function acceptPhone(
       hub.subscribe(client, null);
       return;
     }
+    if (message.type === 'watchTerminal') {
+      hub.watchTerminal(client, { windowId: message.windowId, terminalId: message.terminalId });
+      return;
+    }
+    if (message.type === 'unwatchTerminal') {
+      hub.watchTerminal(client, null);
+      return;
+    }
     if (message.type === 'refreshPullRequests') {
       refreshPullRequests();
       return;

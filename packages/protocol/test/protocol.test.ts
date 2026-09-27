@@ -3,8 +3,10 @@ import type { z } from 'zod';
 
 import {
   applyPatch,
+  applyTerminalPatch,
   clientMessageSchema,
   diffDetail,
+  type ExecutionPatch,
   followerMessageSchema,
   parseMessage,
   pushRegistrationSchema,
@@ -13,6 +15,9 @@ import {
   serverMessageSchema,
   type SessionDetail,
   sessionPatchSchema,
+  type TerminalDetail,
+  type TerminalExecution,
+  type TerminalLine,
   type WindowState
 } from '../src';
 
@@ -37,6 +42,7 @@ const window: WindowState = {
       archived: false
     }
   ],
+  terminals: [],
   canOrganize: true,
   agents: [{ id: 'agent', name: 'Agent', description: null, builtin: true }],
   models: []
@@ -71,6 +77,40 @@ const base = session([turn('r1', [markdown('a')]), turn('r2', [markdown('b'), ma
 
 const clone = (detail: SessionDetail): SessionDetail =>
   JSON.parse(JSON.stringify(detail)) as SessionDetail;
+
+const line = (text: string): TerminalLine => [{ text, fg: null, bg: null, flags: 0 }];
+
+const meta = (id: string): Omit<TerminalExecution, 'lines'> => ({
+  id,
+  command: 'npm test',
+  cwd: null,
+  startedAt: 1,
+  endedAt: null,
+  exitCode: null,
+  sessionId: null,
+  callId: null,
+  alternate: false,
+  dropped: 0,
+  tail: []
+});
+
+const execution = (
+  id: string,
+  lines: string[],
+  fields: Partial<TerminalExecution> = {}
+): TerminalExecution => ({ ...meta(id), lines: lines.map(line), ...fields });
+
+const update = (
+  id: string,
+  append: string[],
+  fields: Partial<ExecutionPatch> = {}
+): ExecutionPatch => ({ ...meta(id), append: append.map(line), ...fields });
+
+const terminal = (): TerminalDetail => ({
+  id: 't1',
+  dropped: 0,
+  executions: [execution('e1', ['a', 'b']), execution('e2', ['c'])]
+});
 
 describe('protocol', () => {
   it.each<[z.ZodType, unknown]>([
@@ -172,5 +212,33 @@ describe('protocol', () => {
 
   it('skips unchanged sessions', () => {
     expect(diffDetail(base, clone(base))).toBeNull();
+  });
+
+  it.each<[string, Parameters<typeof applyTerminalPatch>[1], TerminalExecution[]]>([
+    [
+      'appended output',
+      { dropped: 0, executions: [update('e2', ['d'], { tail: [line('%')] })] },
+      [execution('e1', ['a', 'b']), execution('e2', ['c', 'd'], { tail: [line('%')] })]
+    ],
+    [
+      'dropped lines',
+      { dropped: 0, executions: [update('e1', ['x'], { dropped: 2 })] },
+      [execution('e1', ['x'], { dropped: 2 }), execution('e2', ['c'])]
+    ],
+    [
+      'lines dropped past the old end',
+      { dropped: 0, executions: [update('e2', ['z'], { dropped: 4 })] },
+      [execution('e1', ['a', 'b']), execution('e2', ['z'], { dropped: 4 })]
+    ],
+    [
+      'new execution with dropped history',
+      { dropped: 1, executions: [update('e3', ['e'], { exitCode: 0 })] },
+      [execution('e2', ['c']), execution('e3', ['e'], { exitCode: 0 })]
+    ]
+  ])('patches terminal %s', (_, patch, executions) => {
+    const current = terminal();
+    applyTerminalPatch(current, patch);
+    expect(current.executions).toEqual(executions);
+    expect(current.dropped).toBe(patch.dropped);
   });
 });

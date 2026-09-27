@@ -95,7 +95,8 @@ describe('pending overlay', () => {
             message: 'grep',
             detail: null,
             awaitingConfirmation: false,
-            status: 'running'
+            status: 'running',
+            terminal: null
           }
         ]
       ]

@@ -58,6 +58,13 @@ export function connectFollower(
         window.onDidChangeState((state) => send({ type: 'window', window: state })),
         window.onDidChangeSession(({ sessionId, detail }) =>
           send({ type: 'session', sessionId, detail })
+        ),
+        window.onDidChangeTerminal((update) =>
+          send(
+            'patch' in update
+              ? { type: 'terminalPatch', terminalId: update.terminalId, patch: update.patch }
+              : { type: 'terminal', terminalId: update.terminalId, detail: update.detail }
+          )
         )
       );
       resolve();
@@ -69,6 +76,7 @@ export function connectFollower(
     socket.once('close', () => {
       for (const subscription of subscriptions) subscription.dispose();
       window.setWatches([]);
+      window.setTerminalWatches([]);
       resolve();
     });
   });
@@ -83,6 +91,7 @@ export function connectFollower(
       return;
     }
     if (message.type === 'watch') window.setWatches(message.sessions);
+    else if (message.type === 'watchTerminals') window.setTerminalWatches(message.terminalIds);
     else if (message.type === 'query') void query(message);
     else void run(message);
   });

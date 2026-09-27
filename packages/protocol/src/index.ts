@@ -5,3 +5,4 @@ export * from './domain.ts';
 export * from './messages.ts';
 export * from './patch.ts';
 export * from './push.ts';
+export * from './terminal.ts';

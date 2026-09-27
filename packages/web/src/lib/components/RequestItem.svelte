@@ -5,6 +5,7 @@
   import FileDiff from '@lucide/svelte/icons/file-diff';
   import FilePen from '@lucide/svelte/icons/file-pen';
   import ShieldAlert from '@lucide/svelte/icons/shield-alert';
+  import SquareTerminal from '@lucide/svelte/icons/square-terminal';
   import type { QuestionAnswers, RequestView, ResponsePart } from '@pocket-pilot/protocol';
 
   import { baseName } from '../code/paths';
@@ -88,6 +89,19 @@
         </details>
       {:else}
         <div class="flex items-start gap-2 text-sm text-base-content/70">{@render tool(part)}</div>
+      {/if}
+      {#if part.terminal}
+        <a
+          class="-mt-1 ml-6 flex items-center gap-2 self-start text-sm text-base-content/70 hover:text-primary"
+          href={routeHash({
+            name: 'terminal',
+            windowId,
+            terminalId: part.terminal.terminalId,
+            executionId: part.terminal.executionId
+          })}
+        >
+          <SquareTerminal class="size-4 shrink-0" />Open terminal
+        </a>
       {/if}
     {:else if part.kind === 'edit'}
       <a

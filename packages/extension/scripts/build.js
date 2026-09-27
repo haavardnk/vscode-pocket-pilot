@@ -20,6 +20,7 @@ const options = {
   format: 'cjs',
   target: 'node22',
   mainFields: ['module', 'main'],
+  alias: { '@xterm/headless': '@xterm/headless/lib-headless/xterm-headless.mjs' },
   external: ['vscode', 'bufferutil', 'utf-8-validate'],
   minify: production,
   sourcemap: production ? false : 'linked',

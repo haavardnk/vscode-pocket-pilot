@@ -70,8 +70,24 @@ describe('TranscriptBuffer', () => {
     const buffer = new TranscriptBuffer();
     const hooks: HookEvent[] = [
       { kind: 'prompt', sessionId: 's', at: at(1), prompt: 'go' },
-      { kind: 'toolStart', sessionId: 's', at: at(2), callId: 'a', toolName: 'grep', paths: [] },
-      { kind: 'toolStart', sessionId: 's', at: at(4), callId: 'b', toolName: 'read', paths: [] }
+      {
+        kind: 'toolStart',
+        sessionId: 's',
+        at: at(2),
+        callId: 'a',
+        toolName: 'grep',
+        paths: [],
+        command: null
+      },
+      {
+        kind: 'toolStart',
+        sessionId: 's',
+        at: at(4),
+        callId: 'b',
+        toolName: 'read',
+        paths: [],
+        command: null
+      }
     ];
     for (const event of hooks) buffer.hook(event);
     buffer.append([

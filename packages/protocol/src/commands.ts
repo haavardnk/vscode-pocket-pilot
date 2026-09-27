@@ -9,6 +9,7 @@ import {
 } from './domain.ts';
 
 const sessionTarget = { windowId: z.string(), sessionId: z.string() };
+const terminalTarget = { windowId: z.string(), terminalId: z.string() };
 
 export const commandSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -63,6 +64,19 @@ export const commandSchema = z.discriminatedUnion('kind', [
     modelId: z.string().min(1),
     key: modelConfigKeySchema,
     value: configValueSchema.nullable()
+  }),
+  z.object({
+    kind: z.literal('terminalInput'),
+    ...terminalTarget,
+    text: z.string().min(1).max(10_000),
+    execute: z.boolean()
+  }),
+  z.object({ kind: z.literal('killTerminal'), ...terminalTarget }),
+  z.object({
+    kind: z.literal('createTerminal'),
+    windowId: z.string(),
+    terminalId: z.uuid(),
+    folderId: z.string().nullable()
   })
 ]);
 

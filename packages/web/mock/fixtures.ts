@@ -1,11 +1,29 @@
-import type { Model, PullRequestState, SessionDetail, WindowState } from '@pocket-pilot/protocol';
+import {
+  type Model,
+  type PullRequestState,
+  SEGMENT_BOLD,
+  type SessionDetail,
+  type TerminalColor,
+  type TerminalDetail,
+  type TerminalLine,
+  type TerminalSummary,
+  type WindowState
+} from '@pocket-pilot/protocol';
+
+export interface MockTerminal {
+  summary: TerminalSummary;
+  detail: TerminalDetail;
+}
 
 export interface MockWindow {
   state: WindowState;
   details: Map<string, SessionDetail>;
+  terminals: Map<string, TerminalDetail>;
 }
 
 const MINUTE = 60_000;
+const RED = 1;
+export const GREEN = 2;
 
 const AGENTS: WindowState['agents'] = [
   { id: 'agent', name: 'Agent', description: 'Edits files and runs tools', builtin: true },
@@ -92,13 +110,90 @@ export function refreshSummary(window: MockWindow, sessionId: string, now: numbe
   else window.state.sessions[index] = summary;
 }
 
+export function line(text: string, fg: TerminalColor = null, flags = 0): TerminalLine {
+  return [{ text, fg, bg: null, flags }];
+}
+
+export function newTerminal(
+  id: string,
+  cwd: string | null,
+  fields: Partial<TerminalSummary> = {}
+): MockTerminal {
+  return {
+    summary: {
+      id,
+      name: 'zsh',
+      cwd,
+      shell: 'zsh',
+      agent: false,
+      sessionId: null,
+      command: null,
+      lastExitCode: null,
+      shellIntegration: true,
+      exited: false,
+      ...fields
+    },
+    detail: { id, dropped: 0, executions: [] }
+  };
+}
+
+function terminals(now: number): MockTerminal[] {
+  const user = newTerminal('t-user', '~/Git/vscode-pocket-pilot', { lastExitCode: 1 });
+  const execution = {
+    cwd: user.summary.cwd,
+    sessionId: null,
+    callId: null,
+    alternate: false,
+    dropped: 0,
+    tail: []
+  };
+  user.detail.executions.push(
+    {
+      ...execution,
+      id: 'e-status',
+      command: 'git status',
+      startedAt: now - 6 * MINUTE,
+      endedAt: now - 6 * MINUTE,
+      exitCode: 0,
+      lines: [
+        [
+          { text: 'On branch ', fg: null, bg: null, flags: 0 },
+          { text: 'main', fg: null, bg: null, flags: SEGMENT_BOLD }
+        ],
+        line('Changes not staged for commit:'),
+        line('\tmodified:   packages/web/src/lib/routing.ts', RED)
+      ]
+    },
+    {
+      ...execution,
+      id: 'e-lint',
+      command: 'npm run lint',
+      startedAt: now - 5 * MINUTE,
+      endedAt: now - 5 * MINUTE,
+      exitCode: 1,
+      lines: [line('src/App.svelte'), line('✖ 1 problem (1 error, 0 warnings)', RED, SEGMENT_BOLD)]
+    }
+  );
+  const agent = newTerminal('t-agent', '~/Git/vscode-pocket-pilot', {
+    name: 'Copilot',
+    agent: true,
+    sessionId: 's1'
+  });
+  return [user, agent];
+}
+
 function buildWindow(
-  state: Omit<WindowState, 'sessions'>,
+  state: Omit<WindowState, 'sessions' | 'terminals'>,
   details: SessionDetail[],
   now: number,
-  archived: readonly string[] = []
+  archived: readonly string[] = [],
+  shells: MockTerminal[] = []
 ): MockWindow {
-  const window: MockWindow = { state: { ...state, sessions: [] }, details: new Map() };
+  const window: MockWindow = {
+    state: { ...state, sessions: [], terminals: shells.map(({ summary }) => summary) },
+    details: new Map(),
+    terminals: new Map(shells.map(({ detail }) => [detail.id, detail]))
+  };
   details.forEach((detail, index) => {
     window.details.set(detail.id, detail);
     window.state.sessions.push({
@@ -158,7 +253,8 @@ export function initialWindows(now: number): MockWindow[] {
                   message: 'Read `App.svelte`',
                   detail: null,
                   awaitingConfirmation: false,
-                  status: 'done'
+                  status: 'done',
+                  terminal: null
                 },
                 { kind: 'edit', path: '/repo/packages/web/src/App.svelte' },
                 {
@@ -168,7 +264,8 @@ export function initialWindows(now: number): MockWindow[] {
                   message: 'Run `npm test`',
                   detail: 'npm test -- --run',
                   awaitingConfirmation: true,
-                  status: 'running'
+                  status: 'running',
+                  terminal: null
                 }
               ]
             }
@@ -292,7 +389,8 @@ export function initialWindows(now: number): MockWindow[] {
         }
       ],
       now,
-      ['s5']
+      ['s5'],
+      terminals(now)
     ),
     buildWindow(
       {

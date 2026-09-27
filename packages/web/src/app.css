@@ -8,6 +8,7 @@
 @plugin './themes/frappe.ts';
 @plugin './themes/macchiato.ts';
 @plugin './themes/mocha.ts';
+@plugin './themes/terminal.ts';
 
 html {
   -webkit-tap-highlight-color: transparent;

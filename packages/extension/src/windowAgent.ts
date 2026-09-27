@@ -19,6 +19,7 @@ import * as vscode from 'vscode';
 import { agentFolders, agentUri } from './agents/agentFolders';
 import { AgentSource } from './agents/agentSource';
 import { EMPTY_WINDOW } from './cluster/hub';
+import type { TerminalUpdate } from './cluster/localWindow';
 import { CodeService } from './code/codeService';
 import { type Blob, MAX_FILE_BYTES, readBlob } from './code/files';
 import { type CodeFolder, codeFolder } from './code/folders';
@@ -35,6 +36,7 @@ import { LiveEdits } from './sessions/liveEdits';
 import { LiveMirror } from './sessions/liveMirror';
 import { SessionStore } from './sessions/sessionStore';
 import { liveMirrorMode, SECTION } from './settings';
+import { isTerminalCommand, TerminalService } from './terminals/terminalService';
 
 const PUBLISH_DELAY_MS = 100;
 const EXPORT_COMMAND = 'workbench.action.chat.export';
@@ -58,7 +60,12 @@ export class WindowAgent implements vscode.Disposable {
 
   private readonly stateChanged = new vscode.EventEmitter<WindowState>();
   private readonly sessionChanged = new vscode.EventEmitter<SessionUpdate>();
-  private readonly subscriptions: vscode.Disposable[] = [this.stateChanged, this.sessionChanged];
+  private readonly terminalChanged = new vscode.EventEmitter<TerminalUpdate>();
+  private readonly subscriptions: vscode.Disposable[] = [
+    this.stateChanged,
+    this.sessionChanged,
+    this.terminalChanged
+  ];
   private readonly store: SessionStore;
   private readonly flags: FlagStore;
   private readonly agentSource: AgentSource;
@@ -67,6 +74,7 @@ export class WindowAgent implements vscode.Disposable {
   private readonly code: CodeService;
   private readonly edits: LiveEdits;
   private readonly mirror: LiveMirror;
+  private readonly terminals: TerminalService;
   private readonly paths: ChatPaths;
   private readonly detailQueues = new Map<string, Promise<void>>();
   private watches = new Map<string, number>();
@@ -79,6 +87,7 @@ export class WindowAgent implements vscode.Disposable {
 
   readonly onDidChangeState = this.stateChanged.event;
   readonly onDidChangeSession = this.sessionChanged.event;
+  readonly onDidChangeTerminal = this.terminalChanged.event;
 
   constructor(
     context: vscode.ExtensionContext,
@@ -141,8 +150,15 @@ export class WindowAgent implements vscode.Disposable {
       canOrganize: this.paths.stateDatabase !== null,
       settings
     });
+    this.terminals = new TerminalService(() => this.folders, report);
     this.subscriptions.push(
       languages,
+      this.terminals,
+      this.terminals.onDidChange(() => this.schedulePublish()),
+      this.terminals.onDidUpdate((update) => this.terminalChanged.fire(update)),
+      this.terminals.onDidLink((sessionId) => {
+        if (this.watches.has(sessionId)) this.pushDetail(sessionId);
+      }),
       this.modelSource,
       { dispose: () => this.agentSource.dispose() },
       { dispose: () => this.store.dispose() },
@@ -187,6 +203,7 @@ export class WindowAgent implements vscode.Disposable {
       sessions: this.store
         .summaries()
         .map((summary) => ({ ...summary, ...this.flags.flags(summary.id) })),
+      terminals: this.terminals.summaries(),
       canOrganize: this.paths.stateDatabase !== null,
       agents: this.agents,
       models: this.models
@@ -201,7 +218,15 @@ export class WindowAgent implements vscode.Disposable {
     this.mirror.wake();
   }
 
+  setTerminalWatches(terminalIds: readonly string[]): void {
+    this.terminals.watch(terminalIds);
+  }
+
   async run(command: Command): Promise<void> {
+    if (isTerminalCommand(command)) {
+      this.terminals.run(command);
+      return;
+    }
     if ('sessionId' in command && !this.store.summaries().some((s) => s.id === command.sessionId)) {
       throw new Error('Unknown session');
     }
@@ -214,6 +239,7 @@ export class WindowAgent implements vscode.Disposable {
   }
 
   async hook(event: HookEvent): Promise<void> {
+    this.terminals.hook(event);
     await Promise.all([this.store.hook(event), this.edits.hook(event)]);
     this.mirror.poke();
   }
@@ -239,7 +265,11 @@ export class WindowAgent implements vscode.Disposable {
         const limit = this.watches.get(sessionId);
         if (limit === undefined) return;
         const detail = await this.store.detail(sessionId, limit);
-        if (this.watches.has(sessionId)) this.sessionChanged.fire({ sessionId, detail });
+        if (!this.watches.has(sessionId)) return;
+        this.sessionChanged.fire({
+          sessionId,
+          detail: detail && this.terminals.decorate(detail)
+        });
       })
       .catch((error: unknown) => this.report(`Session detail failed: ${String(error)}`))
       .finally(() => {

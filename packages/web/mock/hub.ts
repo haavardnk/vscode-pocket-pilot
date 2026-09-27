@@ -6,22 +6,40 @@ import {
   type PullRequestState,
   type ServerMessage,
   type SessionDetail,
+  type TerminalExecution,
+  type TerminalLine,
+  type TerminalSummary,
   type WindowState
 } from '@pocket-pilot/protocol';
 
 import { MockCode } from './code.ts';
 import {
+  GREEN,
   initialPullRequests,
   initialWindows,
+  line,
   type MockWindow,
+  newTerminal,
   refreshSummary
 } from './fixtures.ts';
 
 const REPLY_DELAY_MS = 800;
+const INTERRUPTED = 130;
+
+type TerminalCommand = Extract<
+  Command,
+  { kind: 'terminalInput' | 'killTerminal' | 'createTerminal' }
+>;
+
+export interface TerminalWatch {
+  windowId: string;
+  terminalId: string;
+}
 
 export interface MockClient {
   send(message: ServerMessage): void;
   subscription: { windowId: string; sessionId: string; limit: number } | null;
+  terminal: TerminalWatch | null;
 }
 
 export class MockHub {
@@ -52,6 +70,7 @@ export class MockHub {
     this.sent.clear();
     for (const client of this.clients) {
       client.subscription = null;
+      client.terminal = null;
       client.send(this.snapshot());
     }
   }
@@ -72,6 +91,17 @@ export class MockHub {
     if (subscription) this.sendDetail(client);
   }
 
+  watchTerminal(client: MockClient, target: TerminalWatch | null): void {
+    client.terminal = target && { windowId: target.windowId, terminalId: target.terminalId };
+    if (!client.terminal) return;
+    const { windowId, terminalId } = client.terminal;
+    const detail =
+      this.windows
+        .find((window) => window.state.windowId === windowId)
+        ?.terminals.get(terminalId) ?? null;
+    client.send({ type: 'terminal', windowId, terminalId, detail });
+  }
+
   refreshPullRequests(): void {
     this.pullRequests = { ...this.pullRequests, fetchedAt: Date.now() };
     this.broadcast({ type: 'pullRequests', state: this.pullRequests });
@@ -88,6 +118,14 @@ export class MockHub {
     if (!window) throw new Error('Window is no longer open');
     if (command.kind === 'setModelConfig') {
       this.configure(command);
+      return;
+    }
+    if (
+      command.kind === 'terminalInput' ||
+      command.kind === 'killTerminal' ||
+      command.kind === 'createTerminal'
+    ) {
+      this.runTerminal(window, command);
       return;
     }
     if (command.kind === 'newSession') {
@@ -153,6 +191,7 @@ export class MockHub {
       if (!last || tool?.kind !== 'tool') throw new Error('No tool is waiting');
       tool.awaitingConfirmation = false;
       tool.status = command.decision === 'accept' ? 'done' : 'failed';
+      if (command.decision === 'accept') this.runTool(window, detail.id, tool);
       last.parts.push({
         kind: 'markdown',
         text: command.decision === 'accept' ? 'Tests passed.' : 'Skipped the tool.'
@@ -231,7 +270,8 @@ export class MockHub {
           message: 'Read `README.md`',
           detail: null,
           awaitingConfirmation: false,
-          status: 'running'
+          status: 'running',
+          terminal: null
         }
       ]
     });
@@ -254,6 +294,139 @@ export class MockHub {
     this.changed(window, sessionId);
     const next = detail.queued.shift();
     if (next) this.ask(window, sessionId, next.text);
+  }
+
+  private runTerminal(window: MockWindow, command: TerminalCommand): void {
+    if (command.kind === 'createTerminal') {
+      if (window.terminals.has(command.terminalId)) throw new Error('Terminal already exists');
+      const folders = window.state.folders;
+      const folder =
+        command.folderId === null
+          ? folders[0]
+          : folders.find((candidate) => candidate.id === command.folderId);
+      if (command.folderId !== null && !folder) throw new Error('Folder is no longer open');
+      const { summary, detail } = newTerminal(
+        command.terminalId,
+        folder ? `~/Git/${folder.name}` : null
+      );
+      window.state.terminals.push(summary);
+      window.terminals.set(detail.id, detail);
+      this.broadcast({ type: 'window', window: window.state });
+      return;
+    }
+    const summary = window.state.terminals.find((terminal) => terminal.id === command.terminalId);
+    const detail = window.terminals.get(command.terminalId);
+    if (!summary || !detail) throw new Error('Terminal is no longer open');
+    if (command.kind === 'killTerminal') {
+      window.state.terminals = window.state.terminals.filter((terminal) => terminal !== summary);
+      window.terminals.delete(detail.id);
+      this.broadcast({ type: 'window', window: window.state });
+      for (const client of this.watchers(window, detail.id)) {
+        client.send({
+          type: 'terminal',
+          windowId: window.state.windowId,
+          terminalId: detail.id,
+          detail: null
+        });
+      }
+      return;
+    }
+    const running = detail.executions.find((execution) => execution.endedAt === null);
+    if (!command.execute) {
+      if (command.text === '\x03' && running)
+        this.endExecution(window, summary, running, INTERRUPTED, [line('^C')]);
+      return;
+    }
+    if (running) return;
+    const execution = this.startExecution(window, summary, command.text, null);
+    if (command.text === 'npm run dev') {
+      this.appendOutput(window, summary.id, execution, [line('VITE ready in 312 ms', GREEN)]);
+      return;
+    }
+    this.later(() =>
+      this.endExecution(window, summary, execution, 0, [line(`Ran ${command.text}`)])
+    );
+  }
+
+  private runTool(
+    window: MockWindow,
+    sessionId: string,
+    tool: Extract<SessionDetail['requests'][number]['parts'][number], { kind: 'tool' }>
+  ): void {
+    const summary = window.state.terminals.find(
+      (terminal) => terminal.agent && terminal.sessionId === sessionId
+    );
+    if (tool.toolId !== 'run_in_terminal' || !tool.detail || !summary) return;
+    const execution = this.startExecution(window, summary, tool.detail, tool.callId);
+    this.endExecution(window, summary, execution, 0, [line('✓ 292 tests passed', GREEN)]);
+    tool.terminal = { terminalId: summary.id, executionId: execution.id };
+  }
+
+  private startExecution(
+    window: MockWindow,
+    summary: TerminalSummary,
+    command: string,
+    callId: string | null
+  ): TerminalExecution {
+    const execution: TerminalExecution = {
+      id: this.id('execution'),
+      command,
+      cwd: summary.cwd,
+      startedAt: Date.now(),
+      endedAt: null,
+      exitCode: null,
+      sessionId: summary.sessionId,
+      callId,
+      alternate: false,
+      dropped: 0,
+      tail: [],
+      lines: []
+    };
+    window.terminals.get(summary.id)?.executions.push(execution);
+    summary.command = command;
+    this.broadcast({ type: 'window', window: window.state });
+    this.appendOutput(window, summary.id, execution, []);
+    return execution;
+  }
+
+  private endExecution(
+    window: MockWindow,
+    summary: TerminalSummary,
+    execution: TerminalExecution,
+    exitCode: number,
+    output: TerminalLine[]
+  ): void {
+    if (!window.terminals.has(summary.id) || execution.endedAt !== null) return;
+    execution.endedAt = Date.now();
+    execution.exitCode = exitCode;
+    summary.command = null;
+    summary.lastExitCode = exitCode;
+    this.broadcast({ type: 'window', window: window.state });
+    this.appendOutput(window, summary.id, execution, output);
+  }
+
+  private appendOutput(
+    window: MockWindow,
+    terminalId: string,
+    execution: TerminalExecution,
+    append: TerminalLine[]
+  ): void {
+    const detail = window.terminals.get(terminalId);
+    if (!detail) return;
+    const { lines, ...fields } = execution;
+    lines.push(...append);
+    const patch = { dropped: detail.dropped, executions: [{ ...fields, append }] };
+    for (const client of this.watchers(window, terminalId)) {
+      client.send({ type: 'terminalPatch', windowId: window.state.windowId, terminalId, patch });
+    }
+  }
+
+  private watchers(window: MockWindow, terminalId: string): MockClient[] {
+    return [...this.clients].filter(
+      (client) =>
+        client.terminal?.windowId === window.state.windowId &&
+        client.terminal.terminalId === terminalId
+    );
   }
 
   private configure(command: Extract<Command, { kind: 'setModelConfig' }>): void {

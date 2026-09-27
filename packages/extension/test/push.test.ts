@@ -36,6 +36,7 @@ function windows(...sessions: SessionSummary[]): WindowState[] {
       repositories: [],
       folders: [],
       sessions,
+      terminals: [],
       canOrganize: true,
       agents: [],
       models: []

@@ -4,6 +4,7 @@ import { codeQuerySchema, codeResultSchema } from './code.ts';
 import { commandSchema, sessionWatchSchema } from './commands.ts';
 import { pullRequestStateSchema, sessionDetailSchema, windowStateSchema } from './domain.ts';
 import { sessionPatchSchema } from './patch.ts';
+import { terminalDetailSchema, terminalPatchSchema } from './terminal.ts';
 
 const hookTarget = { sessionId: z.string(), at: z.number() };
 
@@ -14,7 +15,8 @@ export const hookEventSchema = z.discriminatedUnion('kind', [
     ...hookTarget,
     callId: z.string(),
     toolName: z.string(),
-    paths: z.array(z.string())
+    paths: z.array(z.string()),
+    command: z.string().nullable()
   }),
   z.object({ kind: z.literal('toolEnd'), ...hookTarget, callId: z.string() }),
   z.object({ kind: z.literal('stop'), ...hookTarget })
@@ -35,6 +37,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     limit: z.number().int().min(1).max(500)
   }),
   z.object({ type: z.literal('unsubscribe') }),
+  z.object({ type: z.literal('watchTerminal'), windowId: z.string(), terminalId: z.string() }),
+  z.object({ type: z.literal('unwatchTerminal') }),
   z.object({ type: z.literal('command'), requestId: z.string(), command: commandSchema }),
   z.object({ type: z.literal('query'), requestId: z.string(), query: codeQuerySchema }),
   z.object({ type: z.literal('refreshPullRequests') }),
@@ -62,6 +66,18 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
     sessionId: z.string(),
     patch: sessionPatchSchema
   }),
+  z.object({
+    type: z.literal('terminal'),
+    windowId: z.string(),
+    terminalId: z.string(),
+    detail: terminalDetailSchema.nullable()
+  }),
+  z.object({
+    type: z.literal('terminalPatch'),
+    windowId: z.string(),
+    terminalId: z.string(),
+    patch: terminalPatchSchema
+  }),
   z.object({ type: z.literal('pullRequests'), state: pullRequestStateSchema }),
   z.object({
     type: z.literal('result'),
@@ -81,6 +97,16 @@ export const followerMessageSchema = z.discriminatedUnion('type', [
     detail: sessionDetailSchema.nullable()
   }),
   z.object({
+    type: z.literal('terminal'),
+    terminalId: z.string(),
+    detail: terminalDetailSchema.nullable()
+  }),
+  z.object({
+    type: z.literal('terminalPatch'),
+    terminalId: z.string(),
+    patch: terminalPatchSchema
+  }),
+  z.object({
     type: z.literal('result'),
     requestId: z.string(),
     ok: z.boolean(),
@@ -91,6 +117,7 @@ export const followerMessageSchema = z.discriminatedUnion('type', [
 
 export const leaderMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('watch'), sessions: z.array(sessionWatchSchema) }),
+  z.object({ type: z.literal('watchTerminals'), terminalIds: z.array(z.string()) }),
   z.object({ type: z.literal('command'), requestId: z.string(), command: commandSchema }),
   z.object({ type: z.literal('query'), requestId: z.string(), query: codeQuerySchema }),
   z.object({ type: z.literal('hook'), requestId: z.string(), event: hookEventSchema })
