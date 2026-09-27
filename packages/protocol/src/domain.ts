@@ -1,0 +1,182 @@
+import { z } from 'zod';
+
+export const repositorySchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  github: z.object({ owner: z.string(), name: z.string() }).nullable()
+});
+
+export const sessionStatusSchema = z.enum(['idle', 'running', 'needsInput', 'failed']);
+
+export const sessionSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  status: sessionStatusSchema,
+  modelId: z.string().nullable(),
+  modeId: z.string().nullable(),
+  requestCount: z.number(),
+  preview: z.string().nullable()
+});
+
+export const requestStateSchema = z.enum([
+  'pending',
+  'complete',
+  'cancelled',
+  'failed',
+  'needsInput'
+]);
+
+export const responsePartSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('markdown'), text: z.string() }),
+  z.object({ kind: z.literal('thinking'), text: z.string(), title: z.string().nullable() }),
+  z.object({
+    kind: z.literal('tool'),
+    callId: z.string(),
+    toolId: z.string(),
+    message: z.string(),
+    awaitingConfirmation: z.boolean()
+  }),
+  z.object({ kind: z.literal('edit'), path: z.string() }),
+  z.object({ kind: z.literal('progress'), text: z.string() }),
+  z.object({ kind: z.literal('question'), text: z.string(), answered: z.boolean() })
+]);
+
+export const requestViewSchema = z.object({
+  id: z.string(),
+  timestamp: z.number(),
+  message: z.string(),
+  modelId: z.string().nullable(),
+  state: requestStateSchema,
+  error: z.string().nullable(),
+  parts: z.array(responsePartSchema)
+});
+
+export const deliverySchema = z.enum(['queued', 'steering']);
+
+export const queuedRequestSchema = z.object({
+  id: z.string(),
+  delivery: deliverySchema,
+  text: z.string()
+});
+
+export const liveEventSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('message'),
+    at: z.number(),
+    text: z.string(),
+    reasoning: z.string().nullable()
+  }),
+  z.object({
+    kind: z.literal('tool'),
+    at: z.number(),
+    callId: z.string(),
+    name: z.string(),
+    state: z.enum(['running', 'succeeded', 'failed'])
+  })
+]);
+
+export const sessionDetailSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: sessionStatusSchema,
+  modelId: z.string().nullable(),
+  modeId: z.string().nullable(),
+  totalRequests: z.number(),
+  requests: z.array(requestViewSchema),
+  queued: z.array(queuedRequestSchema),
+  live: z.array(liveEventSchema)
+});
+
+export const agentSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  builtin: z.boolean()
+});
+
+export const modelConfigKeySchema = z.enum(['reasoningEffort', 'contextSize']);
+
+export const configValueSchema = z.union([z.string(), z.number()]);
+
+export const modelConfigOptionSchema = z.object({
+  key: modelConfigKeySchema,
+  title: z.string(),
+  choices: z.array(
+    z.object({
+      value: configValueSchema,
+      label: z.string(),
+      description: z.string().nullable()
+    })
+  ),
+  defaultValue: configValueSchema.nullable(),
+  value: configValueSchema.nullable()
+});
+
+export const modelSchema = z.object({
+  id: z.string(),
+  vendor: z.string(),
+  family: z.string(),
+  name: z.string(),
+  maxInputTokens: z.number().nullable(),
+  options: z.array(modelConfigOptionSchema)
+});
+
+export const windowStateSchema = z.object({
+  windowId: z.string(),
+  name: z.string(),
+  repositories: z.array(repositorySchema),
+  sessions: z.array(sessionSummarySchema),
+  agents: z.array(agentSchema),
+  models: z.array(modelSchema)
+});
+
+export const checkStateSchema = z.enum(['success', 'failure', 'pending', 'none']);
+
+export const reviewStateSchema = z.enum(['approved', 'changesRequested', 'reviewRequired', 'none']);
+
+export const pullRequestSchema = z.object({
+  repositoryKey: z.string(),
+  number: z.number(),
+  title: z.string(),
+  url: z.string(),
+  author: z.string().nullable(),
+  isDraft: z.boolean(),
+  headRef: z.string(),
+  baseRef: z.string(),
+  updatedAt: z.string(),
+  checks: checkStateSchema,
+  review: reviewStateSchema,
+  mergeable: z.enum(['mergeable', 'conflicting', 'unknown']),
+  additions: z.number(),
+  deletions: z.number()
+});
+
+export const pullRequestStateSchema = z.object({
+  status: z.enum(['disabled', 'signedOut', 'loading', 'ready']),
+  fetchedAt: z.number().nullable(),
+  errors: z.array(z.object({ repositoryKey: z.string(), message: z.string() })),
+  pullRequests: z.array(pullRequestSchema)
+});
+
+export type Repository = z.infer<typeof repositorySchema>;
+export type SessionStatus = z.infer<typeof sessionStatusSchema>;
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+export type RequestState = z.infer<typeof requestStateSchema>;
+export type ResponsePart = z.infer<typeof responsePartSchema>;
+export type RequestView = z.infer<typeof requestViewSchema>;
+export type Delivery = z.infer<typeof deliverySchema>;
+export type QueuedRequest = z.infer<typeof queuedRequestSchema>;
+export type LiveEvent = z.infer<typeof liveEventSchema>;
+export type SessionDetail = z.infer<typeof sessionDetailSchema>;
+export type Agent = z.infer<typeof agentSchema>;
+export type ModelConfigKey = z.infer<typeof modelConfigKeySchema>;
+export type ConfigValue = z.infer<typeof configValueSchema>;
+export type ModelConfigOption = z.infer<typeof modelConfigOptionSchema>;
+export type Model = z.infer<typeof modelSchema>;
+export type WindowState = z.infer<typeof windowStateSchema>;
+export type CheckState = z.infer<typeof checkStateSchema>;
+export type ReviewState = z.infer<typeof reviewStateSchema>;
+export type PullRequest = z.infer<typeof pullRequestSchema>;
+export type PullRequestState = z.infer<typeof pullRequestStateSchema>;
