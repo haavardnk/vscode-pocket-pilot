@@ -1,5 +1,9 @@
 export type FolderTab = 'files' | 'changes';
 
+export type Tab = 'chats' | 'pullRequests' | 'code' | 'settings';
+
+export const TABS: Tab[] = ['chats', 'pullRequests', 'code', 'settings'];
+
 export type Route =
   | { name: 'chats' }
   | { name: 'pullRequests' }
@@ -72,6 +76,25 @@ export function routeHash(route: Route): string {
       return hashOf('edits', route.windowId, route.sessionId);
     case 'sessionDiff':
       return hashOf('edit', route.windowId, route.sessionId, route.path);
+  }
+}
+
+export function tabOf(route: Route): Tab {
+  switch (route.name) {
+    case 'chats':
+    case 'pullRequests':
+    case 'code':
+    case 'settings':
+      return route.name;
+    case 'new':
+    case 'session':
+    case 'sessionChanges':
+    case 'sessionDiff':
+      return 'chats';
+    case 'folder':
+    case 'file':
+    case 'gitDiff':
+      return 'code';
   }
 }
 

@@ -12,6 +12,7 @@
     PermissionLevel,
     QuestionAnswers
   } from '@pocket-pilot/protocol';
+  import { untrack } from 'svelte';
 
   import Composer from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
@@ -56,12 +57,12 @@
   });
 
   $effect.pre(() => {
-    if (!hub.detail) return;
+    if (!hub.detail || untrack(() => router.tab) !== 'chats') return;
     followBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 120;
   });
 
   $effect(() => {
-    if (!hub.detail || !followBottom) return;
+    if (!hub.detail || !followBottom || router.tab !== 'chats') return;
     scrollTo({ top: document.documentElement.scrollHeight });
   });
 
@@ -130,7 +131,7 @@
   }
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<div class="flex flex-1 flex-col">
   <header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">
     <div class="flex h-14 items-center gap-1 px-2">
       <button
@@ -222,7 +223,7 @@
   </main>
 
   {#if detail && hostWindow}
-    <footer class="sticky bottom-0 z-20 border-t border-base-300 bg-base-100 pb-safe">
+    <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
       <div class="flex flex-col gap-3 px-3 pt-3 pb-3">
         {#if detail.queued.length > 0}
           <ul class="flex flex-col gap-1" aria-label="Queued messages">

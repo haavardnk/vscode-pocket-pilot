@@ -35,7 +35,7 @@
   }
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<div class="flex flex-1 flex-col">
   <ScreenHeader
     title={baseName(path)}
     subtitle={parentPath(path) || folder?.name}

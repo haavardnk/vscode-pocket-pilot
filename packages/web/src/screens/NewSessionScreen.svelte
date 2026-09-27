@@ -92,7 +92,7 @@
   }
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<div class="flex flex-1 flex-col">
   <header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">
     <div class="flex h-14 items-center gap-1 px-2">
       <button
@@ -136,7 +136,7 @@
   </main>
 
   {#if target && !pending}
-    <footer class="sticky bottom-0 z-20 border-t border-base-300 bg-base-100 pb-safe">
+    <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
       <div class="px-3 py-3">
         <Composer
           busy={false}

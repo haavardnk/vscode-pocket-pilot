@@ -55,7 +55,7 @@
   }
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<div class="flex flex-1 flex-col">
   <ScreenHeader
     title="Changes"
     subtitle={summary?.title}
@@ -97,7 +97,7 @@
   </main>
 
   {#if pending > 0}
-    <footer class="sticky bottom-0 z-20 border-t border-base-300 bg-base-100 pb-safe">
+    <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
       <div class="flex gap-2 p-3">
         <button
           class="btn flex-1"

@@ -38,7 +38,7 @@
   });
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<div class="flex flex-1 flex-col">
   <ScreenHeader title={folder?.name ?? 'Folder'} subtitle={path || hostWindow?.name} {back}>
     {#snippet actions()}
       <RefreshButton loading={active.loading} onrefresh={() => void active.refresh()} />

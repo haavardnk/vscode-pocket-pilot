@@ -67,6 +67,15 @@ test.describe('paired', () => {
     expect(background).toBe(BASES[testInfo.project.name]);
   });
 
+  test('orders the tabs', async ({ page }) => {
+    await expect(page.getByRole('navigation').getByRole('button')).toHaveText([
+      'Chats',
+      'Code',
+      'Pull requests',
+      'Settings'
+    ]);
+  });
+
   test('filters chats and pull requests by repository', async ({ page }) => {
     const picker = page.getByRole('combobox', { name: 'Repository' });
     await picker.selectOption({ label: 'immich-edit' });
@@ -375,6 +384,28 @@ test.describe('paired', () => {
     await expect(changes.getByText('Undone')).toBeVisible();
     await expect(changes.getByText('Kept')).toBeVisible();
     await expect(page.getByRole('button', { name: /Keep all/ })).toHaveCount(0);
+  });
+
+  test('keeps each tab where it was left', async ({ page }) => {
+    const tabs = page.getByRole('navigation');
+    await openSession(page, 'Build the phone app');
+    await expect(tabs).toBeVisible();
+    const message = page.getByRole('textbox', { name: 'Message' });
+    await message.fill('Half-written draft');
+    await expect(tabs).toBeHidden();
+    await message.blur();
+
+    await openFolder(page);
+    await tabs.getByRole('button', { name: 'Chats' }).click();
+    await expect(page.getByRole('heading', { name: 'Build the phone app' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('Half-written draft');
+
+    await tabs.getByRole('button', { name: 'Code' }).click();
+    await expect(page.getByRole('heading', { name: 'vscode-pocket-pilot' })).toBeVisible();
+    await tabs.getByRole('button', { name: 'Code' }).click();
+    await expect(
+      page.getByRole('link', { name: 'vscode-pocket-pilot', exact: true })
+    ).toBeVisible();
   });
 
   test('draws the repository menu on an opaque background', async ({ page }) => {

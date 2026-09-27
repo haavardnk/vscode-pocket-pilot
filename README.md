@@ -100,6 +100,12 @@ Every VS Code window runs Pocket Pilot. One of them wins the port and becomes th
 others connect to it over loopback and report their chats. When the leader window closes, another
 window takes over within a few seconds and the phone reconnects on its own.
 
+## Tabs on the phone
+
+The tab bar stays at the bottom on every screen, including inside a chat, and hides while the
+keyboard is open. Each tab keeps the screen you left it on, with its scroll position and any
+half-written message. Tapping the tab you are already on goes back to its first screen.
+
 ## Pinned and archived chats
 
 The menu next to a chat, and the one in a chat's header, pins, archives or unarchives it. The
