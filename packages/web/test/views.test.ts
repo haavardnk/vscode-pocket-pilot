@@ -31,6 +31,7 @@ function session(
     createdAt: 0,
     updatedAt,
     status,
+    lastRequestState: null,
     modelId: null,
     modeId: null,
     requestCount: 1,

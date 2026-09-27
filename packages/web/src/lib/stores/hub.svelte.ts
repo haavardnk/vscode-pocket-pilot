@@ -49,8 +49,9 @@ class HubStore {
       message: (message) => this.apply(message),
       connection: (state) => {
         this.connection = state;
-        if (state === 'open' && this.subscription)
-          this.socket?.send({ type: 'subscribe', ...this.subscription });
+        if (state !== 'open') return;
+        this.reportPresence();
+        if (this.subscription) this.socket?.send({ type: 'subscribe', ...this.subscription });
       },
       rejected: onRejected
     });
@@ -117,8 +118,13 @@ class HubStore {
   }
 
   private readonly wake = (): void => {
+    this.reportPresence();
     if (document.visibilityState === 'visible') this.socket?.reconnectNow();
   };
+
+  private reportPresence(): void {
+    this.socket?.send({ type: 'presence', visible: document.visibilityState === 'visible' });
+  }
 
   private apply(message: ServerMessage): void {
     if (message.type === 'snapshot') {

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
-import type { ClientMessage, Device } from '@pocket-pilot/protocol';
+import type { ClientMessage, Device, PushEvents } from '@pocket-pilot/protocol';
 import { WebSocketServer } from 'ws';
 
 import { type MockClient, MockHub } from './hub.ts';
@@ -26,6 +26,12 @@ const TYPES: Record<string, string> = {
 
 const hub = new MockHub();
 const devices = new Map<string, Device>();
+const pushes = new Map<string, { subscription: unknown; events: PushEvents }>();
+const pushTests: string[] = [];
+
+const PUSH_KEY =
+  'BBbSzvfmzP9RzBcphct00u2qmFYTkZtBi63G1ymzZCRN1Vu7kqN5uFDQ0-TNu8K1uOVrCEtMZKTEG5x2Unvwqfw';
+const DEFAULT_EVENTS: PushEvents = { finished: true, needsInput: true, failed: true };
 
 function tokenOf(request: IncomingMessage): string | null {
   const match = new RegExp(`(?:^|; )${COOKIE}=([^;]+)`).exec(request.headers.cookie ?? '');
@@ -94,8 +100,11 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
   if (url === '/__reset' && request.method === 'POST') {
     hub.reset();
     devices.clear();
+    pushes.clear();
+    pushTests.length = 0;
     return json(response, 200, {});
   }
+  if (url === '/__push') return json(response, 200, { pushes: [...pushes.values()], pushTests });
   if (url === '/api/auth')
     return json(response, 200, {
       device: deviceOf(request),
@@ -123,8 +132,35 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
       { 'set-cookie': `${COOKIE}=; Path=/; Max-Age=0` }
     );
   }
+  if (url.startsWith('/api/push')) return handlePush(request, response, url);
   if (url.startsWith('/api/')) return json(response, 404, { error: 'Not found' });
   await serveStatic(request, response);
+}
+
+async function handlePush(
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: string
+): Promise<void> {
+  const device = deviceOf(request);
+  if (!device) return json(response, 401, { error: 'Pair this device first' });
+  const stored = pushes.get(device.id);
+  if (url === '/api/push/test' && request.method === 'POST') {
+    if (!stored) return json(response, 404, { error: 'Notifications are off on this device' });
+    pushTests.push(device.id);
+    return json(response, 204, null);
+  }
+  if (url !== '/api/push') return json(response, 404, { error: 'Not found' });
+  if (request.method === 'GET')
+    return json(response, 200, { publicKey: PUSH_KEY, events: stored?.events ?? null });
+  if (request.method === 'DELETE') {
+    pushes.delete(device.id);
+    return json(response, 204, null);
+  }
+  const body = await readBody(request);
+  const events = (body.events as PushEvents | null) ?? stored?.events ?? DEFAULT_EVENTS;
+  pushes.set(device.id, { subscription: body.subscription, events });
+  return json(response, 200, { publicKey: PUSH_KEY, events });
 }
 
 const server = createServer((request, response) => {
@@ -149,6 +185,7 @@ server.on('upgrade', (request, socket, head) => {
     hub.connect(client);
     ws.on('message', (raw: Buffer) => {
       const message = JSON.parse(raw.toString('utf8')) as ClientMessage;
+      if (message.type === 'presence') return;
       if (message.type === 'subscribe') hub.subscribe(client, message);
       else if (message.type === 'unsubscribe') hub.subscribe(client, null);
       else if (message.type === 'refreshPullRequests') hub.refreshPullRequests();

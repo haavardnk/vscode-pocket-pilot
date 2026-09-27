@@ -3,9 +3,14 @@ import { basename } from 'node:path';
 import { errorMessage } from '../errors';
 import { watchTargets } from '../fsWatch';
 import { type PollerOptions, PullRequestPoller } from '../pullRequests/poller';
+import { PushService } from '../push/pushService';
+import { PushStore } from '../push/pushStore';
+import { StatusWatcher } from '../push/statusWatcher';
+import { vapidKeys } from '../push/vapid';
 import { type PasswordCheck, startServer } from '../server/app';
 import { DeviceStore } from '../server/devices';
 import { PairingStore } from '../server/pairing';
+import { PhoneRegistry } from '../server/phones';
 import { startTunnel, type TunnelSettings } from '../tunnel/tunnel';
 import { Hub } from './hub';
 import { attachLocalWindow } from './localLink';
@@ -35,6 +40,19 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
   const files = sharedFiles(options.storage);
   const secret = await clusterSecret(options.storage);
   const devices = new DeviceStore(files.devices, options.expireDays);
+  const phones = new PhoneRegistry();
+  const push = new PushService({
+    store: new PushStore(files.push),
+    keys: await vapidKeys(files.vapid),
+    activeDevices: async () => new Set((await devices.list()).map((device) => device.id)),
+    visible: (deviceId) => phones.visible(deviceId),
+    report
+  });
+  const alerts = new StatusWatcher((alert) => {
+    push
+      .notify(alert)
+      .catch((error: unknown) => report(`Push notifications failed: ${errorMessage(error)}`));
+  });
 
   const poller: PullRequestPoller = new PullRequestPoller({
     ...options.pullRequests,
@@ -44,7 +62,10 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
   });
   const hub: Hub = new Hub(options.version, poller.current(), {
     clientsChanged: (count) => poller.setActive(count > 0),
-    windowsChanged: () => poller.repositoriesChanged()
+    windowsChanged: () => {
+      poller.repositoriesChanged();
+      alerts.observe(hub.windowStates());
+    }
   });
 
   const server = await startServer({
@@ -55,6 +76,8 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
     hub,
     devices,
     pairing: new PairingStore(files.pairing),
+    phones,
+    push,
     password: options.password,
     expireDays: options.expireDays,
     refreshPullRequests: () => poller.refresh(),
@@ -84,6 +107,7 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
     close: async () => {
       local.dispose();
       poller.dispose();
+      alerts.dispose();
       await watcher.close();
       await tunnel.close();
       await server.close();

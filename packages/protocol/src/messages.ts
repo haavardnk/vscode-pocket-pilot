@@ -21,7 +21,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('unsubscribe') }),
   z.object({ type: z.literal('command'), requestId: z.string(), command: commandSchema }),
   z.object({ type: z.literal('query'), requestId: z.string(), query: codeQuerySchema }),
-  z.object({ type: z.literal('refreshPullRequests') })
+  z.object({ type: z.literal('refreshPullRequests') }),
+  z.object({ type: z.literal('presence'), visible: z.boolean() })
 ]);
 
 export const serverMessageSchema = z.discriminatedUnion('type', [

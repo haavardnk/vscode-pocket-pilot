@@ -2,6 +2,7 @@
   import type { AuthInfo, Connection, Device } from '@pocket-pilot/protocol';
 
   import { logout } from '../lib/api/auth';
+  import NotificationSettings from '../lib/components/NotificationSettings.svelte';
   import { hub } from '../lib/stores/hub.svelte';
   import { theme, THEMES } from '../lib/stores/theme.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -63,6 +64,8 @@
       {/if}
     </div>
   </section>
+
+  <NotificationSettings {connection} />
 
   <section class="flex flex-col gap-2">
     <h2 class="text-sm font-medium text-base-content/60">Connection</h2>

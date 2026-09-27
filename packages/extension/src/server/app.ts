@@ -12,14 +12,15 @@ import {
   pairRequestSchema
 } from '@pocket-pilot/protocol';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
-import type { WebSocket } from 'ws';
 
 import { acceptFollower } from '../cluster/followerLink';
 import type { Hub } from '../cluster/hub';
 import { LOOPBACK } from '../cluster/sharedState';
 import type { DeviceStore } from './devices';
 import type { PairingStore } from './pairing';
+import type { PhoneRegistry } from './phones';
 import { acceptPhone } from './phoneSocket';
+import { type PushEndpoint, registerPushRoutes } from './pushRoutes';
 import { INTERNAL_PATH, tunnelTraffic } from './tunnelTraffic';
 
 export const TOKEN_COOKIE = 'pocket_pilot_token';
@@ -41,6 +42,8 @@ export interface ServerOptions {
   hub: Hub;
   devices: DeviceStore;
   pairing: PairingStore;
+  phones: PhoneRegistry;
+  push: PushEndpoint;
   password: PasswordCheck;
   expireDays: () => number;
   refreshPullRequests: () => void;
@@ -61,8 +64,7 @@ declare module 'fastify' {
 }
 
 export async function startServer(options: ServerOptions): Promise<RunningServer> {
-  const { hub, devices, pairing, password, report } = options;
-  const phones = new Map<WebSocket, string>();
+  const { hub, devices, pairing, phones, password, report } = options;
   const app = Fastify({
     logger: false,
     bodyLimit: 64 * 1024,
@@ -71,8 +73,11 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   app.decorateRequest('device', null);
   const tunnel = tunnelTraffic(app, options.namedTunnel);
-  const sameOrigin = (request: FastifyRequest): boolean =>
-    request.headers.origin === `https://${request.headers.host}`;
+  const sameOrigin = (request: FastifyRequest): boolean => {
+    const { origin, upgrade } = request.headers;
+    if (origin === undefined) return request.method === 'GET' && upgrade === undefined;
+    return origin === `https://${request.headers.host}`;
+  };
 
   await app.register(fastifyHelmet, {
     crossOriginEmbedderPolicy: false,
@@ -131,10 +136,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     return authInfo(request, device);
   };
 
-  const closeDevice = (id: string): void => {
-    for (const [socket, deviceId] of phones) if (deviceId === id) socket.close(4401, 'revoked');
-  };
-
   const requireOrigin = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     if (!sameOrigin(request)) await reply.code(403).send({ error: 'Cross-origin request refused' });
   };
@@ -172,7 +173,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     const device = await authenticate(request);
     if (device) {
       await devices.remove([device.id]);
-      closeDevice(device.id);
+      phones.close(device.id);
     }
     void reply.clearCookie(TOKEN_COOKIE, { path: '/' });
     return authInfo(request, null);
@@ -188,10 +189,16 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     scope.get('/ws', { websocket: true }, (socket, request) => {
       const device = request.device;
       if (!device) return socket.close(4401, 'unauthorized');
-      phones.set(socket, device.id);
-      socket.on('close', () => phones.delete(socket));
-      acceptPhone(socket, hub, options.refreshPullRequests, report);
+      phones.add(socket, device.id);
+      acceptPhone(
+        socket,
+        hub,
+        options.refreshPullRequests,
+        (visible) => phones.setVisible(socket, visible),
+        report
+      );
     });
+    registerPushRoutes(scope, options.push);
   });
 
   app.register(async (scope) => {
@@ -231,9 +238,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     port: typeof address === 'object' && address ? address.port : options.port,
     tunnel: tunnel.server,
     revokeMissing: async () => {
-      const active = new Set((await devices.list()).map((device) => device.id));
-      for (const [socket, deviceId] of phones)
-        if (!active.has(deviceId)) socket.close(4401, 'revoked');
+      phones.closeMissing(new Set((await devices.list()).map((device) => device.id)));
     },
     close: async () => {
       await app.close();

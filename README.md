@@ -16,6 +16,7 @@ Cloudflare tunnel. From the phone you can:
 - start a new chat in any open window
 - browse the open workspace folders and read files with syntax highlighting
 - review uncommitted changes, and keep or undo the files a chat edited
+- get a notification when an agent finishes, needs input or fails
 - see open pull requests with check, review and merge status
 
 The phone reaches the computer through a free Cloudflare quick tunnel, which needs no account, or
@@ -136,6 +137,22 @@ The phone can only read files inside the open workspace folders. It follows symb
 when they stay inside the folder. A chat's diff can also show a file outside the workspace when
 the agent edited one.
 
+## Notifications
+
+Turn on **Notify this device** under **Settings** to get a push notification when an agent
+finishes, needs your input or fails. Pick which of the three you want and use **Send test
+notification** to check delivery. Tapping a notification opens that chat.
+
+- On iPhone and iPad, notifications only work in the installed app, so they need a permanent
+  address. Add the page to the home screen and turn them on from there.
+- On other phones they also work in the browser. Behind a quick tunnel the address changes when
+  the leader window restarts, and tapping an older notification opens the old address.
+- A phone that has the app open in the foreground gets no notification; it already shows the chat.
+- A finished notification waits three seconds, so a request that is followed right away by the
+  next one does not ping the phone.
+- Notifications go out from the leader window. Changes that happen while another window takes over
+  are not sent.
+
 ## Security
 
 - Pocket Pilot listens only on loopback. Phones reach it through the tunnel, so anyone on the
@@ -153,6 +170,9 @@ the agent edited one.
 - The optional password is stored as a scrypt hash in VS Code secret storage, never in settings.
 - Anyone who can pair a phone can run agents in your workspace. Treat a pairing code like a
   password.
+- Push notifications carry the chat title and the window name. They are encrypted end to end
+  between VS Code and the phone, and go only to the push services of Apple, Google, Mozilla and
+  Microsoft.
 
 ## Development
 

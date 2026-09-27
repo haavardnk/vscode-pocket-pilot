@@ -5,22 +5,10 @@ import {
   type PairRequest
 } from '@pocket-pilot/protocol';
 
-export class AuthError extends Error {}
+import { request } from './http';
 
 async function call(path: string, init?: RequestInit): Promise<AuthInfo> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: 'same-origin',
-    headers: init?.body ? { 'content-type': 'application/json' } : undefined
-  });
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = (body as { error?: unknown } | null)?.error;
-    throw new AuthError(
-      typeof message === 'string' ? message : `Request failed (${response.status})`
-    );
-  }
-  return authInfoSchema.parse(body);
+  return authInfoSchema.parse(await request(path, init));
 }
 
 export function fetchAuth(): Promise<AuthInfo> {

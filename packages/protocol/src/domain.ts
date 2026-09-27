@@ -13,18 +13,6 @@ export const workspaceFolderSchema = z.object({
 
 export const sessionStatusSchema = z.enum(['idle', 'running', 'needsInput', 'failed']);
 
-export const sessionSummarySchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  status: sessionStatusSchema,
-  modelId: z.string().nullable(),
-  modeId: z.string().nullable(),
-  requestCount: z.number(),
-  preview: z.string().nullable()
-});
-
 export const requestStateSchema = z.enum([
   'pending',
   'complete',
@@ -32,6 +20,19 @@ export const requestStateSchema = z.enum([
   'failed',
   'needsInput'
 ]);
+
+export const sessionSummarySchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  status: sessionStatusSchema,
+  lastRequestState: requestStateSchema.nullable(),
+  modelId: z.string().nullable(),
+  modeId: z.string().nullable(),
+  requestCount: z.number(),
+  preview: z.string().nullable()
+});
 
 export const permissionLevelSchema = z.enum(['default', 'autoApprove', 'autopilot']);
 

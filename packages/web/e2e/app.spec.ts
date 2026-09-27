@@ -195,6 +195,76 @@ test.describe('paired', () => {
     await expect(page.getByRole('button', { name: 'Pair' })).toBeVisible();
   });
 
+  test('turns on notifications and sends a test', async ({ page }) => {
+    await page.addInitScript(() => {
+      const endpoint = 'https://fcm.googleapis.com/fcm/send/e2e';
+      let permission: NotificationPermission = 'default';
+      let subscription: object | null = null;
+      const pushManager = {
+        getSubscription: () => Promise.resolve(subscription),
+        subscribe: () => {
+          subscription = {
+            endpoint,
+            options: { applicationServerKey: null },
+            toJSON: () => ({ endpoint, keys: { p256dh: 'p256dh', auth: 'auth' } }),
+            unsubscribe: () => {
+              subscription = null;
+              return Promise.resolve(true);
+            }
+          };
+          return Promise.resolve(subscription);
+        }
+      };
+      const registration = { pushManager };
+      Object.defineProperty(navigator, 'serviceWorker', {
+        value: {
+          ready: Promise.resolve(registration),
+          getRegistration: () => Promise.resolve(registration),
+          register: () => Promise.resolve(registration),
+          addEventListener: () => undefined
+        }
+      });
+      Object.defineProperty(window, 'PushManager', { value: class {} });
+      Object.defineProperty(window, 'Notification', {
+        value: {
+          get permission() {
+            return permission;
+          },
+          requestPermission: () => {
+            permission = 'granted';
+            return Promise.resolve(permission);
+          }
+        }
+      });
+    });
+    await page.reload();
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('checkbox', { name: 'Notify this device' }).check();
+    await expect(page.getByRole('checkbox', { name: 'Agent finished' })).toBeChecked();
+    await page.getByRole('checkbox', { name: 'Agent needs input' }).uncheck();
+    await expect(page.getByRole('checkbox', { name: 'Agent needs input' })).not.toBeChecked();
+    await page.getByRole('button', { name: 'Send test notification' }).click();
+    await expect(page.getByRole('button', { name: 'Test notification sent' })).toBeVisible();
+
+    const state = (await (await page.request.get('/__push')).json()) as {
+      pushes: { subscription: { endpoint: string }; events: Record<string, boolean> }[];
+      pushTests: string[];
+    };
+    expect(state.pushes).toEqual([
+      {
+        subscription: {
+          endpoint: 'https://fcm.googleapis.com/fcm/send/e2e',
+          keys: expect.anything()
+        },
+        events: { finished: true, needsInput: false, failed: true }
+      }
+    ]);
+    expect(state.pushTests).toHaveLength(1);
+
+    await page.getByRole('checkbox', { name: 'Notify this device' }).uncheck();
+    await expect(page.getByRole('checkbox', { name: 'Agent finished' })).toHaveCount(0);
+  });
+
   for (const { connection, note } of CONNECTIONS) {
     test(`describes a ${connection} connection in settings`, async ({ page }) => {
       await page.route('**/api/auth', async (route) => {

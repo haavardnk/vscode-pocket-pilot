@@ -10,6 +10,9 @@ export default defineConfig({
     tailwindcss(),
     svelte(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src/sw',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       injectRegister: 'script',
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'theme.js'],
@@ -33,21 +36,9 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        globIgnores: ['assets/lang/**'],
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/ws$/, /^\/internal$/],
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.pathname.startsWith('/assets/lang/'),
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'shiki-languages',
-              expiration: { maxEntries: 80 }
-            }
-          }
-        ]
+        globIgnores: ['assets/lang/**']
       }
     })
   ],

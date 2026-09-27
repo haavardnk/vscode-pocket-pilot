@@ -11,6 +11,7 @@ export function acceptPhone(
   socket: WebSocket,
   hub: Hub,
   refreshPullRequests: () => void,
+  presence: (visible: boolean) => void,
   report: (message: string) => void
 ): void {
   let alive = true;
@@ -58,6 +59,10 @@ export function acceptPhone(
     }
     if (message.type === 'refreshPullRequests') {
       refreshPullRequests();
+      return;
+    }
+    if (message.type === 'presence') {
+      presence(message.visible);
       return;
     }
     if (message.type === 'query') {

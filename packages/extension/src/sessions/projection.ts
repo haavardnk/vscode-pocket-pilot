@@ -97,12 +97,14 @@ export function projectSummary(root: unknown, id: string, modifiedAt: number): S
   const requests = requestsOf(session);
   const last = requests.at(-1);
   const created = asNumber(session.creationDate) ?? modifiedAt;
+  const state = last ? requestState(last) : null;
   return {
     id,
     title: titleOf(session, requests),
     createdAt: created,
     updatedAt: Math.max(modifiedAt, asNumber(last?.timestamp) ?? created),
-    status: statusOf(last ? requestState(last) : null),
+    status: statusOf(state),
+    lastRequestState: state,
     modelId: sessionModel(session, last),
     modeId: sessionMode(session),
     requestCount: requests.length,

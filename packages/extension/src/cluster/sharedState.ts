@@ -9,13 +9,17 @@ export interface SharedFiles {
   devices: string;
   pairing: string;
   tunnel: string;
+  push: string;
+  vapid: string;
 }
 
 export function sharedFiles(storage: string): SharedFiles {
   return {
     devices: join(storage, 'devices.json'),
     pairing: join(storage, 'pairing.json'),
-    tunnel: join(storage, 'tunnel.json')
+    tunnel: join(storage, 'tunnel.json'),
+    push: join(storage, 'push.json'),
+    vapid: join(storage, 'vapid.json')
   };
 }
 

@@ -68,6 +68,7 @@ function summaryOf(detail: SessionDetail, updatedAt: number): WindowState['sessi
     createdAt: detail.requests[0]?.timestamp ?? updatedAt,
     updatedAt,
     status: detail.status,
+    lastRequestState: last?.state ?? null,
     modelId: detail.modelId,
     modeId: detail.modeId,
     requestCount: detail.totalRequests,

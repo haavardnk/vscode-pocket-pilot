@@ -9,9 +9,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 
 import { Hub } from '../src/cluster/hub';
+import { PushService } from '../src/push/pushService';
+import { PushStore } from '../src/push/pushStore';
+import { vapidKeys } from '../src/push/vapid';
 import { type RunningServer, startServer, TOKEN_COOKIE } from '../src/server/app';
 import { DeviceStore } from '../src/server/devices';
 import { PairingStore } from '../src/server/pairing';
+import { PhoneRegistry } from '../src/server/phones';
 
 interface Response {
   status: number;
@@ -24,6 +28,7 @@ interface Fixture {
   port: number;
   tunnelPort: number;
   server: RunningServer;
+  sent: string[];
 }
 
 interface RequestOptions {
@@ -47,14 +52,28 @@ async function start(namedTunnel = false): Promise<Fixture> {
   const folder = await mkdtemp(join(tmpdir(), 'pocket-pilot-server-'));
   await writeFile(join(folder, 'index.html'), '<!doctype html><title>app</title>');
   await writeFile(join(folder, 'manifest.webmanifest'), '{}');
+  const sent: string[] = [];
+  const devices = new DeviceStore(join(folder, 'devices.json'), () => 30);
+  const phones = new PhoneRegistry();
   const server = await startServer({
     port: 0,
     namedTunnel,
     webRoot: folder,
     clusterSecret: 'secret',
     hub: new Hub('1.0.0', noPullRequests),
-    devices: new DeviceStore(join(folder, 'devices.json'), () => 30),
+    devices,
     pairing: new PairingStore(join(folder, 'pairing.json')),
+    phones,
+    push: new PushService({
+      store: new PushStore(join(folder, 'push.json')),
+      keys: await vapidKeys(join(folder, 'vapid.json')),
+      activeDevices: async () => new Set((await devices.list()).map((device) => device.id)),
+      visible: (deviceId) => phones.visible(deviceId),
+      send: async (_subscription, payload) => {
+        sent.push(payload);
+      },
+      report: () => undefined
+    }),
     password: { enabled: async () => false, verify: async () => false },
     expireDays: () => 30,
     refreshPullRequests: () => undefined,
@@ -62,7 +81,7 @@ async function start(namedTunnel = false): Promise<Fixture> {
   });
   await new Promise<void>((resolve) => server.tunnel.listen(0, '127.0.0.1', resolve));
   const { port: tunnelPort } = server.tunnel.address() as AddressInfo;
-  return { folder, port: server.port, tunnelPort, server };
+  return { folder, port: server.port, tunnelPort, server, sent };
 }
 
 async function cleanUp(fixture: Fixture): Promise<void> {
@@ -215,5 +234,83 @@ describe.each([
       headers: viaTunnel()
     });
     expect(response.status).toBe(manifest);
+  });
+});
+
+describe('push routes', () => {
+  let fixture: Fixture;
+  let cookie: string;
+
+  const call = (method: string, path: string, body?: unknown): Promise<Response> =>
+    send(fixture, path, {
+      tunnel: true,
+      method,
+      headers: viaTunnel({
+        origin: PUBLIC_ORIGIN,
+        cookie,
+        ...(body === undefined ? {} : { 'content-type': 'application/json' })
+      }),
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+
+  const registration = (endpoint: string): unknown => ({
+    subscription: { endpoint, keys: { p256dh: 'p256dh', auth: 'auth' } },
+    events: null
+  });
+
+  beforeAll(async () => {
+    fixture = await start(true);
+    const paired = await pair(fixture, PUBLIC_ORIGIN);
+    cookie = paired.headers['set-cookie']?.[0]?.split(';')[0] ?? '';
+  });
+
+  afterAll(() => cleanUp(fixture));
+
+  it('registers, tests and removes a subscription', async () => {
+    const registered = await call('PUT', '/api/push', registration('https://fcm.googleapis.com/x'));
+    expect(registered.status).toBe(200);
+    expect(JSON.parse(registered.body)).toMatchObject({
+      events: { finished: true, needsInput: true, failed: true }
+    });
+
+    expect((await call('POST', '/api/push/test')).status).toBe(204);
+    expect(JSON.parse(fixture.sent[0] ?? '{}')).toMatchObject({ title: 'Pocket Pilot' });
+
+    expect((await call('DELETE', '/api/push')).status).toBe(204);
+    expect((await call('POST', '/api/push/test')).status).toBe(404);
+  });
+
+  it('refuses push services outside the allowlist', async () => {
+    const response = await call('PUT', '/api/push', registration('https://127.0.0.1/x'));
+    expect(response.status).toBe(400);
+  });
+
+  it.each([
+    { origin: undefined, status: 200 },
+    { origin: PUBLIC_ORIGIN, status: 200 },
+    { origin: 'https://evil.test', status: 403 }
+  ])('reads settings with origin $origin', async ({ origin, status }) => {
+    const response = await send(fixture, '/api/push', {
+      tunnel: true,
+      headers: viaTunnel({ cookie, ...(origin === undefined ? {} : { origin }) })
+    });
+    expect(response.status).toBe(status);
+  });
+
+  it.each(['DELETE', 'POST'])('refuses %s without an origin', async (method) => {
+    const path = method === 'POST' ? '/api/push/test' : '/api/push';
+    const response = await send(fixture, path, {
+      tunnel: true,
+      method,
+      headers: viaTunnel({ cookie })
+    });
+    expect(response.status).toBe(403);
+  });
+
+  it('refuses the phone socket without an origin', async () => {
+    const socket = new WebSocket(`ws://127.0.0.1:${fixture.tunnelPort}/ws`, {
+      headers: viaTunnel({ cookie })
+    });
+    expect(await refused(socket)).toBe(403);
   });
 });

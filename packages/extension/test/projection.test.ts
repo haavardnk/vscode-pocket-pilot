@@ -31,6 +31,7 @@ describe('projection', () => {
       createdAt: 1_699_999_000_000,
       updatedAt: 1_800_000_000_000,
       status: 'idle',
+      lastRequestState: 'complete',
       modelId: 'copilot/gpt-5',
       modeId: 'file:///Users/dev/.github/agents/Reviewer.agent.md',
       requestCount: 2,

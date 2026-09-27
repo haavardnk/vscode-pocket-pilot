@@ -5,6 +5,7 @@ import {
   clientMessageSchema,
   followerMessageSchema,
   parseMessage,
+  pushRegistrationSchema,
   serverMessageSchema,
   type WindowState
 } from '../src';
@@ -21,6 +22,7 @@ const window: WindowState = {
       createdAt: 1,
       updatedAt: 2,
       status: 'running',
+      lastRequestState: 'pending',
       modelId: 'copilot/gpt-5',
       modeId: 'agent',
       requestCount: 1,
@@ -90,5 +92,17 @@ describe('protocol', () => {
     JSON.stringify({ type: 'unknown' })
   ])('rejects %s', (raw) => {
     expect(parseMessage(clientMessageSchema, raw)).toBeNull();
+  });
+
+  it.each([
+    ['https://fcm.googleapis.com/fcm/send/abc', true],
+    ['http://fcm.googleapis.com/fcm/send/abc', false],
+    ['not a url', false]
+  ])('accepts push endpoint %s: %s', (endpoint, valid) => {
+    const registration = {
+      subscription: { endpoint, keys: { p256dh: 'p', auth: 'a' } },
+      events: null
+    };
+    expect(pushRegistrationSchema.safeParse(registration).success).toBe(valid);
   });
 });
