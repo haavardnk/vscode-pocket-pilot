@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseHook } from '../src/hooks/hookEvent';
+import { editPaths, parseHook } from '../src/hooks/hookEvent';
 
 const at = Date.UTC(2026, 0, 1);
 const payload = {
@@ -17,7 +17,7 @@ describe('chat hooks', () => {
       { windowId: 'w1', event: { kind: 'prompt', sessionId: 's1', at, prompt: 'Fix it' } }
     ],
     [
-      'a started tool',
+      'an edit tool',
       {
         ...payload,
         hook_event_name: 'PreToolUse',
@@ -27,7 +27,14 @@ describe('chat hooks', () => {
       },
       {
         windowId: 'w1',
-        event: { kind: 'toolStart', sessionId: 's1', at, callId: 'call_1', toolName: 'create_file' }
+        event: {
+          kind: 'toolStart',
+          sessionId: 's1',
+          at,
+          callId: 'call_1',
+          toolName: 'create_file',
+          paths: ['/w/a.ts']
+        }
       }
     ],
     [
@@ -45,5 +52,25 @@ describe('chat hooks', () => {
     ['an unknown event', { ...payload, hook_event_name: 'SessionStart' }, null]
   ])('parses %s', (_, body, expected) => {
     expect(parseHook(body)).toEqual(expected);
+  });
+
+  it.each([
+    ['replace_string_in_file', { filePath: '/w/a.ts', oldString: 'a' }, ['/w/a.ts']],
+    ['create_file', JSON.stringify({ filePath: 'file:///w/b%20c.ts' }), ['/w/b c.ts']],
+    [
+      'multi_replace_string_in_file',
+      { replacements: [{ filePath: '/w/a.ts' }, { filePath: '/w/b.ts' }, { filePath: '/w/a.ts' }] },
+      ['/w/a.ts', '/w/b.ts']
+    ],
+    [
+      'apply_patch',
+      { input: '*** Begin Patch\n*** Update File: /w/a.ts\n@@\n*** Add File: /w/n.ts\n+x\n' },
+      ['/w/a.ts', '/w/n.ts']
+    ],
+    ['create_file', { filePath: 'relative.ts' }, []],
+    ['create_file', { filePath: 'file://host/%' }, []],
+    ['read_file', { filePath: '/w/a.ts' }, []]
+  ])('finds paths edited by %s', (tool, input, expected) => {
+    expect(editPaths(tool, input)).toEqual(expected);
   });
 });

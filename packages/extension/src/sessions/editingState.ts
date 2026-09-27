@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import { type Blob, MAX_FILE_BYTES } from '../code/files';
 import { parseJson } from '../json';
+import { parseTimeline, type Timeline } from './timeline';
 
 export const EMPTY_HASH = 'da39a3e';
 const STATES: readonly EditState[] = ['pending', 'kept', 'undone'];
@@ -47,10 +48,7 @@ export class EditingSessions {
   constructor(private readonly root: string | null) {}
 
   async entries(sessionId: string): Promise<EditingEntry[]> {
-    if (this.root === null) return [];
-    const raw = await readFile(join(this.root, sessionId, 'state.json'), 'utf8').catch(() => null);
-    if (raw === null) return [];
-    const parsed = stateSchema.safeParse(parseJson(raw));
+    const parsed = stateSchema.safeParse(await this.state(sessionId));
     if (!parsed.success) return [];
     const initial = new Map(
       parsed.data.initialFileContents.map(([resource, hash]) => [resource, hash])
@@ -73,6 +71,10 @@ export class EditingSessions {
     });
   }
 
+  async timeline(sessionId: string): Promise<Timeline> {
+    return parseTimeline(await this.state(sessionId));
+  }
+
   async blob(sessionId: string, hash: string): Promise<Blob> {
     if (this.root === null || !hashSchema.safeParse(hash).success) return 'missing';
     const file = join(this.root, sessionId, 'contents', hash);
@@ -80,5 +82,11 @@ export class EditingSessions {
     if (!info?.isFile()) return 'missing';
     if (info.size > MAX_FILE_BYTES) return 'tooLarge';
     return readFile(file);
+  }
+
+  private async state(sessionId: string): Promise<unknown> {
+    if (this.root === null) return undefined;
+    const raw = await readFile(join(this.root, sessionId, 'state.json'), 'utf8').catch(() => null);
+    return raw === null ? undefined : parseJson(raw);
   }
 }

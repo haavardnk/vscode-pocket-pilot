@@ -78,6 +78,16 @@ export class CodeService {
           kind: 'sessionDiff',
           ...(await this.sources.sessions.diff(query.sessionId, query.path))
         };
+      case 'requestChanges':
+        return {
+          kind: 'requestChanges',
+          files: await this.sources.sessions.requestChanges(query.sessionId, query.requestId)
+        };
+      case 'requestDiff':
+        return {
+          kind: 'requestDiff',
+          ...(await this.sources.sessions.requestDiff(query.sessionId, query.requestId, query.path))
+        };
     }
   }
 

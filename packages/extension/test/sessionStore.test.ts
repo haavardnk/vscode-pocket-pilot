@@ -138,7 +138,14 @@ describe('SessionStore', () => {
     const at = Date.now();
     const hooks: HookEvent[] = [
       { kind: 'prompt', sessionId: 'fresh', at, prompt: 'Write the parser' },
-      { kind: 'toolStart', sessionId: 'fresh', at: at + 1, callId: 'c', toolName: 'grep' }
+      {
+        kind: 'toolStart',
+        sessionId: 'fresh',
+        at: at + 1,
+        callId: 'c',
+        toolName: 'grep',
+        paths: []
+      }
     ];
     for (const event of hooks) await store.hook(event);
     expect(store.summaries()[0]).toMatchObject({

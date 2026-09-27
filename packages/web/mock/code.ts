@@ -31,6 +31,7 @@ interface MockEdit {
   relativePath: string;
   change: SessionChange['change'];
   baseline: SessionChange['baseline'];
+  requestId: string;
   hunks: DiffHunk[];
 }
 
@@ -177,6 +178,7 @@ const EDITS: Record<string, MockEdit[]> = {
       relativePath: 'packages/web/src/App.svelte',
       change: 'modified',
       baseline: 'session',
+      requestId: 'r1',
       hunks: APP_HUNKS
     },
     {
@@ -185,6 +187,7 @@ const EDITS: Record<string, MockEdit[]> = {
       relativePath: 'packages/web/src/lib/routing.ts',
       change: 'modified',
       baseline: 'commit',
+      requestId: 'r0',
       hunks: ROUTING_HUNKS
     }
   ]
@@ -211,23 +214,30 @@ export class MockCode {
   }
 
   query(query: CodeQuery): CodeResult {
-    if (query.kind === 'sessionChanges')
+    if (query.kind === 'sessionChanges' || query.kind === 'requestChanges') {
+      const requestId = query.kind === 'requestChanges' ? query.requestId : null;
       return {
-        kind: 'sessionChanges',
-        files: (EDITS[query.sessionId] ?? []).map((edit) =>
-          this.sessionChange(query.sessionId, edit)
+        kind: query.kind,
+        files: this.edits(query.sessionId, requestId).map((edit) =>
+          this.sessionChange(query.sessionId, edit, requestId)
         )
       };
-    if (query.kind === 'sessionDiff') {
-      const edit = EDITS[query.sessionId]?.find((candidate) => candidate.path === query.path);
-      if (!edit) throw new Error('File is not part of this chat');
+    }
+    if (query.kind === 'sessionDiff' || query.kind === 'requestDiff') {
+      const requestId = query.kind === 'requestDiff' ? query.requestId : null;
+      const edit = this.edits(query.sessionId, requestId).find(
+        (candidate) => candidate.path === query.path
+      );
+      if (!edit) {
+        throw new Error(`File is not part of this ${requestId ? 'request' : 'chat'}`);
+      }
       const undone = this.stateOf(query.sessionId, edit) === 'undone';
       return {
-        kind: 'sessionDiff',
+        kind: query.kind,
         language:
           this.folder(query.windowId, edit.folderId).files[edit.relativePath]?.language ?? null,
-        file: this.sessionChange(query.sessionId, edit),
-        diff: { kind: 'text', hunks: undone ? [] : edit.hunks }
+        file: this.sessionChange(query.sessionId, edit, requestId),
+        diff: { kind: 'text', hunks: undone && !requestId ? [] : edit.hunks }
       };
     }
     const folder = this.folder(query.windowId, query.folderId);
@@ -273,7 +283,16 @@ export class MockCode {
     return this.states.get(`${sessionId}:${edit.path}`) ?? 'pending';
   }
 
-  private sessionChange(sessionId: string, edit: MockEdit): SessionChange {
+  private edits(sessionId: string, requestId: string | null): MockEdit[] {
+    const edits = EDITS[sessionId] ?? [];
+    return requestId ? edits.filter((edit) => edit.requestId === requestId) : edits;
+  }
+
+  private sessionChange(
+    sessionId: string,
+    edit: MockEdit,
+    requestId: string | null
+  ): SessionChange {
     const { hunks, path, folderId, relativePath, change, baseline } = edit;
     return {
       path,
@@ -281,7 +300,7 @@ export class MockCode {
       folderId,
       relativePath,
       change,
-      baseline,
+      baseline: requestId ? 'request' : baseline,
       state: this.stateOf(sessionId, edit),
       ...counts(hunks)
     };

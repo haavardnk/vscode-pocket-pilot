@@ -46,11 +46,20 @@
   {/key}
 {:else if route.name === 'sessionChanges'}
   {#key hash}
-    <SessionChangesScreen windowId={route.windowId} sessionId={route.sessionId} />
+    <SessionChangesScreen
+      windowId={route.windowId}
+      sessionId={route.sessionId}
+      requestId={route.requestId}
+    />
   {/key}
 {:else if route.name === 'sessionDiff'}
   {#key hash}
-    <SessionDiffScreen windowId={route.windowId} sessionId={route.sessionId} path={route.path} />
+    <SessionDiffScreen
+      windowId={route.windowId}
+      sessionId={route.sessionId}
+      path={route.path}
+      requestId={route.requestId}
+    />
   {/key}
 {:else}
   <HomeScreen tab={route.name} {device} {connection} {onsignedout} />

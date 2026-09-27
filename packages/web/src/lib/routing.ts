@@ -14,8 +14,14 @@ export type Route =
   | { name: 'folder'; windowId: string; folderId: string; tab: FolderTab; path: string }
   | { name: 'file'; windowId: string; folderId: string; path: string }
   | { name: 'gitDiff'; windowId: string; folderId: string; path: string }
-  | { name: 'sessionChanges'; windowId: string; sessionId: string }
-  | { name: 'sessionDiff'; windowId: string; sessionId: string; path: string };
+  | { name: 'sessionChanges'; windowId: string; sessionId: string; requestId: string | null }
+  | {
+      name: 'sessionDiff';
+      windowId: string;
+      sessionId: string;
+      path: string;
+      requestId: string | null;
+    };
 
 const STATIC: Record<string, Route> = {
   prs: { name: 'pullRequests' },
@@ -26,7 +32,7 @@ const STATIC: Record<string, Route> = {
 
 export function parseRoute(hash: string): Route {
   const segments = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
-  const [head = '', first, second, third = ''] = segments;
+  const [head = '', first, second, third = '', fourth] = segments;
   if (!first || !second) return STATIC[head] ?? { name: 'chats' };
   switch (head) {
     case 'session':
@@ -40,9 +46,20 @@ export function parseRoute(hash: string): Route {
     case 'diff':
       return { name: 'gitDiff', windowId: first, folderId: second, path: third };
     case 'edits':
-      return { name: 'sessionChanges', windowId: first, sessionId: second };
+      return {
+        name: 'sessionChanges',
+        windowId: first,
+        sessionId: second,
+        requestId: third || null
+      };
     case 'edit':
-      return { name: 'sessionDiff', windowId: first, sessionId: second, path: third };
+      return {
+        name: 'sessionDiff',
+        windowId: first,
+        sessionId: second,
+        path: third,
+        requestId: fourth || null
+      };
     default:
       return { name: 'chats' };
   }
@@ -73,9 +90,13 @@ export function routeHash(route: Route): string {
     case 'gitDiff':
       return hashOf('diff', route.windowId, route.folderId, route.path);
     case 'sessionChanges':
-      return hashOf('edits', route.windowId, route.sessionId);
+      return route.requestId
+        ? hashOf('edits', route.windowId, route.sessionId, route.requestId)
+        : hashOf('edits', route.windowId, route.sessionId);
     case 'sessionDiff':
-      return hashOf('edit', route.windowId, route.sessionId, route.path);
+      return route.requestId
+        ? hashOf('edit', route.windowId, route.sessionId, route.path, route.requestId)
+        : hashOf('edit', route.windowId, route.sessionId, route.path);
   }
 }
 

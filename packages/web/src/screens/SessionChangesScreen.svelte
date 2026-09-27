@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SessionChange } from '@pocket-pilot/protocol';
+  import type { CodeResultFor, SessionChange } from '@pocket-pilot/protocol';
 
   import { baseName, parentPath } from '../lib/code/paths';
   import BaselineNote from '../lib/components/code/BaselineNote.svelte';
@@ -18,9 +18,10 @@
   interface Props {
     windowId: string;
     sessionId: string;
+    requestId: string | null;
   }
 
-  const { windowId, sessionId }: Props = $props();
+  const { windowId, sessionId, requestId }: Props = $props();
 
   let acting = $state(false);
 
@@ -28,11 +29,15 @@
   const summary = $derived(hostWindow?.sessions.find((candidate) => candidate.id === sessionId));
   const updatedAt = $derived(summary?.updatedAt);
   const connected = $derived(hub.connection === 'open' && hostWindow !== undefined);
-  const changes = new QueryResource(() =>
-    hub.query({ kind: 'sessionChanges', windowId, sessionId })
+  const changes = new QueryResource<CodeResultFor<'sessionChanges' | 'requestChanges'>>(() =>
+    requestId
+      ? hub.query({ kind: 'requestChanges', windowId, sessionId, requestId })
+      : hub.query({ kind: 'sessionChanges', windowId, sessionId })
   );
   const pending = $derived(
-    (changes.value?.files ?? []).filter((file) => stateOf(file) === 'pending').length
+    requestId
+      ? 0
+      : (changes.value?.files ?? []).filter((file) => stateOf(file) === 'pending').length
   );
   const baseline = $derived(
     changes.value?.files.find((file) => file.baseline !== 'session')?.baseline ?? 'session'
@@ -57,7 +62,7 @@
 
 <div class="flex flex-1 flex-col">
   <ScreenHeader
-    title="Changes"
+    title={requestId ? 'Message changes' : 'Changes'}
     subtitle={summary?.title}
     back={{ name: 'session', windowId, sessionId }}
   >
@@ -71,14 +76,24 @@
       {#snippet children(result)}
         <BaselineNote {baseline} />
         {#if result.files.length === 0}
-          <p class="p-10 text-center text-base-content/70">This chat has not changed any files.</p>
+          <p class="p-10 text-center text-base-content/70">
+            {requestId
+              ? 'This message did not change any files.'
+              : 'This chat has not changed any files.'}
+          </p>
         {:else}
           <ul class="list" aria-label="Changed files">
             {#each result.files as file (file.path)}
               <li>
                 <a
                   class="list-row items-center gap-3 py-2.5 active:bg-base-200"
-                  href={routeHash({ name: 'sessionDiff', windowId, sessionId, path: file.path })}
+                  href={routeHash({
+                    name: 'sessionDiff',
+                    windowId,
+                    sessionId,
+                    path: file.path,
+                    requestId
+                  })}
                 >
                   <ChangeBadge change={file.change} />
                   <div class="min-w-0 list-col-grow">

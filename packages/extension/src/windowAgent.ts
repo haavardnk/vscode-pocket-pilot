@@ -20,6 +20,7 @@ import { agentFolders, agentUri } from './agents/agentFolders';
 import { AgentSource } from './agents/agentSource';
 import { EMPTY_WINDOW } from './cluster/hub';
 import { CodeService } from './code/codeService';
+import { type Blob, MAX_FILE_BYTES, readBlob } from './code/files';
 import { type CodeFolder, codeFolder } from './code/folders';
 import { LanguageIndex } from './code/languageIndex';
 import { SessionChanges } from './code/sessionChanges';
@@ -30,6 +31,7 @@ import { ModelSource } from './models/modelSource';
 import { type ChatPaths, chatPaths } from './paths';
 import { EditingSessions } from './sessions/editingState';
 import { FlagStore } from './sessions/flagStore';
+import { LiveEdits } from './sessions/liveEdits';
 import { LiveMirror } from './sessions/liveMirror';
 import { SessionStore } from './sessions/sessionStore';
 import { liveMirrorMode, SECTION } from './settings';
@@ -40,6 +42,15 @@ const EXPORT_COMMAND = 'workbench.action.chat.export';
 export interface SessionUpdate {
   sessionId: string;
   detail: SessionDetail | null;
+}
+
+async function currentBlob(path: string): Promise<Blob> {
+  const document = vscode.workspace.textDocuments.find(
+    (candidate) => candidate.uri.scheme === 'file' && candidate.uri.fsPath === path
+  );
+  if (!document) return (await readBlob(path)).blob;
+  const content = Buffer.from(document.getText());
+  return content.length > MAX_FILE_BYTES ? 'tooLarge' : content;
 }
 
 export class WindowAgent implements vscode.Disposable {
@@ -54,6 +65,7 @@ export class WindowAgent implements vscode.Disposable {
   private readonly modelSource: ModelSource;
   private readonly controller: Controller;
   private readonly code: CodeService;
+  private readonly edits: LiveEdits;
   private readonly mirror: LiveMirror;
   private readonly paths: ChatPaths;
   private readonly detailQueues = new Map<string, Promise<void>>();
@@ -84,6 +96,7 @@ export class WindowAgent implements vscode.Disposable {
     this.agentSource = new AgentSource(agentUri(this.paths), report);
     const settings = new ModelSettingsFile(this.paths.modelSettings);
     this.modelSource = new ModelSource(this.paths.debugLogs, settings, report);
+    this.edits = new LiveEdits(currentBlob);
     this.mirror = new LiveMirror({
       file: context.storageUri
         ? join(context.storageUri.fsPath, 'live-export.json')
@@ -108,6 +121,9 @@ export class WindowAgent implements vscode.Disposable {
       language: (path) => languages.resolve(path),
       editing: new EditingSessions(this.paths.editingSessions),
       editedPaths: (sessionId) => this.store.editedPaths(sessionId),
+      detail: (sessionId, limit) => this.store.detail(sessionId, limit),
+      current: currentBlob,
+      live: this.edits,
       home: homedir()
     });
     this.code = new CodeService({
@@ -198,7 +214,7 @@ export class WindowAgent implements vscode.Disposable {
   }
 
   async hook(event: HookEvent): Promise<void> {
-    await this.store.hook(event);
+    await Promise.all([this.store.hook(event), this.edits.hook(event)]);
     this.mirror.poke();
   }
 

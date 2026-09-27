@@ -377,7 +377,11 @@ test.describe('paired', () => {
 
   test('keeps and undoes the edits of a chat', async ({ page }) => {
     await openSession(page, 'Build the phone app');
-    await page.getByRole('link', { name: 'App.svelte' }).click();
+    await page.getByRole('link', { name: 'Changes (2)' }).click();
+    await page
+      .getByRole('list', { name: 'Changed files' })
+      .getByRole('link', { name: /App\.svelte/ })
+      .click();
     await expect(page.getByTestId('diff').locator('[data-kind="added"]').first()).toContainText(
       'import Composer'
     );
@@ -391,6 +395,25 @@ test.describe('paired', () => {
     const changes = page.getByRole('list', { name: 'Changed files' });
     await expect(changes.getByText('Undone')).toBeVisible();
     await expect(changes.getByText('Kept')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Keep all/ })).toHaveCount(0);
+  });
+
+  test('shows the files one message changed', async ({ page }) => {
+    await openSession(page, 'Build the phone app');
+    const request = page.locator('[data-request="r1"]');
+    await expect(request.getByRole('img', { name: 'Done' })).toBeVisible();
+    await expect(request.getByRole('img', { name: 'Running' })).toBeVisible();
+    await request.getByRole('link', { name: 'Files changed (1)' }).click();
+    await expect(page.getByRole('heading', { name: 'Message changes' })).toBeVisible();
+    const changes = page.getByRole('list', { name: 'Changed files' });
+    await expect(changes.getByRole('link')).toHaveCount(1);
+    await changes.getByRole('link', { name: /App\.svelte/ }).click();
+    await expect(page.getByTestId('diff').locator('[data-kind="added"]').first()).toContainText(
+      'import Composer'
+    );
+    await expect(page.getByRole('button', { name: 'Keep' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(page.getByRole('heading', { name: 'Message changes' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Keep all/ })).toHaveCount(0);
   });
 

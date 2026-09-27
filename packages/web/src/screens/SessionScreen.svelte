@@ -179,7 +179,7 @@
         <a
           class="btn gap-1 btn-ghost btn-sm"
           aria-label={`Changes (${detail.editedFiles})`}
-          href={routeHash({ name: 'sessionChanges', windowId, sessionId })}
+          href={routeHash({ name: 'sessionChanges', windowId, sessionId, requestId: null })}
         >
           <FileDiff class="size-4" />{detail.editedFiles}
         </a>

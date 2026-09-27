@@ -259,8 +259,16 @@ describe('routing', () => {
     { name: 'folder', windowId: 'w', folderId: 'f', tab: 'changes', path: '' },
     { name: 'file', windowId: 'w', folderId: 'f', path: 'src/%20.ts' },
     { name: 'gitDiff', windowId: 'w', folderId: 'f', path: 'a/b.ts' },
-    { name: 'sessionChanges', windowId: 'w', sessionId: 's' },
-    { name: 'sessionDiff', windowId: 'w', sessionId: 's', path: '/Users/me/a/b.ts' }
+    { name: 'sessionChanges', windowId: 'w', sessionId: 's', requestId: null },
+    { name: 'sessionChanges', windowId: 'w', sessionId: 's', requestId: 'r/1' },
+    {
+      name: 'sessionDiff',
+      windowId: 'w',
+      sessionId: 's',
+      path: '/Users/me/a/b.ts',
+      requestId: null
+    },
+    { name: 'sessionDiff', windowId: 'w', sessionId: 's', path: '/a b.ts', requestId: 'r1' }
   ])('round-trips $name routes', (route) => {
     expect(parseRoute(routeHash(route))).toEqual(route);
   });

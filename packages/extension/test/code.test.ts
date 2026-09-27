@@ -3,17 +3,19 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { CodeQuery, CodeResult } from '@pocket-pilot/protocol';
+import type { CodeQuery, CodeResult, RequestView, SessionDetail } from '@pocket-pilot/protocol';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CodeService } from '../src/code/codeService';
 import { diffBlobs } from '../src/code/diff';
+import { type Blob, readBlob } from '../src/code/files';
 import { codeFolder } from '../src/code/folders';
 import { parseNumstat, parseStatus, statusChange } from '../src/code/git';
 import { languageResolver } from '../src/code/languages';
 import { relativeSegments } from '../src/code/paths';
 import { SessionChanges } from '../src/code/sessionChanges';
 import { EditingSessions } from '../src/sessions/editingState';
+import { LiveEdits } from '../src/sessions/liveEdits';
 
 describe('git parsing', () => {
   it.each([
@@ -106,6 +108,21 @@ describe('code queries', () => {
   let workspace: string;
   let editing: string;
   let service: CodeService;
+  let live: LiveEdits;
+  let detail: SessionDetail;
+  const fileUri = (fsPath: string): { scheme: string; fsPath: string } => ({
+    scheme: 'file',
+    fsPath
+  });
+  const view = (id: string, message: string, timestamp: number, paths: string[]): RequestView => ({
+    id,
+    timestamp,
+    message,
+    modelId: null,
+    state: 'complete',
+    error: null,
+    parts: paths.map((path) => ({ kind: 'edit', path }))
+  });
   const folder = (): ReturnType<typeof codeFolder> => codeFolder('demo', workspace);
   const git = (...args: string[]): string =>
     execFileSync('git', args, { cwd: workspace, encoding: 'utf8' });
@@ -119,6 +136,21 @@ describe('code queries', () => {
     root = await mkdtemp(join(tmpdir(), 'pocket-pilot-code-'));
     workspace = join(root, 'demo');
     editing = join(root, 'editing');
+    detail = {
+      id: 's1',
+      title: 'Demo',
+      status: 'idle',
+      modelId: null,
+      modeId: null,
+      permission: 'default',
+      totalRequests: 2,
+      editedFiles: 3,
+      requests: [
+        view('r1', 'Change a', 1_700_000_000_000, []),
+        view('r2', 'Document it', 1_700_000_060_000, [join(workspace, 'DOCS.md')])
+      ],
+      queued: []
+    };
     await mkdir(join(workspace, 'src'), { recursive: true });
     await writeFile(join(workspace, 'src', 'a.ts'), 'one\ntwo\nthree\n');
     await writeFile(join(workspace, 'README.md'), '# Demo\n');
@@ -140,7 +172,52 @@ describe('code queries', () => {
       JSON.stringify({
         version: 2,
         initialFileContents: [],
-        timeline: {},
+        timeline: {
+          operations: [
+            {
+              type: 'textEdit',
+              uri: fileUri(join(workspace, 'src', 'a.ts')),
+              requestId: 'r1',
+              epoch: 2,
+              edits: [
+                {
+                  text: '2',
+                  range: { startLineNumber: 2, startColumn: 1, endLineNumber: 2, endColumn: 4 }
+                }
+              ]
+            },
+            {
+              type: 'create',
+              uri: fileUri(join(workspace, 'src', 'new.ts')),
+              requestId: 'r1',
+              epoch: 3,
+              initialContent: ''
+            },
+            {
+              type: 'textEdit',
+              uri: fileUri(join(workspace, 'src', 'new.ts')),
+              requestId: 'r1',
+              epoch: 4,
+              edits: [
+                {
+                  text: 'fresh\n',
+                  range: { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 }
+                }
+              ]
+            }
+          ],
+          fileBaselines: [
+            [
+              'a::r1',
+              {
+                uri: fileUri(join(workspace, 'src', 'a.ts')),
+                requestId: 'r1',
+                content: 'one\ntwo\nthree\n',
+                epoch: 1
+              }
+            ]
+          ]
+        },
         recentSnapshot: {
           entries: [
             {
@@ -158,6 +235,8 @@ describe('code queries', () => {
     );
     const folders = (): ReturnType<typeof codeFolder>[] => [folder()];
     const language = (path: string): string | null => (path.endsWith('.ts') ? 'typescript' : null);
+    const current = async (path: string): Promise<Blob> => (await readBlob(path)).blob;
+    live = new LiveEdits(current);
     service = new CodeService({
       folders,
       language,
@@ -175,6 +254,9 @@ describe('code queries', () => {
                 ]
               : null
           ),
+        detail: (sessionId) => Promise.resolve(sessionId === 's1' ? detail : null),
+        current,
+        live,
         home: root
       })
     });
@@ -272,5 +354,62 @@ describe('code queries', () => {
     await expect(query({ kind: 'sessionChanges', ...target, sessionId: 'nope' })).rejects.toThrow(
       'Unknown session'
     );
+  });
+
+  it('scopes changes to one request', async () => {
+    const r1 = await query({ kind: 'requestChanges', ...target, sessionId: 's1', requestId: 'r1' });
+    expect(
+      r1.files.map(({ label, change, baseline, additions, deletions }) => [
+        label,
+        change,
+        baseline,
+        additions,
+        deletions
+      ])
+    ).toEqual([
+      ['src/a.ts', 'modified', 'request', 1, 1],
+      ['src/new.ts', 'added', 'request', 1, 0]
+    ]);
+    const r2 = await query({ kind: 'requestChanges', ...target, sessionId: 's1', requestId: 'r2' });
+    expect(r2.files.map(({ label, baseline }) => [label, baseline])).toEqual([['DOCS.md', 'none']]);
+    await expect(
+      query({
+        kind: 'requestDiff',
+        ...target,
+        sessionId: 's1',
+        requestId: 'r1',
+        path: join(workspace, 'DOCS.md')
+      })
+    ).rejects.toThrow('File is not part of this request');
+    await expect(
+      query({ kind: 'requestChanges', ...target, sessionId: 's1', requestId: 'r9' })
+    ).rejects.toThrow('Unknown request');
+  });
+
+  it('diffs the latest request from hook snapshots', async () => {
+    const docs = join(workspace, 'DOCS.md');
+    const at = detail.requests[1]?.timestamp ?? 0;
+    await live.hook({ kind: 'prompt', sessionId: 's1', at, prompt: 'Document it' });
+    await live.hook({
+      kind: 'toolStart',
+      sessionId: 's1',
+      at: at + 10,
+      callId: 'c1',
+      toolName: 'replace_string_in_file',
+      paths: [docs]
+    });
+    await writeFile(docs, '# Demo\nMore\n');
+    const result = await query({
+      kind: 'requestDiff',
+      ...target,
+      sessionId: 's1',
+      requestId: 'r2',
+      path: docs
+    });
+    expect([result.file.baseline, result.file.additions, result.file.deletions]).toEqual([
+      'request',
+      1,
+      0
+    ]);
   });
 });

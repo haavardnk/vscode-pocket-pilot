@@ -2,6 +2,7 @@
   import CircleCheck from '@lucide/svelte/icons/circle-check';
   import CircleHelp from '@lucide/svelte/icons/circle-help';
   import CircleX from '@lucide/svelte/icons/circle-x';
+  import FileDiff from '@lucide/svelte/icons/file-diff';
   import FilePen from '@lucide/svelte/icons/file-pen';
   import ShieldAlert from '@lucide/svelte/icons/shield-alert';
   import type { QuestionAnswers, RequestView, ResponsePart } from '@pocket-pilot/protocol';
@@ -27,6 +28,9 @@
   let acting = $state(false);
 
   const parts = $derived(mergeMarkdown(request.parts));
+  const edited = $derived(
+    new Set(request.parts.flatMap((part) => (part.kind === 'edit' ? [part.path] : []))).size
+  );
 
   async function act(action: () => Promise<boolean>): Promise<void> {
     acting = true;
@@ -88,7 +92,13 @@
     {:else if part.kind === 'edit'}
       <a
         class="flex max-w-full items-center gap-2 self-start text-sm text-base-content/70 hover:text-primary"
-        href={routeHash({ name: 'sessionDiff', windowId, sessionId, path: part.path })}
+        href={routeHash({
+          name: 'sessionDiff',
+          windowId,
+          sessionId,
+          path: part.path,
+          requestId: request.id
+        })}
       >
         <FilePen class="size-4 shrink-0" />
         <span class="truncate font-mono underline decoration-base-content/30"
@@ -157,6 +167,15 @@
       </div>
     {/if}
   {/each}
+
+  {#if edited > 0}
+    <a
+      class="flex items-center gap-2 self-start text-sm text-base-content/70 hover:text-primary"
+      href={routeHash({ name: 'sessionChanges', windowId, sessionId, requestId: request.id })}
+    >
+      <FileDiff class="size-4 shrink-0" />Files changed ({edited})
+    </a>
+  {/if}
 
   {#if request.state === 'failed'}
     <div role="alert" class="alert alert-soft text-sm alert-error">

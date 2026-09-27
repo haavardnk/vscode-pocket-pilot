@@ -1,5 +1,6 @@
 <script lang="ts">
   import FileCode from '@lucide/svelte/icons/file-code';
+  import type { CodeResultFor } from '@pocket-pilot/protocol';
 
   import { baseName, parentPath } from '../lib/code/paths';
   import BaselineNote from '../lib/components/code/BaselineNote.svelte';
@@ -21,16 +22,19 @@
     windowId: string;
     sessionId: string;
     path: string;
+    requestId: string | null;
   }
 
-  const { windowId, sessionId, path }: Props = $props();
+  const { windowId, sessionId, path, requestId }: Props = $props();
 
   let acting = $state(false);
 
   const hostWindow = $derived(hub.windows.find((candidate) => candidate.windowId === windowId));
   const connected = $derived(hub.connection === 'open' && hostWindow !== undefined);
-  const diff = new QueryResource(() =>
-    hub.query({ kind: 'sessionDiff', windowId, sessionId, path })
+  const diff = new QueryResource<CodeResultFor<'sessionDiff' | 'requestDiff'>>(() =>
+    requestId
+      ? hub.query({ kind: 'requestDiff', windowId, sessionId, requestId, path })
+      : hub.query({ kind: 'sessionDiff', windowId, sessionId, path })
   );
   const file = $derived(diff.value?.file);
   const label = $derived(file?.label ?? path);
@@ -53,7 +57,7 @@
   <ScreenHeader
     title={baseName(label)}
     subtitle={parentPath(label)}
-    back={{ name: 'sessionChanges', windowId, sessionId }}
+    back={{ name: 'sessionChanges', windowId, sessionId, requestId }}
   >
     {#snippet actions()}
       {#if file?.folderId && file.relativePath !== null && file.change !== 'deleted'}
@@ -90,7 +94,7 @@
     </QueryView>
   </main>
 
-  {#if editState === 'pending'}
+  {#if editState === 'pending' && !requestId}
     <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
       <div class="flex gap-2 p-3">
         <button

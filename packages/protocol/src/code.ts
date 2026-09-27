@@ -3,6 +3,7 @@ import { z } from 'zod';
 const pathField = z.string().max(4096);
 const folderTarget = { windowId: z.string(), folderId: z.string() };
 const sessionTarget = { windowId: z.string(), sessionId: z.string() };
+const requestTarget = { ...sessionTarget, requestId: z.string() };
 
 export const fileChangeSchema = z.enum([
   'modified',
@@ -15,7 +16,7 @@ export const fileChangeSchema = z.enum([
 
 export const editStateSchema = z.enum(['pending', 'kept', 'undone']);
 
-export const baselineSchema = z.enum(['session', 'commit', 'none']);
+export const baselineSchema = z.enum(['session', 'request', 'commit', 'none']);
 
 export const treeEntrySchema = z.object({
   name: z.string(),
@@ -70,7 +71,9 @@ export const codeQuerySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('gitChanges'), ...folderTarget }),
   z.object({ kind: z.literal('gitDiff'), ...folderTarget, path: pathField }),
   z.object({ kind: z.literal('sessionChanges'), ...sessionTarget }),
-  z.object({ kind: z.literal('sessionDiff'), ...sessionTarget, path: pathField })
+  z.object({ kind: z.literal('sessionDiff'), ...sessionTarget, path: pathField }),
+  z.object({ kind: z.literal('requestChanges'), ...requestTarget }),
+  z.object({ kind: z.literal('requestDiff'), ...requestTarget, path: pathField })
 ]);
 
 export const codeResultSchema = z.discriminatedUnion('kind', [
@@ -102,6 +105,13 @@ export const codeResultSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('sessionChanges'), files: z.array(sessionChangeSchema) }),
   z.object({
     kind: z.literal('sessionDiff'),
+    language: z.string().nullable(),
+    file: sessionChangeSchema,
+    diff: diffContentSchema
+  }),
+  z.object({ kind: z.literal('requestChanges'), files: z.array(sessionChangeSchema) }),
+  z.object({
+    kind: z.literal('requestDiff'),
     language: z.string().nullable(),
     file: sessionChangeSchema,
     diff: diffContentSchema

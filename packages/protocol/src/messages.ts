@@ -13,7 +13,8 @@ export const hookEventSchema = z.discriminatedUnion('kind', [
     kind: z.literal('toolStart'),
     ...hookTarget,
     callId: z.string(),
-    toolName: z.string()
+    toolName: z.string(),
+    paths: z.array(z.string())
   }),
   z.object({ kind: z.literal('toolEnd'), ...hookTarget, callId: z.string() }),
   z.object({ kind: z.literal('stop'), ...hookTarget })

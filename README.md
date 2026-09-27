@@ -16,7 +16,8 @@ Cloudflare tunnel. From the phone you can:
 - start a new chat in any open window
 - pin chats to the top of the list and archive finished ones, in step with VS Code
 - browse the open workspace folders and read files with syntax highlighting
-- review uncommitted changes, and keep or undo the files a chat edited
+- review uncommitted changes, keep or undo the files a chat edited, and see what each message
+  changed
 - get a notification when an agent finishes, needs input or fails
 - see open pull requests with check, review and merge status
 
@@ -170,12 +171,17 @@ The **Code** tab lists the workspace folders of every open window.
   images show as pictures. Files over 2 MB are not sent to the phone, and highlighting stops above
   256 KB or 5,000 lines.
 - **Changes** lists uncommitted changes against `HEAD`, with a diff for each file.
-- A chat that edited files shows a **Changes** button next to its title, and every edit in the
-  chat links to its diff. Keep or undo one file, or all of them. This works like the buttons in the
-  VS Code chat view.
+- A chat that edited files shows a **Changes** button next to its title. Keep or undo one file, or
+  all of them. This works like the buttons in the VS Code chat view.
+- Each message that edited files ends with **Files changed**, and every edit in it links to its
+  diff. These diffs show only what that message changed, from the file as it was before the
+  message to the file after it. Changes made outside the agent between messages, such as a
+  formatter run, are not counted.
 
 VS Code saves a chat's edit snapshot about once a minute. Until it does, a chat's diff compares
-with the last commit, or shows the whole file when it is new, and says so above the diff.
+with the last commit, or shows the whole file when it is new, and says so above the diff. The
+running message's diffs do not wait for that: Pocket Pilot records each file before the agent
+edits it.
 
 The phone can only read files inside the open workspace folders. It follows symbolic links only
 when they stay inside the folder. A chat's diff can also show a file outside the workspace when
