@@ -1,0 +1,212 @@
+{
+  "name": "pocket-pilot",
+  "displayName": "Pocket Pilot",
+  "description": "Monitor and steer VS Code chat agents from your phone through a Cloudflare tunnel.",
+  "version": "0.1.0",
+  "publisher": "haavardnk",
+  "license": "MIT",
+  "icon": "media/web/icon-512.png",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/haavardnk/vscode-pocket-pilot"
+  },
+  "engines": {
+    "vscode": "^1.136.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "copilot",
+    "chat",
+    "agent",
+    "remote",
+    "mobile",
+    "pwa"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.cjs",
+  "contributes": {
+    "commands": [
+      {
+        "command": "pocketPilot.menu",
+        "title": "Show Menu",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.start",
+        "title": "Start",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.stop",
+        "title": "Stop",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.restart",
+        "title": "Restart",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.showPairing",
+        "title": "Pair Phone",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.copyUrl",
+        "title": "Copy Phone URL",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.manageDevices",
+        "title": "Manage Paired Devices",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.setPassword",
+        "title": "Set Password",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.clearPassword",
+        "title": "Remove Password",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.setUpTunnel",
+        "title": "Set Up Cloudflare Tunnel",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.removeTunnel",
+        "title": "Remove Cloudflare Tunnel",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.signInGitHub",
+        "title": "Sign In to GitHub",
+        "category": "Pocket Pilot"
+      },
+      {
+        "command": "pocketPilot.showLog",
+        "title": "Show Log",
+        "category": "Pocket Pilot"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "pocketPilot.start",
+          "when": "!config.pocketPilot.enabled"
+        },
+        {
+          "command": "pocketPilot.stop",
+          "when": "config.pocketPilot.enabled"
+        },
+        {
+          "command": "pocketPilot.restart",
+          "when": "config.pocketPilot.enabled"
+        },
+        {
+          "command": "pocketPilot.showPairing",
+          "when": "config.pocketPilot.enabled"
+        },
+        {
+          "command": "pocketPilot.copyUrl",
+          "when": "config.pocketPilot.enabled"
+        },
+        {
+          "command": "pocketPilot.clearPassword",
+          "when": "pocketPilot.hasPassword"
+        },
+        {
+          "command": "pocketPilot.removeTunnel",
+          "when": "pocketPilot.hasTunnel"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Pocket Pilot",
+      "properties": {
+        "pocketPilot.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "machine",
+          "markdownDescription": "Run Pocket Pilot in every window. The leader window serves phones through Cloudflare Tunnel. Without a tunnel token this is a quick tunnel with a temporary `trycloudflare.com` address that changes on every restart and cannot be installed as an app. Run **Pocket Pilot: Set Up Cloudflare Tunnel** for a permanent address. Anyone on the internet can reach the sign-in page; pairing codes and the password still protect it."
+        },
+        "pocketPilot.port": {
+          "type": "integer",
+          "default": 48111,
+          "minimum": 1024,
+          "maximum": 65534,
+          "scope": "machine",
+          "description": "Port on 127.0.0.1 that connects the VS Code windows. The Cloudflare tunnel uses the next port. Every window must use the same port."
+        },
+        "pocketPilot.tunnel.cloudflaredPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Path to a cloudflared binary. Leave empty to download a checksum-verified copy."
+        },
+        "pocketPilot.devices.expireDays": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 0,
+          "scope": "machine",
+          "description": "Forget paired devices that have not connected for this many days. 0 keeps them forever."
+        },
+        "pocketPilot.pullRequests.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Fetch open pull requests for the repositories of open windows."
+        },
+        "pocketPilot.pullRequests.pollSeconds": {
+          "type": "integer",
+          "default": 60,
+          "minimum": 15,
+          "description": "Pull request refresh interval while a phone is connected."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "check": "tsc -p tsconfig.json",
+    "package": "vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@pocket-pilot/protocol": "0.1.0",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/helmet": "^13.1.1",
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/static": "^10.1.5",
+    "@fastify/websocket": "^11.3.1",
+    "@octokit/graphql": "^9.0.5",
+    "chokidar": "^5.0.0",
+    "fastify": "^5.12.5",
+    "git-url-parse": "^16.1.0",
+    "jsonc-parser": "^3.3.1",
+    "qrcode": "^1.5.4",
+    "ws": "^8.22.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/git-url-parse": "^16.0.2",
+    "@types/qrcode": "^1.5.6",
+    "@types/vscode": "1.136.0",
+    "@types/ws": "^8.18.1",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2"
+  }
+}

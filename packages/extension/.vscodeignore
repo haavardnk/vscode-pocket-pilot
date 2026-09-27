@@ -1,0 +1,7 @@
+**
+!dist/extension.cjs
+!dist/extension.cjs.LEGAL.txt
+!media/**
+!package.json
+!README.md
+!LICENSE

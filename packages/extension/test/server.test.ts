@@ -1,0 +1,219 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { type IncomingHttpHeaders, type IncomingMessage, request } from 'node:http';
+import { type AddressInfo, createServer } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { authInfoSchema, type PullRequestState } from '@pocket-pilot/protocol';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { WebSocket } from 'ws';
+
+import { Hub } from '../src/cluster/hub';
+import { type RunningServer, startServer, TOKEN_COOKIE } from '../src/server/app';
+import { DeviceStore } from '../src/server/devices';
+import { PairingStore } from '../src/server/pairing';
+
+interface Response {
+  status: number;
+  headers: IncomingHttpHeaders;
+  body: string;
+}
+
+interface Fixture {
+  folder: string;
+  port: number;
+  tunnelPort: number;
+  server: RunningServer;
+}
+
+interface RequestOptions {
+  tunnel?: boolean;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+const PUBLIC_HOST = 'abc.trycloudflare.com';
+const PUBLIC_ORIGIN = `https://${PUBLIC_HOST}`;
+
+const noPullRequests: PullRequestState = {
+  status: 'disabled',
+  fetchedAt: null,
+  errors: [],
+  pullRequests: []
+};
+
+async function start(namedTunnel = false): Promise<Fixture> {
+  const folder = await mkdtemp(join(tmpdir(), 'pocket-pilot-server-'));
+  await writeFile(join(folder, 'index.html'), '<!doctype html><title>app</title>');
+  await writeFile(join(folder, 'manifest.webmanifest'), '{}');
+  const server = await startServer({
+    port: 0,
+    namedTunnel,
+    webRoot: folder,
+    clusterSecret: 'secret',
+    hub: new Hub('1.0.0', noPullRequests),
+    devices: new DeviceStore(join(folder, 'devices.json'), () => 30),
+    pairing: new PairingStore(join(folder, 'pairing.json')),
+    password: { enabled: async () => false, verify: async () => false },
+    expireDays: () => 30,
+    refreshPullRequests: () => undefined,
+    report: () => undefined
+  });
+  await new Promise<void>((resolve) => server.tunnel.listen(0, '127.0.0.1', resolve));
+  const { port: tunnelPort } = server.tunnel.address() as AddressInfo;
+  return { folder, port: server.port, tunnelPort, server };
+}
+
+async function cleanUp(fixture: Fixture): Promise<void> {
+  fixture.server.tunnel.close();
+  fixture.server.tunnel.closeAllConnections();
+  await fixture.server.close();
+  await rm(fixture.folder, { recursive: true, force: true });
+}
+
+function viaTunnel(headers: Record<string, string> = {}): Record<string, string> {
+  return { host: PUBLIC_HOST, 'x-forwarded-proto': 'https', ...headers };
+}
+
+function send(fixture: Fixture, path: string, options: RequestOptions = {}): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const target = {
+      host: '127.0.0.1',
+      port: options.tunnel ? fixture.tunnelPort : fixture.port,
+      path,
+      method: options.method ?? 'GET',
+      headers: options.headers,
+      agent: false
+    };
+    request(target, (response: IncomingMessage) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.on('error', reject);
+      response.on('end', () =>
+        resolve({
+          status: response.statusCode ?? 0,
+          headers: response.headers,
+          body: Buffer.concat(chunks).toString()
+        })
+      );
+    })
+      .on('error', reject)
+      .end(options.body);
+  });
+}
+
+function opened(socket: WebSocket): Promise<void> {
+  return new Promise((resolve, reject) => {
+    socket.once('open', resolve);
+    socket.once('error', reject);
+  });
+}
+
+function refused(socket: WebSocket): Promise<number> {
+  socket.on('error', () => undefined);
+  return new Promise((resolve) =>
+    socket.once('unexpected-response', (_request, response) => {
+      socket.terminate();
+      resolve(response.statusCode ?? 0);
+    })
+  );
+}
+
+async function pair(fixture: Fixture, origin: string): Promise<Response> {
+  const { code } = await new PairingStore(join(fixture.folder, 'pairing.json')).create();
+  return send(fixture, '/api/pair', {
+    tunnel: true,
+    method: 'POST',
+    headers: viaTunnel({ origin, 'content-type': 'application/json' }),
+    body: JSON.stringify({ code, deviceName: 'Phone' })
+  });
+}
+
+describe('server', () => {
+  let fixture: Fixture;
+
+  beforeAll(async () => {
+    fixture = await start();
+  });
+
+  afterAll(async () => {
+    fixture.server.tunnel.close();
+    await rm(fixture.folder, { recursive: true, force: true });
+  });
+
+  it('serves only the cluster link on the local port', async () => {
+    const socket = new WebSocket(`ws://127.0.0.1:${fixture.port}/internal`);
+    await opened(socket);
+    socket.close();
+    const [page, auth] = await Promise.all([send(fixture, '/'), send(fixture, '/api/auth')]);
+    expect([page.status, auth.status]).toEqual([404, 404]);
+  });
+
+  it('redirects plain HTTP tunnel requests to HTTPS', async () => {
+    const response = await send(fixture, '/api/auth?x=1', {
+      tunnel: true,
+      headers: viaTunnel({ 'x-forwarded-proto': 'http' })
+    });
+    expect(response.status).toBe(308);
+    expect(response.headers.location).toBe(`${PUBLIC_ORIGIN}/api/auth?x=1`);
+  });
+
+  it('refuses cluster links through the tunnel', async () => {
+    const socket = new WebSocket(`ws://127.0.0.1:${fixture.tunnelPort}/internal`, {
+      headers: viaTunnel()
+    });
+    expect(await refused(socket)).toBe(403);
+  });
+
+  it('refuses cross-origin pairing', async () => {
+    expect((await pair(fixture, 'https://evil.test')).status).toBe(403);
+  });
+
+  it('releases the port on close', async () => {
+    await fixture.server.close();
+    const probe = createServer();
+    await new Promise<void>((resolve, reject) => {
+      probe.once('error', reject);
+      probe.listen(fixture.port, '127.0.0.1', resolve);
+    });
+    probe.close();
+  });
+});
+
+describe.each([
+  { namedTunnel: false, connection: 'quickTunnel', manifest: 404 },
+  { namedTunnel: true, connection: 'tunnel', manifest: 200 }
+])('server through a $connection', ({ namedTunnel, connection, manifest }) => {
+  let fixture: Fixture;
+
+  beforeAll(async () => {
+    fixture = await start(namedTunnel);
+  });
+
+  afterAll(() => cleanUp(fixture));
+
+  it('pairs with a secure cookie and opens the phone socket', async () => {
+    const paired = await pair(fixture, PUBLIC_ORIGIN);
+    expect(paired.status).toBe(200);
+    expect(authInfoSchema.parse(JSON.parse(paired.body)).connection).toBe(connection);
+    const cookie = paired.headers['set-cookie']?.[0] ?? '';
+    expect(cookie).toContain(`${TOKEN_COOKIE}=`);
+    expect(cookie).toMatch(/;\s*secure/i);
+
+    const socket = new WebSocket(`ws://127.0.0.1:${fixture.tunnelPort}/ws`, {
+      origin: PUBLIC_ORIGIN,
+      headers: viaTunnel({ cookie: cookie.split(';')[0] ?? '' })
+    });
+    await opened(socket);
+    socket.close();
+  });
+
+  it('serves the install files only through a named tunnel', async () => {
+    const response = await send(fixture, '/manifest.webmanifest', {
+      tunnel: true,
+      headers: viaTunnel()
+    });
+    expect(response.status).toBe(manifest);
+  });
+});
