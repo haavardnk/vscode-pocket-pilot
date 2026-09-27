@@ -26,9 +26,12 @@ const window: WindowState = {
       modelId: 'copilot/gpt-5',
       modeId: 'agent',
       requestCount: 1,
-      preview: 'Fix login'
+      preview: 'Fix login',
+      pinned: true,
+      archived: false
     }
   ],
+  canOrganize: true,
   agents: [{ id: 'agent', name: 'Agent', description: null, builtin: true }],
   models: []
 };

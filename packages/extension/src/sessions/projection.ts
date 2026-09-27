@@ -23,6 +23,8 @@ const PREVIEW_LENGTH = 160;
 const DETAIL_LENGTH = 4000;
 const LINK = /\[([^\]]*)\]\(([^)\s]+)\)/g;
 
+export type LogSummary = Omit<SessionSummary, 'pinned' | 'archived'>;
+
 interface PartContext {
   state: RequestState;
   latest: boolean;
@@ -92,7 +94,7 @@ function titleOf(root: JsonRecord, requests: JsonRecord[]): string {
   return first ? clip(requestText(first), TITLE_LENGTH) || 'New chat' : 'New chat';
 }
 
-export function projectSummary(root: unknown, id: string, modifiedAt: number): SessionSummary {
+export function projectSummary(root: unknown, id: string, modifiedAt: number): LogSummary {
   const session = asRecord(root);
   const requests = requestsOf(session);
   const last = requests.at(-1);
@@ -319,7 +321,7 @@ export function editedPaths(root: unknown): string[] {
 
 export function projectDetail(
   root: unknown,
-  summary: SessionSummary,
+  summary: LogSummary,
   limit: number,
   liveFor: (requestText: string) => LiveEvent[]
 ): SessionDetail {

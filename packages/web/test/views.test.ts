@@ -16,14 +16,16 @@ import {
   pullRequestsFor,
   repositoryGroups,
   resolveRepository,
-  sessionEntries
+  sessionEntries,
+  sessionSections
 } from '../src/lib/hub/views';
 import { pairCode, parseRoute, type Route, routeHash } from '../src/lib/routing';
 
 function session(
   id: string,
   updatedAt: number,
-  status: SessionSummary['status'] = 'idle'
+  status: SessionSummary['status'] = 'idle',
+  flags: Partial<Pick<SessionSummary, 'pinned' | 'archived'>> = {}
 ): SessionSummary {
   return {
     id,
@@ -35,7 +37,10 @@ function session(
     modelId: null,
     modeId: null,
     requestCount: 1,
-    preview: null
+    preview: null,
+    pinned: false,
+    archived: false,
+    ...flags
   };
 }
 
@@ -46,6 +51,7 @@ function window(windowId: string, keys: string[], sessions: SessionSummary[]): W
     repositories: keys.map((key) => ({ key, label: key.split('/').at(-1) ?? key, github: null })),
     folders: [],
     sessions,
+    canOrganize: true,
     agents: [],
     models: []
   };
@@ -90,6 +96,29 @@ describe('repositoryGroups', () => {
     expect(
       sessionEntries(WINDOWS, groups, ALL_REPOSITORIES).map((entry) => entry.session.id)
     ).toEqual(['s2', 's3', 's1']);
+  });
+
+  it('puts pinned chats first and archived chats last, archive winning over pin', () => {
+    const windows = [
+      window(
+        'w1',
+        [],
+        [
+          session('recent', 40),
+          session('pinned', 10, 'idle', { pinned: true }),
+          session('archived', 50, 'idle', { archived: true }),
+          session('both', 30, 'idle', { pinned: true, archived: true })
+        ]
+      )
+    ];
+    const { pinned, recent, archived } = sessionSections(
+      windows,
+      repositoryGroups(windows),
+      ALL_REPOSITORIES
+    );
+    expect(
+      [pinned, recent, archived].map((entries) => entries.map((entry) => entry.session.id))
+    ).toEqual([['pinned'], ['recent'], ['archived', 'both']]);
   });
 });
 

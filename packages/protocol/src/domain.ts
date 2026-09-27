@@ -31,7 +31,9 @@ export const sessionSummarySchema = z.object({
   modelId: z.string().nullable(),
   modeId: z.string().nullable(),
   requestCount: z.number(),
-  preview: z.string().nullable()
+  preview: z.string().nullable(),
+  pinned: z.boolean(),
+  archived: z.boolean()
 });
 
 export const permissionLevelSchema = z.enum(['default', 'autoApprove', 'autopilot']);
@@ -189,6 +191,7 @@ export const windowStateSchema = z.object({
   repositories: z.array(repositorySchema),
   folders: z.array(workspaceFolderSchema),
   sessions: z.array(sessionSummarySchema),
+  canOrganize: z.boolean(),
   agents: z.array(agentSchema),
   models: z.array(modelSchema)
 });

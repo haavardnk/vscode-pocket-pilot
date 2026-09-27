@@ -37,6 +37,8 @@ export const commandSchema = z.discriminatedUnion('kind', [
     button: z.string().min(1)
   }),
   z.object({ kind: z.literal('acceptElicitation'), ...sessionTarget }),
+  z.object({ kind: z.literal('setPinned'), ...sessionTarget, pinned: z.boolean() }),
+  z.object({ kind: z.literal('setArchived'), ...sessionTarget, archived: z.boolean() }),
   z.object({
     kind: z.literal('setPermission'),
     ...sessionTarget,

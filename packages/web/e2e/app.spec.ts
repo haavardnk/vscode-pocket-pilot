@@ -144,6 +144,37 @@ test.describe('paired', () => {
     await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('');
   });
 
+  test('pins, archives and unarchives chats', async ({ page }) => {
+    const chats = page.getByRole('list', { name: 'Chats' });
+    await page.getByRole('button', { name: 'Actions for Fix flaky cluster test' }).click();
+    await page
+      .getByRole('dialog', { name: 'Fix flaky cluster test' })
+      .getByRole('button', { name: 'Pin', exact: true })
+      .click();
+    await expect(chats.getByRole('listitem').first()).toHaveText('Pinned');
+    await expect(chats.getByRole('listitem').nth(1)).toContainText('Fix flaky cluster test');
+
+    await openSession(page, 'Plan the release');
+    await page.getByRole('button', { name: 'Chat actions' }).click();
+    await page
+      .getByRole('dialog', { name: 'Plan the release' })
+      .getByRole('button', { name: 'Archive', exact: true })
+      .click();
+    await expect(chats.getByRole('link', { name: /Build the phone app/ })).toBeVisible();
+    await expect(chats.getByRole('link', { name: /Plan the release/ })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Archived (2)' }).click();
+    const archived = page.getByRole('list', { name: 'Archived chats' });
+    await expect(archived.getByRole('link', { name: /Plan the release/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Actions for Bump dependencies' }).click();
+    await page
+      .getByRole('dialog', { name: 'Bump dependencies' })
+      .getByRole('button', { name: 'Unarchive' })
+      .click();
+    await expect(chats.getByRole('link', { name: /Bump dependencies/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Archived (1)' })).toBeVisible();
+  });
+
   test('changes agent, model and thinking effort', async ({ page }) => {
     await openSession(page, 'Fix flaky cluster test');
     await page.getByRole('button', { name: 'Reviewer' }).click();

@@ -1,7 +1,15 @@
+import { setTimeout as delay } from 'node:timers/promises';
+
 import type { Agent, Command, Model, PermissionLevel, SessionDetail } from '@pocket-pilot/protocol';
 import * as vscode from 'vscode';
 
 import type { ModelSettingsFile } from '../models/modelSettings';
+import type { SessionFlags } from '../sessions/sessionFlags';
+import {
+  LOCAL_SESSION_AUTHORITY,
+  LOCAL_SESSION_SCHEME,
+  localSessionPath
+} from '../sessions/sessionUri';
 import {
   answersError,
   confirmationPrompt,
@@ -10,20 +18,25 @@ import {
   requirePendingElicitation
 } from './interactions';
 
+const AGENT_SESSION_CONTEXT = 25;
+const ARCHIVE_PROMPT_MS = 3000;
+
 export interface ControllerSources {
   models: () => Promise<Model[]>;
   agents: () => Promise<Agent[]>;
   detail: (sessionId: string) => Promise<SessionDetail | null>;
   editedFiles: (sessionId: string) => Promise<string[]>;
+  expectFlags: (sessionId: string, flags: Partial<SessionFlags>) => void;
   expectPermission: (sessionId: string, level: PermissionLevel) => void;
+  canOrganize: boolean;
   settings: ModelSettingsFile;
 }
 
 export function sessionResource(sessionId: string): vscode.Uri {
   return vscode.Uri.from({
-    scheme: 'vscode-chat-session',
-    authority: 'local',
-    path: `/${Buffer.from(sessionId).toString('base64url')}`
+    scheme: LOCAL_SESSION_SCHEME,
+    authority: LOCAL_SESSION_AUTHORITY,
+    path: localSessionPath(sessionId)
   });
 }
 
@@ -93,6 +106,18 @@ export class Controller {
         await this.submit(command.sessionId, PERMISSION_COMMANDS[command.level]);
         this.sources.expectPermission(command.sessionId, command.level);
         return;
+      case 'setPinned':
+        this.requireOrganize();
+        await this.agentSessionCommand(
+          command.pinned ? 'agentSession.pin' : 'agentSession.unpin',
+          command.sessionId
+        );
+        this.sources.expectFlags(command.sessionId, { pinned: command.pinned });
+        return;
+      case 'setArchived':
+        this.requireOrganize();
+        await this.setArchived(command.sessionId, command.archived);
+        return;
       case 'editDecision':
         await this.decideEdits(command);
         return;
@@ -129,6 +154,32 @@ export class Controller {
 
   private async focus(sessionId: string): Promise<void> {
     await vscode.commands.executeCommand('vscode.open', sessionResource(sessionId));
+  }
+
+  private requireOrganize(): void {
+    if (!this.sources.canOrganize) {
+      throw new Error('Chats in a window without a folder cannot be pinned or archived');
+    }
+  }
+
+  private async agentSessionCommand(id: string, sessionId: string): Promise<void> {
+    const session = { resource: sessionResource(sessionId) };
+    await vscode.commands.executeCommand(id, {
+      $mid: AGENT_SESSION_CONTEXT,
+      session,
+      sessions: [session]
+    });
+  }
+
+  private async setArchived(sessionId: string, archived: boolean): Promise<void> {
+    const done = this.agentSessionCommand(
+      archived ? 'agentSession.archive' : 'agentSession.unarchive',
+      sessionId
+    ).then(() => this.sources.expectFlags(sessionId, { archived }));
+    const prompted = delay(ARCHIVE_PROMPT_MS, true, { ref: false });
+    if (await Promise.race([done.then(() => false), prompted])) {
+      throw new Error('VS Code asks what to do with the pending edits of this chat');
+    }
   }
 
   private async decideEdits(command: Extract<Command, { kind: 'editDecision' }>): Promise<void> {

@@ -7,6 +7,7 @@ export interface ChatPaths {
   editingSessions: string | null;
   transcripts: string | null;
   debugLogs: string | null;
+  stateDatabase: string | null;
   userDir: string;
   modelSettings: string;
   copilotStorage: string;
@@ -26,7 +27,8 @@ export function chatPaths(context: vscode.ExtensionContext): ChatPaths {
       sessions: join(globalStorage, 'emptyWindowChatSessions'),
       editingSessions: null,
       transcripts: null,
-      debugLogs: null
+      debugLogs: null,
+      stateDatabase: null
     };
   }
   const workspaceStorage = dirname(context.storageUri.fsPath);
@@ -36,6 +38,7 @@ export function chatPaths(context: vscode.ExtensionContext): ChatPaths {
     sessions: join(workspaceStorage, 'chatSessions'),
     editingSessions: join(workspaceStorage, 'chatEditingSessions'),
     transcripts: join(copilot, 'transcripts'),
-    debugLogs: join(copilot, 'debug-logs')
+    debugLogs: join(copilot, 'debug-logs'),
+    stateDatabase: join(workspaceStorage, 'state.vscdb')
   };
 }

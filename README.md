@@ -14,6 +14,7 @@ Cloudflare tunnel. From the phone you can:
   autopilot
 - switch agent and model, and change thinking effort or context size
 - start a new chat in any open window
+- pin chats to the top of the list and archive finished ones, in step with VS Code
 - browse the open workspace folders and read files with syntax highlighting
 - review uncommitted changes, and keep or undo the files a chat edited
 - get a notification when an agent finishes, needs input or fails
@@ -98,6 +99,19 @@ the same port.
 Every VS Code window runs Pocket Pilot. One of them wins the port and becomes the leader; the
 others connect to it over loopback and report their chats. When the leader window closes, another
 window takes over within a few seconds and the phone reconnects on its own.
+
+## Pinned and archived chats
+
+The menu next to a chat, and the one in a chat's header, pins, archives or unarchives it. The
+phone uses the same commands as the chat sessions view in VS Code, so both show the same state.
+
+- Pinned chats come first. Archived chats are hidden behind **Archived** at the bottom of the list.
+- A chat pinned or archived in VS Code shows up on the phone after about a minute, because
+  VS Code saves that state to disk on a timer.
+- When the chat has edits you have not kept or undone, VS Code asks what to do with them before
+  it archives the chat. Answer that dialog on the computer.
+- Chats in a window without a folder have no menu. VS Code keeps their state where extensions
+  cannot read it.
 
 ## Answering the agent
 

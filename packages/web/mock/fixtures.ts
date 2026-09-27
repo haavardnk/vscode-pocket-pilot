@@ -72,15 +72,22 @@ function summaryOf(detail: SessionDetail, updatedAt: number): WindowState['sessi
     modelId: detail.modelId,
     modeId: detail.modeId,
     requestCount: detail.totalRequests,
-    preview: last?.message ?? null
+    preview: last?.message ?? null,
+    pinned: false,
+    archived: false
   };
 }
 
 export function refreshSummary(window: MockWindow, sessionId: string, now: number): void {
   const detail = window.details.get(sessionId);
   if (!detail) return;
-  const summary = summaryOf(detail, now);
   const index = window.state.sessions.findIndex((session) => session.id === sessionId);
+  const existing = window.state.sessions[index];
+  const summary = {
+    ...summaryOf(detail, now),
+    pinned: existing?.pinned ?? false,
+    archived: existing?.archived ?? false
+  };
   if (index === -1) window.state.sessions.unshift(summary);
   else window.state.sessions[index] = summary;
 }
@@ -88,12 +95,16 @@ export function refreshSummary(window: MockWindow, sessionId: string, now: numbe
 function buildWindow(
   state: Omit<WindowState, 'sessions'>,
   details: SessionDetail[],
-  now: number
+  now: number,
+  archived: readonly string[] = []
 ): MockWindow {
   const window: MockWindow = { state: { ...state, sessions: [] }, details: new Map() };
   details.forEach((detail, index) => {
     window.details.set(detail.id, detail);
-    window.state.sessions.push(summaryOf(detail, now - index * 25 * MINUTE));
+    window.state.sessions.push({
+      ...summaryOf(detail, now - index * 25 * MINUTE),
+      archived: archived.includes(detail.id)
+    });
   });
   return window;
 }
@@ -113,7 +124,8 @@ export function initialWindows(now: number): MockWindow[] {
         ],
         agents: AGENTS,
         models: models(),
-        folders: [{ id: 'f1', name: 'vscode-pocket-pilot' }]
+        folders: [{ id: 'f1', name: 'vscode-pocket-pilot' }],
+        canOrganize: true
       },
       [
         {
@@ -263,9 +275,33 @@ export function initialWindows(now: number): MockWindow[] {
           ],
           queued: [],
           live: []
+        },
+        {
+          id: 's5',
+          title: 'Bump dependencies',
+          status: 'idle',
+          modelId: 'copilot/gpt-5',
+          modeId: 'agent',
+          permission: 'default',
+          editedFiles: 0,
+          totalRequests: 1,
+          requests: [
+            {
+              id: 'r5',
+              timestamp: now - 80 * MINUTE,
+              message: 'Bump the web dependencies.',
+              modelId: 'copilot/gpt-5',
+              state: 'complete',
+              error: null,
+              parts: [{ kind: 'markdown', text: 'Bumped Svelte and Vite.' }]
+            }
+          ],
+          queued: [],
+          live: []
         }
       ],
-      now
+      now,
+      ['s5']
     ),
     buildWindow(
       {
@@ -280,7 +316,8 @@ export function initialWindows(now: number): MockWindow[] {
         ],
         agents: AGENTS,
         models: models(),
-        folders: [{ id: 'f2', name: 'immich-edit' }]
+        folders: [{ id: 'f2', name: 'immich-edit' }],
+        canOrganize: true
       },
       [
         {

@@ -43,6 +43,7 @@ class FakeWindow implements LocalWindow {
       repositories: [],
       folders: [],
       sessions: [],
+      canOrganize: true,
       agents: [],
       models: []
     };

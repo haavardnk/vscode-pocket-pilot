@@ -27,6 +27,7 @@ import { ModelSettingsFile } from './models/modelSettings';
 import { ModelSource } from './models/modelSource';
 import { type ChatPaths, chatPaths } from './paths';
 import { EditingSessions } from './sessions/editingState';
+import { FlagStore } from './sessions/flagStore';
 import { SessionStore } from './sessions/sessionStore';
 
 const PUBLISH_DELAY_MS = 100;
@@ -43,6 +44,7 @@ export class WindowAgent implements vscode.Disposable {
   private readonly sessionChanged = new vscode.EventEmitter<SessionUpdate>();
   private readonly subscriptions: vscode.Disposable[] = [this.stateChanged, this.sessionChanged];
   private readonly store: SessionStore;
+  private readonly flags: FlagStore;
   private readonly agentSource: AgentSource;
   private readonly modelSource: ModelSource;
   private readonly controller: Controller;
@@ -72,6 +74,7 @@ export class WindowAgent implements vscode.Disposable {
       { sessions: this.paths.sessions, transcripts: this.paths.transcripts },
       report
     );
+    this.flags = new FlagStore(this.paths.stateDatabase, report);
     this.agentSource = new AgentSource(agentUri(this.paths), report);
     const settings = new ModelSettingsFile(this.paths.modelSettings);
     this.modelSource = new ModelSource(this.paths.debugLogs, settings, report);
@@ -93,7 +96,9 @@ export class WindowAgent implements vscode.Disposable {
       agents: () => Promise.resolve(this.agents),
       detail: (sessionId) => this.store.detail(sessionId, 1),
       editedFiles: (sessionId) => sessionChanges.paths(sessionId),
+      expectFlags: (sessionId, flags) => this.flags.expect(sessionId, flags),
       expectPermission: (sessionId, level) => this.store.expectPermission(sessionId, level),
+      canOrganize: this.paths.stateDatabase !== null,
       settings
     });
     this.subscriptions.push(
@@ -101,6 +106,7 @@ export class WindowAgent implements vscode.Disposable {
       this.modelSource,
       { dispose: () => this.agentSource.dispose() },
       { dispose: () => this.store.dispose() },
+      { dispose: () => this.flags.dispose() },
       { dispose: () => clearTimeout(this.publishTimer) },
       this.modelSource.onDidChange(() => void this.refreshModels()),
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
@@ -115,12 +121,14 @@ export class WindowAgent implements vscode.Disposable {
     );
     this.agentSource.onDidChange(() => void this.refreshAgents());
     this.store.onDidChange((sessionId) => this.onSessionChange(sessionId));
+    this.flags.onDidChange(() => this.schedulePublish());
   }
 
   async start(): Promise<void> {
     this.agentSource.setFolders(agentFolders(this.paths));
     await Promise.all([
       this.store.start(),
+      this.flags.start(),
       this.refreshAgents(),
       this.refreshModels(),
       this.refreshRepositories()
@@ -133,7 +141,10 @@ export class WindowAgent implements vscode.Disposable {
       name: vscode.workspace.name ?? 'Empty window',
       repositories: this.repositories,
       folders: this.folders.map(({ id, name }) => ({ id, name })),
-      sessions: this.store.summaries(),
+      sessions: this.store
+        .summaries()
+        .map((summary) => ({ ...summary, ...this.flags.flags(summary.id) })),
+      canOrganize: this.paths.stateDatabase !== null,
       agents: this.agents,
       models: this.models
     };

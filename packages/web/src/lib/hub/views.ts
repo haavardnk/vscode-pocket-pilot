@@ -25,7 +25,14 @@ export interface RepositoryGroup {
 export interface SessionEntry {
   windowId: string;
   windowName: string;
+  canOrganize: boolean;
   session: SessionSummary;
+}
+
+export interface SessionSections {
+  pinned: SessionEntry[];
+  recent: SessionEntry[];
+  archived: SessionEntry[];
 }
 
 function lastActivity(window: WindowState): number {
@@ -89,10 +96,24 @@ export function sessionEntries(
       window.sessions.map((session) => ({
         windowId: window.windowId,
         windowName: window.name,
+        canOrganize: window.canOrganize,
         session
       }))
     )
     .sort((a, b) => b.session.updatedAt - a.session.updatedAt);
+}
+
+export function sessionSections(
+  windows: WindowState[],
+  groups: RepositoryGroup[],
+  key: string
+): SessionSections {
+  const entries = sessionEntries(windows, groups, key);
+  return {
+    pinned: entries.filter((entry) => entry.session.pinned && !entry.session.archived),
+    recent: entries.filter((entry) => !entry.session.pinned && !entry.session.archived),
+    archived: entries.filter((entry) => entry.session.archived)
+  };
 }
 
 export function windowsForRepository(

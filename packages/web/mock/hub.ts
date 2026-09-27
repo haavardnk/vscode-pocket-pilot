@@ -109,6 +109,14 @@ export class MockHub {
       this.code.decide(detail.id, command.path, command.decision);
       return;
     }
+    if (command.kind === 'setPinned' || command.kind === 'setArchived') {
+      const summary = window.state.sessions.find((session) => session.id === detail.id);
+      if (!summary) throw new Error('Chat not found');
+      if (command.kind === 'setPinned') summary.pinned = command.pinned;
+      else summary.archived = command.archived;
+      this.broadcast({ type: 'window', window: window.state });
+      return;
+    }
     if (command.kind === 'send') {
       if (detail.status === 'idle' || detail.status === 'failed')
         this.ask(window, detail.id, command.text);

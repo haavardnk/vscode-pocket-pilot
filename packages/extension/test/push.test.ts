@@ -22,7 +22,9 @@ function session(state: RequestState | null, requestCount = 1): SessionSummary {
     modelId: null,
     modeId: null,
     requestCount,
-    preview: null
+    preview: null,
+    pinned: false,
+    archived: false
   };
 }
 
@@ -34,6 +36,7 @@ function windows(...sessions: SessionSummary[]): WindowState[] {
       repositories: [],
       folders: [],
       sessions,
+      canOrganize: true,
       agents: [],
       models: []
     }

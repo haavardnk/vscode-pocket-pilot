@@ -1,13 +1,13 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
-import type { PermissionLevel, SessionDetail, SessionSummary } from '@pocket-pilot/protocol';
+import type { PermissionLevel, SessionDetail } from '@pocket-pilot/protocol';
 import type { FSWatcher } from 'chokidar';
 
 import { watchTargets } from '../fsWatch';
 import { LineTailer } from './lineTailer';
 import { applyLogEntry, parseLogEntry } from './mutationLog';
-import { editedPaths, projectDetail, projectSummary } from './projection';
+import { editedPaths, type LogSummary, projectDetail, projectSummary } from './projection';
 import { TranscriptBuffer } from './transcript';
 
 const HOT_SESSIONS = 8;
@@ -25,7 +25,7 @@ interface SessionEntry {
   id: string;
   log: LineTailer;
   root: unknown;
-  summary: SessionSummary | null;
+  summary: LogSummary | null;
   transcript: LineTailer | null;
   events: TranscriptBuffer;
   reading: Promise<void>;
@@ -52,7 +52,7 @@ export class SessionStore {
     return () => this.listeners.delete(listener);
   }
 
-  summaries(): SessionSummary[] {
+  summaries(): LogSummary[] {
     return [...this.entries.values()]
       .flatMap((entry) => (entry.summary && entry.summary.requestCount > 0 ? [entry.summary] : []))
       .sort((a, b) => b.updatedAt - a.updatedAt);

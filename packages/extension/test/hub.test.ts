@@ -23,6 +23,7 @@ function windowState(windowId: string): WindowState {
     repositories: [],
     folders: [],
     sessions: [],
+    canOrganize: true,
     agents: [],
     models: []
   };

@@ -1,5 +1,6 @@
 <script lang="ts">
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
   import FileDiff from '@lucide/svelte/icons/file-diff';
   import Square from '@lucide/svelte/icons/square';
   import type {
@@ -19,6 +20,7 @@
   import ModeSheet from '../lib/components/ModeSheet.svelte';
   import PermissionSheet from '../lib/components/PermissionSheet.svelte';
   import RequestItem from '../lib/components/RequestItem.svelte';
+  import SessionActionsSheet from '../lib/components/SessionActionsSheet.svelte';
   import StatusBadge from '../lib/components/StatusBadge.svelte';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { routeHash } from '../lib/routing';
@@ -33,7 +35,7 @@
 
   const { windowId, sessionId }: Props = $props();
 
-  let sheet = $state<'mode' | 'model' | 'permission' | null>(null);
+  let sheet = $state<'mode' | 'model' | 'permission' | 'actions' | null>(null);
   let deciding = $state(false);
   let stopping = $state(false);
   let followBottom = true;
@@ -168,6 +170,15 @@
           <Square class="size-3.5 fill-current" />
         </button>
       {/if}
+      {#if summary && hostWindow?.canOrganize}
+        <button
+          class="btn btn-square btn-ghost btn-sm"
+          aria-label="Chat actions"
+          onclick={() => (sheet = 'actions')}
+        >
+          <EllipsisVertical class="size-4" />
+        </button>
+      {/if}
     </div>
     <ConnectionBanner />
   </header>
@@ -294,4 +305,9 @@
       onclose={() => (sheet = null)}
     />
   {/if}
+  <SessionActionsSheet
+    target={sheet === 'actions' && summary ? { windowId, session: summary } : null}
+    onarchived={() => router.go({ name: 'chats' })}
+    onclose={() => (sheet = null)}
+  />
 </div>
