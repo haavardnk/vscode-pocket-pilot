@@ -41,6 +41,7 @@ const detail = (parts: ResponsePart[]): SessionDetail => ({
   modeId: null,
   permission: 'default',
   totalRequests: 1,
+  editedFiles: 0,
   requests: [
     { id: 'r', timestamp: 0, message: 'go', modelId: null, state: 'needsInput', error: null, parts }
   ],

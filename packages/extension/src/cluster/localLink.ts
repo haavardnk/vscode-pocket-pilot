@@ -4,7 +4,8 @@ import type { Disposable, LocalWindow } from './localWindow';
 export function attachLocalWindow(hub: Hub, window: LocalWindow): Disposable {
   const link: WindowLink = {
     watch: (sessions) => window.setWatches(sessions),
-    run: (command) => window.run(command)
+    run: (command) => window.run(command),
+    query: (query) => window.query(query)
   };
   hub.addWindow(window.state(), link);
   const subscriptions = [

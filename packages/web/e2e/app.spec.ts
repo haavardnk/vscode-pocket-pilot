@@ -5,6 +5,11 @@ const BASES: Record<string, string> = {
   mocha: 'rgb(30, 30, 46)'
 };
 
+const KEYWORDS: Record<string, string> = {
+  latte: 'rgb(136, 57, 239)',
+  mocha: 'rgb(203, 166, 247)'
+};
+
 const CONNECTIONS = [
   { connection: 'quickTunnel', note: /temporary Cloudflare address/ },
   { connection: 'tunnel', note: /your Cloudflare tunnel/ }
@@ -19,6 +24,12 @@ async function signIn(page: Page): Promise<void> {
 async function openSession(page: Page, title: string): Promise<void> {
   await page.getByRole('link', { name: new RegExp(title) }).click();
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
+}
+
+async function openFolder(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Code' }).click();
+  await page.getByRole('link', { name: 'vscode-pocket-pilot', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'vscode-pocket-pilot' })).toBeVisible();
 }
 
 test.describe('pairing', () => {
@@ -210,6 +221,59 @@ test.describe('paired', () => {
     await page.routeWebSocket('**/ws', (socket) => socket.close());
     await page.reload();
     await expect(page.getByText(/Offline, reconnecting|Connecting to VS Code/)).toBeVisible();
+  });
+
+  test('browses the repository and highlights a file', async ({ page }, testInfo) => {
+    await openFolder(page);
+    const files = page.getByRole('list', { name: 'Files' });
+    await expect(files.getByRole('link', { name: /node_modules/ })).toBeVisible();
+    for (const name of ['packages', 'web', 'src']) await files.getByRole('link', { name }).click();
+    await files.getByRole('link', { name: 'App.svelte' }).click();
+    await expect(page.getByRole('heading', { name: 'App.svelte' })).toBeVisible();
+    const code = page.getByTestId('code');
+    await expect(code).toContainText('import SessionList');
+    const keyword = code.locator('.code-tokens span', { hasText: /^import$/ }).first();
+    await expect(keyword).toHaveCSS('color', KEYWORDS[testInfo.project.name] ?? '');
+    const wrap = page.getByRole('button', { name: 'Wrap lines' });
+    await wrap.click();
+    await expect(wrap).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(page.getByRole('banner').getByText('packages/web/src')).toBeVisible();
+    await expect(files.getByRole('link', { name: 'App.svelte' })).toBeVisible();
+  });
+
+  test('reviews uncommitted changes', async ({ page }) => {
+    await openFolder(page);
+    await page.getByRole('tab', { name: 'Changes' }).click();
+    const changes = page.getByRole('list', { name: 'Changed files' });
+    await expect(changes.getByRole('link')).toHaveCount(3);
+    await changes.getByRole('link', { name: /routing\.ts/ }).click();
+    const diff = page.getByTestId('diff');
+    await expect(diff.locator('[data-kind="removed"]')).toContainText(
+      "export type Route = { name: 'chats' };"
+    );
+    await expect(diff.locator('[data-kind="added"]')).toContainText("{ name: 'code' }");
+    await page.getByRole('link', { name: 'Open file' }).click();
+    await expect(page.getByTestId('code')).toContainText('export function parseRoute');
+  });
+
+  test('keeps and undoes the edits of a chat', async ({ page }) => {
+    await openSession(page, 'Build the phone app');
+    await page.getByRole('link', { name: 'App.svelte' }).click();
+    await expect(page.getByTestId('diff').locator('[data-kind="added"]').first()).toContainText(
+      'import Composer'
+    );
+    await page.getByRole('button', { name: 'Keep' }).click();
+    await expect(page.getByText('Kept')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Keep' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(page.getByText(/Compared with the last commit/)).toBeVisible();
+    page.once('dialog', (dialog) => void dialog.accept());
+    await page.getByRole('button', { name: 'Undo all' }).click();
+    const changes = page.getByRole('list', { name: 'Changed files' });
+    await expect(changes.getByText('Undone')).toBeVisible();
+    await expect(changes.getByText('Kept')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Keep all/ })).toHaveCount(0);
   });
 
   test('draws the repository menu on an opaque background', async ({ page }) => {

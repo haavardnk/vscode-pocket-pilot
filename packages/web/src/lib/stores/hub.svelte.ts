@@ -1,4 +1,6 @@
 import type {
+  CodeQuery,
+  CodeResultFor,
   Command,
   PullRequestState,
   ServerMessage,
@@ -105,6 +107,13 @@ class HubStore {
   command(command: Command): Promise<void> {
     if (!this.socket) return Promise.reject(new Error('Not connected'));
     return this.socket.command(command);
+  }
+
+  async query<Q extends CodeQuery>(query: Q): Promise<CodeResultFor<Q['kind']>> {
+    if (!this.socket) throw new Error('Not connected');
+    const result = await this.socket.query(query);
+    if (result.kind !== query.kind) throw new Error('Unexpected response');
+    return result as CodeResultFor<Q['kind']>;
   }
 
   private readonly wake = (): void => {

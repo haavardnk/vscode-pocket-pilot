@@ -13,6 +13,7 @@ const window: WindowState = {
   windowId: 'w1',
   name: 'demo',
   repositories: [{ key: 'acme/demo', label: 'acme/demo', github: { owner: 'acme', name: 'demo' } }],
+  folders: [{ id: 'f1', name: 'demo' }],
   sessions: [
     {
       id: 's1',
@@ -50,7 +51,35 @@ describe('protocol', () => {
         pullRequests: { status: 'disabled', fetchedAt: null, errors: [], pullRequests: [] }
       }
     ],
-    [followerMessageSchema, { type: 'register', secret: 'x', window }]
+    [followerMessageSchema, { type: 'register', secret: 'x', window }],
+    [
+      clientMessageSchema,
+      {
+        type: 'query',
+        requestId: 'q',
+        query: { kind: 'gitDiff', windowId: 'w1', folderId: 'f1', path: 'a.ts' }
+      }
+    ],
+    [
+      serverMessageSchema,
+      {
+        type: 'queryResult',
+        requestId: 'q',
+        result: {
+          kind: 'gitDiff',
+          language: 'typescript',
+          file: {
+            path: 'a.ts',
+            previousPath: null,
+            change: 'modified',
+            additions: 1,
+            deletions: 1
+          },
+          diff: { kind: 'text', hunks: [{ oldStart: 1, newStart: 1, lines: ['-a', '+b'] }] }
+        },
+        error: null
+      }
+    ]
   ])('round trips %#', (schema, message) => {
     expect(parseMessage(schema, JSON.stringify(message))).toEqual(message);
   });

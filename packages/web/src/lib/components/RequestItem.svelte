@@ -5,27 +5,27 @@
   import Wrench from '@lucide/svelte/icons/wrench';
   import type { QuestionAnswers, RequestView } from '@pocket-pilot/protocol';
 
+  import { baseName } from '../code/paths';
   import { mergeMarkdown } from '../hub/views';
   import { markdown } from '../markdown';
+  import { routeHash } from '../routing';
   import QuestionCard from './QuestionCard.svelte';
 
   interface Props {
     request: RequestView;
+    windowId: string;
+    sessionId: string;
     disabled: boolean;
     onanswer: (resolveId: string, answers: QuestionAnswers | null) => Promise<boolean>;
     onconfirm: (button: string) => Promise<boolean>;
     onelicit: () => Promise<boolean>;
   }
 
-  const { request, disabled, onanswer, onconfirm, onelicit }: Props = $props();
+  const { request, windowId, sessionId, disabled, onanswer, onconfirm, onelicit }: Props = $props();
 
   let acting = $state(false);
 
   const parts = $derived(mergeMarkdown(request.parts));
-
-  function fileName(path: string): string {
-    return path.split(/[\\/]/).at(-1) ?? path;
-  }
 
   async function act(action: () => Promise<boolean>): Promise<void> {
     acting = true;
@@ -59,10 +59,15 @@
           >{/if}
       </div>
     {:else if part.kind === 'edit'}
-      <div class="flex items-center gap-2 text-sm text-base-content/70">
+      <a
+        class="flex max-w-full items-center gap-2 self-start text-sm text-base-content/70 hover:text-primary"
+        href={routeHash({ name: 'sessionDiff', windowId, sessionId, path: part.path })}
+      >
         <FilePen class="size-4 shrink-0" />
-        <span class="truncate font-mono">{fileName(part.path)}</span>
-      </div>
+        <span class="truncate font-mono underline decoration-base-content/30"
+          >{baseName(part.path)}</span
+        >
+      </a>
     {:else if part.kind === 'progress'}
       <p class="text-sm text-base-content/60 italic">{part.text}</p>
     {:else if part.kind === 'questions'}

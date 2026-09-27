@@ -27,6 +27,43 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.code-tokens > span {
+  color: var(--shiki-latte);
+  font-style: var(--shiki-latte-font-style);
+  font-weight: var(--shiki-latte-font-weight);
+  text-decoration: var(--shiki-latte-text-decoration);
+}
+
+[data-theme='frappe'] .code-tokens > span {
+  color: var(--shiki-frappe);
+  font-style: var(--shiki-frappe-font-style);
+  font-weight: var(--shiki-frappe-font-weight);
+  text-decoration: var(--shiki-frappe-text-decoration);
+}
+
+[data-theme='macchiato'] .code-tokens > span {
+  color: var(--shiki-macchiato);
+  font-style: var(--shiki-macchiato-font-style);
+  font-weight: var(--shiki-macchiato-font-weight);
+  text-decoration: var(--shiki-macchiato-text-decoration);
+}
+
+[data-theme='mocha'] .code-tokens > span {
+  color: var(--shiki-mocha);
+  font-style: var(--shiki-mocha-font-style);
+  font-weight: var(--shiki-mocha-font-weight);
+  text-decoration: var(--shiki-mocha-text-decoration);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .code-tokens > span {
+    color: var(--shiki-mocha);
+    font-style: var(--shiki-mocha-font-style);
+    font-weight: var(--shiki-mocha-font-weight);
+    text-decoration: var(--shiki-mocha-text-decoration);
+  }
+}
+
 .markdown {
   overflow-wrap: anywhere;
   line-height: 1.55;

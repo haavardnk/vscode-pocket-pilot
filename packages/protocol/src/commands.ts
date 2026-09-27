@@ -43,6 +43,12 @@ export const commandSchema = z.discriminatedUnion('kind', [
     level: permissionLevelSchema
   }),
   z.object({
+    kind: z.literal('editDecision'),
+    ...sessionTarget,
+    decision: z.enum(['keep', 'undo']),
+    path: z.string().max(4096).nullable()
+  }),
+  z.object({
     kind: z.literal('newSession'),
     windowId: z.string(),
     text: z.string().min(1).max(100_000),

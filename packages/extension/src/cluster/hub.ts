@@ -1,4 +1,6 @@
 import type {
+  CodeQuery,
+  CodeResult,
   Command,
   PullRequestState,
   ServerMessage,
@@ -10,6 +12,7 @@ import type {
 export interface WindowLink {
   watch(sessions: SessionWatch[]): void;
   run(command: Command): Promise<void>;
+  query(query: CodeQuery): Promise<CodeResult>;
 }
 
 export interface HubClient {
@@ -152,6 +155,12 @@ export class Hub {
     const entry = this.windows.get(command.windowId);
     if (!entry) throw new Error('Window is no longer open');
     await entry.link.run(command);
+  }
+
+  async query(query: CodeQuery): Promise<CodeResult> {
+    const entry = this.windows.get(query.windowId);
+    if (!entry) throw new Error('Window is no longer open');
+    return entry.link.query(query);
   }
 
   private syncWatches(windowId: string): void {

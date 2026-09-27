@@ -1,10 +1,12 @@
 <script lang="ts">
+  import CodeXml from '@lucide/svelte/icons/code-xml';
   import GitPullRequest from '@lucide/svelte/icons/git-pull-request';
   import MessagesSquare from '@lucide/svelte/icons/messages-square';
   import Plus from '@lucide/svelte/icons/plus';
   import Settings from '@lucide/svelte/icons/settings';
   import type { AuthInfo, Connection, Device } from '@pocket-pilot/protocol';
 
+  import FolderList from '../lib/components/code/FolderList.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
   import PullRequestList from '../lib/components/PullRequestList.svelte';
   import RepositoryPicker from '../lib/components/RepositoryPicker.svelte';
@@ -14,7 +16,7 @@
   import SettingsPanel from './SettingsPanel.svelte';
 
   interface Props {
-    tab: 'chats' | 'pullRequests' | 'settings';
+    tab: 'chats' | 'pullRequests' | 'code' | 'settings';
     device: Device;
     connection: Connection;
     onsignedout: (info: AuthInfo) => void;
@@ -25,6 +27,7 @@
   const tabs: { name: Props['tab']; label: string; icon: typeof Settings }[] = [
     { name: 'chats', label: 'Chats', icon: MessagesSquare },
     { name: 'pullRequests', label: 'Pull requests', icon: GitPullRequest },
+    { name: 'code', label: 'Code', icon: CodeXml },
     { name: 'settings', label: 'Settings', icon: Settings }
   ];
 </script>
@@ -46,6 +49,8 @@
       <SessionList />
     {:else if tab === 'pullRequests'}
       <PullRequestList />
+    {:else if tab === 'code'}
+      <FolderList />
     {:else}
       <SettingsPanel {device} {connection} {onsignedout} />
     {/if}

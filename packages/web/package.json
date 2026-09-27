@@ -16,7 +16,8 @@
     "@lucide/svelte": "^1.48.0",
     "date-fns": "^4.4.0",
     "dompurify": "^3.4.16",
-    "marked": "^18.0.14"
+    "marked": "^18.0.14",
+    "shiki": "^4.4.3"
   },
   "devDependencies": {
     "@catppuccin/daisyui": "^2.1.1",

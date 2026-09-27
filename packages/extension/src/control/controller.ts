@@ -14,6 +14,7 @@ export interface ControllerSources {
   models: () => Promise<Model[]>;
   agents: () => Promise<Agent[]>;
   detail: (sessionId: string) => Promise<SessionDetail | null>;
+  editedFiles: (sessionId: string) => Promise<string[]>;
   expectPermission: (sessionId: string, level: PermissionLevel) => void;
   settings: ModelSettingsFile;
 }
@@ -92,6 +93,9 @@ export class Controller {
         await this.submit(command.sessionId, PERMISSION_COMMANDS[command.level]);
         this.sources.expectPermission(command.sessionId, command.level);
         return;
+      case 'editDecision':
+        await this.decideEdits(command);
+        return;
       case 'newSession': {
         if (command.modeId) await this.requireAgent(command.modeId);
         const model = command.modelId ? await this.requireModel(command.modelId) : null;
@@ -125,6 +129,23 @@ export class Controller {
 
   private async focus(sessionId: string): Promise<void> {
     await vscode.commands.executeCommand('vscode.open', sessionResource(sessionId));
+  }
+
+  private async decideEdits(command: Extract<Command, { kind: 'editDecision' }>): Promise<void> {
+    const files = await this.sources.editedFiles(command.sessionId);
+    if (command.path !== null && !files.includes(command.path)) {
+      throw new Error('File is not part of this chat');
+    }
+    await this.focus(command.sessionId);
+    if (command.path === null && command.decision === 'keep') {
+      await vscode.commands.executeCommand('chatEditing.acceptAllFiles');
+      return;
+    }
+    const action =
+      command.decision === 'keep' ? 'chatEditing.acceptFile' : 'chatEditing.discardFile';
+    for (const path of command.path === null ? files : [command.path]) {
+      await vscode.commands.executeCommand(action, vscode.Uri.file(path));
+    }
   }
 
   private async submit(sessionId: string, text: string): Promise<void> {

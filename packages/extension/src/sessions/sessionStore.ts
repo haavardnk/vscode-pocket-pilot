@@ -7,7 +7,7 @@ import type { FSWatcher } from 'chokidar';
 import { watchTargets } from '../fsWatch';
 import { LineTailer } from './lineTailer';
 import { applyLogEntry, parseLogEntry } from './mutationLog';
-import { projectDetail, projectSummary } from './projection';
+import { editedPaths, projectDetail, projectSummary } from './projection';
 import { TranscriptBuffer } from './transcript';
 
 const HOT_SESSIONS = 8;
@@ -102,6 +102,15 @@ export class SessionStore {
     if (!entry) return;
     entry.permission = { level, at: Date.now() };
     this.emit(sessionId);
+  }
+
+  async editedPaths(sessionId: string): Promise<string[] | null> {
+    const entry = this.entries.get(sessionId);
+    if (!entry?.summary) return null;
+    if (entry.root === undefined) await this.readLog(entry);
+    if (!this.entries.has(sessionId)) return null;
+    this.touch(entry);
+    return editedPaths(entry.root);
   }
 
   dispose(): void {

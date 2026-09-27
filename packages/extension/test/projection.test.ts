@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { plainMessage, projectDetail, projectSummary } from '../src/sessions/projection';
+import {
+  editedPaths,
+  plainMessage,
+  projectDetail,
+  projectSummary
+} from '../src/sessions/projection';
 import { request, SESSION_ID, snapshot } from './fixtures';
 
 describe('projection', () => {
@@ -86,6 +91,20 @@ describe('projection', () => {
       { kind: 'edit', path: '/repo/a.ts' }
     ]);
     expect(detail.permission).toBe('default');
+  });
+
+  it('collects edited file paths across requests', () => {
+    const edit = (uri: object) => ({ kind: 'textEditGroup', uri });
+    const root = snapshot([
+      request('r0', 'one', 1, [edit({ scheme: 'file', fsPath: '/repo/a.ts', path: '/repo/a.ts' })]),
+      request('r1', 'two', 1, [
+        edit({ scheme: 'untitled', path: 'Untitled-1' }),
+        edit({ path: '/repo/b.ts' }),
+        edit({ scheme: 'file', fsPath: '/repo/a.ts', path: '/repo/a.ts' })
+      ])
+    ]);
+    expect(editedPaths(root)).toEqual(['/repo/a.ts', '/repo/b.ts']);
+    expect(projectDetail(root, projectSummary(root, 'file', 0), 1, () => []).editedFiles).toBe(2);
   });
 
   it('reads the session permission level', () => {

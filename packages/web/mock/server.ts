@@ -152,7 +152,20 @@ server.on('upgrade', (request, socket, head) => {
       if (message.type === 'subscribe') hub.subscribe(client, message);
       else if (message.type === 'unsubscribe') hub.subscribe(client, null);
       else if (message.type === 'refreshPullRequests') hub.refreshPullRequests();
-      else {
+      else if (message.type === 'query') {
+        try {
+          const result = hub.query(message.query);
+          client.send({ type: 'queryResult', requestId: message.requestId, result, error: null });
+        } catch (error) {
+          const text = error instanceof Error ? error.message : String(error);
+          client.send({
+            type: 'queryResult',
+            requestId: message.requestId,
+            result: null,
+            error: text
+          });
+        }
+      } else {
         try {
           hub.run(message.command);
           client.send({ type: 'result', requestId: message.requestId, ok: true, error: null });

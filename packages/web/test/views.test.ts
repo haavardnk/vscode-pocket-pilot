@@ -18,7 +18,7 @@ import {
   resolveRepository,
   sessionEntries
 } from '../src/lib/hub/views';
-import { pairCode, parseRoute, routeHash } from '../src/lib/routing';
+import { pairCode, parseRoute, type Route, routeHash } from '../src/lib/routing';
 
 function session(
   id: string,
@@ -43,6 +43,7 @@ function window(windowId: string, keys: string[], sessions: SessionSummary[]): W
     windowId,
     name: windowId,
     repositories: keys.map((key) => ({ key, label: key.split('/').at(-1) ?? key, github: null })),
+    folders: [],
     sessions,
     agents: [],
     models: []
@@ -195,6 +196,7 @@ describe('response parts', () => {
       modelId: null,
       modeId: null,
       permission: 'default',
+      editedFiles: 0,
       totalRequests: requests.length,
       requests,
       queued: [],
@@ -212,14 +214,24 @@ describe('routing', () => {
     ['#/prs', { name: 'pullRequests' }],
     ['#/settings', { name: 'settings' }],
     ['#/new', { name: 'new' }],
+    ['#/code', { name: 'code' }],
     ['#/session/w%2F1/s%201', { name: 'session', windowId: 'w/1', sessionId: 's 1' }],
-    ['#/session/w1', { name: 'chats' }]
+    ['#/session/w1', { name: 'chats' }],
+    ['#/tree/w/f', { name: 'folder', windowId: 'w', folderId: 'f', tab: 'files', path: '' }],
+    ['#/changes/w/f', { name: 'folder', windowId: 'w', folderId: 'f', tab: 'changes', path: '' }]
   ])('parses %s', (hash, route) => {
     expect(parseRoute(hash)).toEqual(route);
   });
 
-  it('round-trips session routes', () => {
-    const route = { name: 'session', windowId: 'w/1', sessionId: 'a#b' } as const;
+  it.each<Route>([
+    { name: 'session', windowId: 'w/1', sessionId: 'a#b' },
+    { name: 'folder', windowId: 'w', folderId: 'f', tab: 'files', path: 'src/a b/c#d' },
+    { name: 'folder', windowId: 'w', folderId: 'f', tab: 'changes', path: '' },
+    { name: 'file', windowId: 'w', folderId: 'f', path: 'src/%20.ts' },
+    { name: 'gitDiff', windowId: 'w', folderId: 'f', path: 'a/b.ts' },
+    { name: 'sessionChanges', windowId: 'w', sessionId: 's' },
+    { name: 'sessionDiff', windowId: 'w', sessionId: 's', path: '/Users/me/a/b.ts' }
+  ])('round-trips $name routes', (route) => {
     expect(parseRoute(routeHash(route))).toEqual(route);
   });
 

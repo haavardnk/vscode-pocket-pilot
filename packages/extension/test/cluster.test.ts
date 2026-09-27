@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type {
+  CodeQuery,
+  CodeResult,
   Command,
   ServerMessage,
   SessionDetail,
@@ -39,6 +41,7 @@ class FakeWindow implements LocalWindow {
       windowId: this.windowId,
       name: this.windowId,
       repositories: [],
+      folders: [],
       sessions: [],
       agents: [],
       models: []
@@ -54,6 +57,12 @@ class FakeWindow implements LocalWindow {
     return command.kind === 'setMode'
       ? Promise.reject(new Error('Unknown agent'))
       : Promise.resolve();
+  }
+
+  query(query: CodeQuery): Promise<CodeResult> {
+    return query.kind === 'tree'
+      ? Promise.resolve({ kind: 'tree', entries: [], truncated: false })
+      : Promise.reject(new Error('Not a git repository'));
   }
 
   onDidChangeState = (): Disposable => ({ dispose: () => undefined });
@@ -253,6 +262,31 @@ describe('cluster', () => {
       { type: 'result', requestId: 'b', ok: false, error: 'Unknown agent' }
     ]);
     expect(second.commands.map((command) => command.kind)).toEqual(['stop', 'setMode']);
+
+    for (const [requestId, kind] of [
+      ['c', 'tree'],
+      ['d', 'gitChanges']
+    ]) {
+      client.socket.send(
+        JSON.stringify({
+          type: 'query',
+          requestId,
+          query: { kind, windowId: 'second', folderId: 'f', path: '' }
+        })
+      );
+    }
+    await waitFor(
+      () => client.messages.filter((message) => message.type === 'queryResult').length === 2
+    );
+    expect(client.messages.filter((message) => message.type === 'queryResult')).toEqual([
+      {
+        type: 'queryResult',
+        requestId: 'c',
+        result: { kind: 'tree', entries: [], truncated: false },
+        error: null
+      },
+      { type: 'queryResult', requestId: 'd', result: null, error: 'Not a git repository' }
+    ]);
 
     await leader.stop();
     await client.closed;

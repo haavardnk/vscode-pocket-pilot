@@ -6,6 +6,11 @@ export const repositorySchema = z.object({
   github: z.object({ owner: z.string(), name: z.string() }).nullable()
 });
 
+export const workspaceFolderSchema = z.object({
+  id: z.string(),
+  name: z.string()
+});
+
 export const sessionStatusSchema = z.enum(['idle', 'running', 'needsInput', 'failed']);
 
 export const sessionSummarySchema = z.object({
@@ -137,6 +142,7 @@ export const sessionDetailSchema = z.object({
   modeId: z.string().nullable(),
   permission: permissionLevelSchema,
   totalRequests: z.number(),
+  editedFiles: z.number(),
   requests: z.array(requestViewSchema),
   queued: z.array(queuedRequestSchema),
   live: z.array(liveEventSchema)
@@ -180,6 +186,7 @@ export const windowStateSchema = z.object({
   windowId: z.string(),
   name: z.string(),
   repositories: z.array(repositorySchema),
+  folders: z.array(workspaceFolderSchema),
   sessions: z.array(sessionSummarySchema),
   agents: z.array(agentSchema),
   models: z.array(modelSchema)
@@ -214,6 +221,7 @@ export const pullRequestStateSchema = z.object({
 });
 
 export type Repository = z.infer<typeof repositorySchema>;
+export type WorkspaceFolder = z.infer<typeof workspaceFolderSchema>;
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 export type RequestState = z.infer<typeof requestStateSchema>;

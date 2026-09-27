@@ -1,5 +1,6 @@
 <script lang="ts">
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import FileDiff from '@lucide/svelte/icons/file-diff';
   import Square from '@lucide/svelte/icons/square';
   import type {
     Agent,
@@ -20,6 +21,7 @@
   import RequestItem from '../lib/components/RequestItem.svelte';
   import StatusBadge from '../lib/components/StatusBadge.svelte';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
+  import { routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -147,6 +149,15 @@
           </div>
         {/if}
       </div>
+      {#if detail && detail.editedFiles > 0}
+        <a
+          class="btn gap-1 btn-ghost btn-sm"
+          aria-label={`Changes (${detail.editedFiles})`}
+          href={routeHash({ name: 'sessionChanges', windowId, sessionId })}
+        >
+          <FileDiff class="size-4" />{detail.editedFiles}
+        </a>
+      {/if}
       {#if busy}
         <button
           class="btn btn-square btn-soft btn-error btn-sm"
@@ -185,6 +196,8 @@
       {#each detail.requests as request (request.id)}
         <RequestItem
           {request}
+          {windowId}
+          {sessionId}
           disabled={!connected}
           onanswer={answer}
           onconfirm={confirm}

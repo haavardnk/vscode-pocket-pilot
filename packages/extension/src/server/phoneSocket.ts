@@ -60,6 +60,17 @@ export function acceptPhone(
       refreshPullRequests();
       return;
     }
+    if (message.type === 'query') {
+      const { requestId, query } = message;
+      hub.query(query).then(
+        (result) => client.send({ type: 'queryResult', requestId, result, error: null }),
+        (error: unknown) => {
+          report(`${query.kind} query failed: ${errorMessage(error)}`);
+          client.send({ type: 'queryResult', requestId, result: null, error: errorMessage(error) });
+        }
+      );
+      return;
+    }
     const { requestId, command } = message;
     hub.command(command).then(
       () => client.send({ type: 'result', requestId, ok: true, error: null }),

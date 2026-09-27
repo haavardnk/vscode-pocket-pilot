@@ -1,7 +1,7 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import {
-  type Command,
+  type CodeResult,
   type FollowerMessage,
   followerMessageSchema,
   type LeaderMessage,
@@ -12,10 +12,12 @@ import type { WebSocket } from 'ws';
 import type { Hub, WindowLink } from './hub';
 
 const REGISTER_TIMEOUT_MS = 5000;
-const COMMAND_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 30_000;
+
+type Reply = Extract<FollowerMessage, { type: 'result' | 'queryResult' }>;
 
 interface Pending {
-  resolve: () => void;
+  settle: (reply: Reply) => void;
   reject: (error: Error) => void;
   timer: NodeJS.Timeout;
 }
@@ -24,6 +26,17 @@ function sameSecret(expected: string, actual: string): boolean {
   const a = Buffer.from(expected);
   const b = Buffer.from(actual);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function commandOutcome(reply: Reply): void {
+  if (reply.type !== 'result') throw new Error('Unexpected reply');
+  if (!reply.ok) throw new Error(reply.error ?? 'Command failed');
+}
+
+function queryOutcome(reply: Reply): CodeResult {
+  if (reply.type !== 'queryResult') throw new Error('Unexpected reply');
+  if (!reply.result) throw new Error(reply.error ?? 'Query failed');
+  return reply.result;
 }
 
 export function acceptFollower(
@@ -36,18 +49,32 @@ export function acceptFollower(
   let windowId: string | null = null;
   const send = (message: LeaderMessage): void => socket.send(JSON.stringify(message));
 
+  const request = <T>(
+    message: (requestId: string) => LeaderMessage,
+    outcome: (reply: Reply) => T
+  ): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      const requestId = randomUUID();
+      const timer = setTimeout(() => {
+        pending.delete(requestId);
+        reject(new Error('The window did not respond'));
+      }, REQUEST_TIMEOUT_MS);
+      const settle = (reply: Reply): void => {
+        try {
+          resolve(outcome(reply));
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      };
+      pending.set(requestId, { settle, reject, timer });
+      send(message(requestId));
+    });
+
   const link: WindowLink = {
     watch: (sessions) => send({ type: 'watch', sessions }),
-    run: (command: Command) =>
-      new Promise<void>((resolve, reject) => {
-        const requestId = randomUUID();
-        const timer = setTimeout(() => {
-          pending.delete(requestId);
-          reject(new Error('The window did not respond'));
-        }, COMMAND_TIMEOUT_MS);
-        pending.set(requestId, { resolve, reject, timer });
-        send({ type: 'command', requestId, command });
-      })
+    run: (command) =>
+      request((requestId) => ({ type: 'command', requestId, command }), commandOutcome),
+    query: (query) => request((requestId) => ({ type: 'query', requestId, query }), queryOutcome)
   };
 
   const registerTimer = setTimeout(
@@ -82,8 +109,7 @@ export function acceptFollower(
     if (!waiting) return;
     pending.delete(message.requestId);
     clearTimeout(waiting.timer);
-    if (message.ok) waiting.resolve();
-    else waiting.reject(new Error(message.error ?? 'Command failed'));
+    waiting.settle(message);
   };
 
   socket.on('message', (data) => {

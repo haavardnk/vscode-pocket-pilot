@@ -1,4 +1,6 @@
 import type {
+  CodeQuery,
+  CodeResult,
   Command,
   PullRequestState,
   ServerMessage,
@@ -6,6 +8,7 @@ import type {
   WindowState
 } from '@pocket-pilot/protocol';
 
+import { MockCode } from './code.ts';
 import {
   initialPullRequests,
   initialWindows,
@@ -24,6 +27,7 @@ export class MockHub {
   private windows: MockWindow[] = [];
   private pullRequests: PullRequestState = initialPullRequests(Date.now());
   private readonly clients = new Set<MockClient>();
+  private readonly code = new MockCode();
   private timers: ReturnType<typeof setTimeout>[] = [];
   private nextId = 1;
 
@@ -42,6 +46,7 @@ export class MockHub {
     const now = Date.now();
     this.windows = initialWindows(now);
     this.pullRequests = initialPullRequests(now);
+    this.code.reset();
     for (const client of this.clients) {
       client.subscription = null;
       client.send(this.snapshot());
@@ -67,6 +72,12 @@ export class MockHub {
     this.broadcast({ type: 'pullRequests', state: this.pullRequests });
   }
 
+  query(query: CodeQuery): CodeResult {
+    if (!this.windows.some((window) => window.state.windowId === query.windowId))
+      throw new Error('Window is no longer open');
+    return this.code.query(query);
+  }
+
   run(command: Command): void {
     const window = this.windows.find((candidate) => candidate.state.windowId === command.windowId);
     if (!window) throw new Error('Window is no longer open');
@@ -83,6 +94,7 @@ export class MockHub {
         modelId: command.modelId,
         modeId: command.modeId ?? 'agent',
         permission: 'default',
+        editedFiles: 0,
         totalRequests: 0,
         requests: [],
         queued: [],
@@ -93,6 +105,10 @@ export class MockHub {
     }
     const detail = window.details.get(command.sessionId);
     if (!detail) throw new Error('Chat not found');
+    if (command.kind === 'editDecision') {
+      this.code.decide(detail.id, command.path, command.decision);
+      return;
+    }
     if (command.kind === 'send') {
       if (detail.status === 'idle' || detail.status === 'failed')
         this.ask(window, detail.id, command.text);

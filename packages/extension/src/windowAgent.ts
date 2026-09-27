@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
 import { basename, dirname } from 'node:path';
 
 import type {
   Agent,
+  CodeQuery,
+  CodeResult,
   Command,
   Model,
   Repository,
@@ -14,11 +17,16 @@ import * as vscode from 'vscode';
 
 import { agentFolders, agentUri } from './agents/agentFolders';
 import { AgentSource } from './agents/agentSource';
+import { CodeService } from './code/codeService';
+import { type CodeFolder, codeFolder } from './code/folders';
+import { LanguageIndex } from './code/languageIndex';
+import { SessionChanges } from './code/sessionChanges';
 import { Controller } from './control/controller';
 import { folderRepository } from './git/repository';
 import { ModelSettingsFile } from './models/modelSettings';
 import { ModelSource } from './models/modelSource';
 import { type ChatPaths, chatPaths } from './paths';
+import { EditingSessions } from './sessions/editingState';
 import { SessionStore } from './sessions/sessionStore';
 
 const PUBLISH_DELAY_MS = 100;
@@ -38,10 +46,12 @@ export class WindowAgent implements vscode.Disposable {
   private readonly agentSource: AgentSource;
   private readonly modelSource: ModelSource;
   private readonly controller: Controller;
+  private readonly code: CodeService;
   private readonly paths: ChatPaths;
   private readonly detailQueues = new Map<string, Promise<void>>();
   private watches = new Map<string, number>();
   private repositories: Repository[] = [];
+  private folders: CodeFolder[] = [];
   private agents: Agent[] = [];
   private models: Model[] = [];
   private readonly versions = { agents: 0, models: 0, repositories: 0 };
@@ -65,14 +75,29 @@ export class WindowAgent implements vscode.Disposable {
     this.agentSource = new AgentSource(agentUri(this.paths), report);
     const settings = new ModelSettingsFile(this.paths.modelSettings);
     this.modelSource = new ModelSource(this.paths.debugLogs, settings, report);
+    const languages = new LanguageIndex();
+    const sessionChanges = new SessionChanges({
+      folders: () => this.folders,
+      language: (path) => languages.resolve(path),
+      editing: new EditingSessions(this.paths.editingSessions),
+      editedPaths: (sessionId) => this.store.editedPaths(sessionId),
+      home: homedir()
+    });
+    this.code = new CodeService({
+      folders: () => this.folders,
+      language: (path) => languages.resolve(path),
+      sessions: sessionChanges
+    });
     this.controller = new Controller({
       models: () => Promise.resolve(this.models),
       agents: () => Promise.resolve(this.agents),
       detail: (sessionId) => this.store.detail(sessionId, 1),
+      editedFiles: (sessionId) => sessionChanges.paths(sessionId),
       expectPermission: (sessionId, level) => this.store.expectPermission(sessionId, level),
       settings
     });
     this.subscriptions.push(
+      languages,
       this.modelSource,
       { dispose: () => this.agentSource.dispose() },
       { dispose: () => this.store.dispose() },
@@ -107,6 +132,7 @@ export class WindowAgent implements vscode.Disposable {
       windowId: this.windowId,
       name: vscode.workspace.name ?? 'Empty window',
       repositories: this.repositories,
+      folders: this.folders.map(({ id, name }) => ({ id, name })),
       sessions: this.store.summaries(),
       agents: this.agents,
       models: this.models
@@ -125,6 +151,10 @@ export class WindowAgent implements vscode.Disposable {
       return Promise.reject(new Error('Unknown session'));
     }
     return this.controller.run(command);
+  }
+
+  query(query: CodeQuery): Promise<CodeResult> {
+    return this.code.query(query);
   }
 
   dispose(): void {
@@ -188,6 +218,8 @@ export class WindowAgent implements vscode.Disposable {
     const folders = (vscode.workspace.workspaceFolders ?? []).filter(
       (folder) => folder.uri.scheme === 'file'
     );
+    this.folders = folders.map((folder) => codeFolder(folder.name, folder.uri.fsPath));
+    this.schedulePublish();
     const repositories = await Promise.all(
       folders.map((folder) => folderRepository(folder.uri.fsPath))
     );

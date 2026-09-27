@@ -39,6 +39,16 @@ export function connectFollower(
     }
   };
 
+  const query = async (message: Extract<LeaderMessage, { type: 'query' }>): Promise<void> => {
+    const { requestId } = message;
+    try {
+      const result = await window.query(message.query);
+      send({ type: 'queryResult', requestId, result, error: null });
+    } catch (error) {
+      send({ type: 'queryResult', requestId, result: null, error: errorMessage(error) });
+    }
+  };
+
   const opened = new Promise<void>((resolve, reject) => {
     socket.once('open', () => {
       send({ type: 'register', secret: options.secret, window: window.state() });
@@ -71,6 +81,7 @@ export function connectFollower(
       return;
     }
     if (message.type === 'watch') window.setWatches(message.sessions);
+    else if (message.type === 'query') void query(message);
     else void run(message);
   });
 

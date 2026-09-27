@@ -1,4 +1,11 @@
-import type { Command, SessionDetail, SessionWatch, WindowState } from '@pocket-pilot/protocol';
+import type {
+  CodeQuery,
+  CodeResult,
+  Command,
+  SessionDetail,
+  SessionWatch,
+  WindowState
+} from '@pocket-pilot/protocol';
 
 export interface Disposable {
   dispose(): void;
@@ -11,6 +18,7 @@ export interface LocalWindow {
   state(): WindowState;
   setWatches(watches: readonly SessionWatch[]): void;
   run(command: Command): Promise<void>;
+  query(query: CodeQuery): Promise<CodeResult>;
   readonly onDidChangeState: Subscribe<WindowState>;
   readonly onDidChangeSession: Subscribe<{ sessionId: string; detail: SessionDetail | null }>;
 }

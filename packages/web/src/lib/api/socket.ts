@@ -1,5 +1,7 @@
 import {
   type ClientMessage,
+  type CodeQuery,
+  type CodeResult,
   type Command,
   parseMessage,
   type ServerMessage,
@@ -8,13 +10,16 @@ import {
 
 export type Connection = 'connecting' | 'open' | 'offline';
 
-const COMMAND_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 30_000;
 const MIN_RETRY_MS = 500;
 const MAX_RETRY_MS = 10_000;
 
-interface Pending {
-  resolve: () => void;
+interface Handlers {
+  resolve: (result: CodeResult | null) => void;
   reject: (error: Error) => void;
+}
+
+interface Pending extends Handlers {
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -54,6 +59,12 @@ export class HubSocket {
       if (!message) return;
       if (message.type === 'result')
         this.settle(message.requestId, message.ok ? null : (message.error ?? 'Failed'));
+      else if (message.type === 'queryResult')
+        this.settle(
+          message.requestId,
+          message.result ? null : (message.error ?? 'Failed'),
+          message.result
+        );
       else this.handlers.message(message);
     });
     socket.addEventListener('close', () => {
@@ -81,17 +92,20 @@ export class HubSocket {
   }
 
   command(command: Command): Promise<void> {
-    const requestId = crypto.randomUUID();
     return new Promise<void>((resolve, reject) => {
-      if (!this.send({ type: 'command', requestId, command })) {
-        reject(new Error('Not connected'));
-        return;
-      }
-      const timer = setTimeout(
-        () => this.settle(requestId, 'VS Code did not respond'),
-        COMMAND_TIMEOUT_MS
-      );
-      this.pending.set(requestId, { resolve, reject, timer });
+      this.request((requestId) => ({ type: 'command', requestId, command }), {
+        resolve: () => resolve(),
+        reject
+      });
+    });
+  }
+
+  query(query: CodeQuery): Promise<CodeResult> {
+    return new Promise<CodeResult>((resolve, reject) => {
+      this.request((requestId) => ({ type: 'query', requestId, query }), {
+        resolve: (result) => (result ? resolve(result) : reject(new Error('Empty result'))),
+        reject
+      });
     });
   }
 
@@ -103,12 +117,25 @@ export class HubSocket {
     this.failPending('Disconnected');
   }
 
-  private settle(requestId: string, error: string | null): void {
+  private request(message: (requestId: string) => ClientMessage, handlers: Handlers): void {
+    const requestId = crypto.randomUUID();
+    if (!this.send(message(requestId))) {
+      handlers.reject(new Error('Not connected'));
+      return;
+    }
+    const timer = setTimeout(
+      () => this.settle(requestId, 'VS Code did not respond'),
+      REQUEST_TIMEOUT_MS
+    );
+    this.pending.set(requestId, { ...handlers, timer });
+  }
+
+  private settle(requestId: string, error: string | null, result: CodeResult | null = null): void {
     const pending = this.pending.get(requestId);
     if (!pending) return;
     this.pending.delete(requestId);
     clearTimeout(pending.timer);
-    if (error === null) pending.resolve();
+    if (error === null) pending.resolve(result);
     else pending.reject(new Error(error));
   }
 

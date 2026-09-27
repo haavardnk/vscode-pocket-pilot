@@ -4,6 +4,7 @@ import type * as vscode from 'vscode';
 
 export interface ChatPaths {
   sessions: string;
+  editingSessions: string | null;
   transcripts: string | null;
   debugLogs: string | null;
   userDir: string;
@@ -23,6 +24,7 @@ export function chatPaths(context: vscode.ExtensionContext): ChatPaths {
     return {
       ...shared,
       sessions: join(globalStorage, 'emptyWindowChatSessions'),
+      editingSessions: null,
       transcripts: null,
       debugLogs: null
     };
@@ -32,6 +34,7 @@ export function chatPaths(context: vscode.ExtensionContext): ChatPaths {
   return {
     ...shared,
     sessions: join(workspaceStorage, 'chatSessions'),
+    editingSessions: join(workspaceStorage, 'chatEditingSessions'),
     transcripts: join(copilot, 'transcripts'),
     debugLogs: join(copilot, 'debug-logs')
   };

@@ -302,6 +302,19 @@ function projectQueued(root: JsonRecord): QueuedRequest[] {
   });
 }
 
+export function editedPaths(root: unknown): string[] {
+  const paths = requestsOf(root).flatMap((request) =>
+    asArray(request.response).flatMap((raw) => {
+      const part = asRecord(raw);
+      if (part.kind !== 'textEditGroup' && part.kind !== 'notebookEditGroup') return [];
+      const uri = asRecord(part.uri);
+      const path = asString(uri.fsPath) ?? asString(uri.path);
+      return path && (uri.scheme ?? 'file') === 'file' ? [path] : [];
+    })
+  );
+  return [...new Set(paths)];
+}
+
 export function projectDetail(
   root: unknown,
   summary: SessionSummary,
@@ -320,6 +333,7 @@ export function projectDetail(
     modeId: summary.modeId,
     permission: sessionPermission(session),
     totalRequests: requests.length,
+    editedFiles: editedPaths(session).length,
     requests: requests.slice(-limit).map((request) => projectRequest(request, request === last)),
     queued: projectQueued(session),
     live: active && last ? liveFor(requestText(last)) : []

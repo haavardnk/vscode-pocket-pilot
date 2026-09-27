@@ -17,7 +17,15 @@ const noPullRequests: PullRequestState = {
 };
 
 function windowState(windowId: string): WindowState {
-  return { windowId, name: windowId, repositories: [], sessions: [], agents: [], models: [] };
+  return {
+    windowId,
+    name: windowId,
+    repositories: [],
+    folders: [],
+    sessions: [],
+    agents: [],
+    models: []
+  };
 }
 
 function detail(count: number): SessionDetail {
@@ -29,6 +37,7 @@ function detail(count: number): SessionDetail {
     modeId: null,
     permission: 'default',
     totalRequests: count,
+    editedFiles: 0,
     requests: Array.from({ length: count }, (_, index) => ({
       id: `r${index}`,
       timestamp: index,
@@ -48,7 +57,8 @@ function link(): WindowLink & { watches: SessionWatch[][] } {
   return {
     watches,
     watch: (sessions) => watches.push(sessions),
-    run: vi.fn(() => Promise.resolve())
+    run: vi.fn(() => Promise.resolve()),
+    query: vi.fn(() => Promise.reject(new Error('No code')))
   };
 }
 

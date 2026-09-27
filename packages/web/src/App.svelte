@@ -4,12 +4,17 @@
 
   import { fetchAuth } from './lib/api/auth';
   import Toasts from './lib/components/Toasts.svelte';
-  import { pairCode } from './lib/routing';
+  import { pairCode, routeHash } from './lib/routing';
   import { hub } from './lib/stores/hub.svelte';
   import { router } from './lib/stores/router.svelte';
+  import FileScreen from './screens/FileScreen.svelte';
+  import FolderScreen from './screens/FolderScreen.svelte';
+  import GitDiffScreen from './screens/GitDiffScreen.svelte';
   import HomeScreen from './screens/HomeScreen.svelte';
   import NewSessionScreen from './screens/NewSessionScreen.svelte';
   import PairScreen from './screens/PairScreen.svelte';
+  import SessionChangesScreen from './screens/SessionChangesScreen.svelte';
+  import SessionDiffScreen from './screens/SessionDiffScreen.svelte';
   import SessionScreen from './screens/SessionScreen.svelte';
 
   const initialCode = pairCode(location.hash);
@@ -38,6 +43,12 @@
   });
 
   const route = $derived(router.route);
+  const hash = $derived(routeHash(route));
+
+  $effect(() => {
+    void hash;
+    scrollTo({ top: 0 });
+  });
 </script>
 
 {#if auth === null}
@@ -58,6 +69,31 @@
   <SessionScreen windowId={route.windowId} sessionId={route.sessionId} />
 {:else if route.name === 'new'}
   <NewSessionScreen />
+{:else if route.name === 'folder'}
+  {#key hash}
+    <FolderScreen
+      windowId={route.windowId}
+      folderId={route.folderId}
+      tab={route.tab}
+      path={route.path}
+    />
+  {/key}
+{:else if route.name === 'file'}
+  {#key hash}
+    <FileScreen windowId={route.windowId} folderId={route.folderId} path={route.path} />
+  {/key}
+{:else if route.name === 'gitDiff'}
+  {#key hash}
+    <GitDiffScreen windowId={route.windowId} folderId={route.folderId} path={route.path} />
+  {/key}
+{:else if route.name === 'sessionChanges'}
+  {#key hash}
+    <SessionChangesScreen windowId={route.windowId} sessionId={route.sessionId} />
+  {/key}
+{:else if route.name === 'sessionDiff'}
+  {#key hash}
+    <SessionDiffScreen windowId={route.windowId} sessionId={route.sessionId} path={route.path} />
+  {/key}
 {:else}
   <HomeScreen
     tab={route.name}

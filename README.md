@@ -14,6 +14,8 @@ Cloudflare tunnel. From the phone you can:
   autopilot
 - switch agent and model, and change thinking effort or context size
 - start a new chat in any open window
+- browse the open workspace folders and read files with syntax highlighting
+- review uncommitted changes, and keep or undo the files a chat edited
 - see open pull requests with check, review and merge status
 
 The phone reaches the computer through a free Cloudflare quick tunnel, which needs no account, or
@@ -113,6 +115,26 @@ for confirmation on the phone first. The phone changes the level through the `/a
 `/autopilot` and `/disableAutoApprove` chat commands. When an organization policy turns off global
 auto approval, VS Code removes those commands, so the change reaches the agent as a plain message
 instead; leave the level alone on such machines.
+
+## Browsing code
+
+The **Code** tab lists the workspace folders of every open window.
+
+- **Files** browses a folder. Files that Git ignores are dimmed, and changed files carry a letter
+  such as `M` or `A`. Text files show with line numbers and Catppuccin syntax highlighting, and
+  images show as pictures. Files over 2 MB are not sent to the phone, and highlighting stops above
+  256 KB or 5,000 lines.
+- **Changes** lists uncommitted changes against `HEAD`, with a diff for each file.
+- A chat that edited files shows a **Changes** button next to its title, and every edit in the
+  chat links to its diff. Keep or undo one file, or all of them. This works like the buttons in the
+  VS Code chat view.
+
+VS Code saves a chat's edit snapshot about once a minute. Until it does, a chat's diff compares
+with the last commit, or shows the whole file when it is new, and says so above the diff.
+
+The phone can only read files inside the open workspace folders. It follows symbolic links only
+when they stay inside the folder. A chat's diff can also show a file outside the workspace when
+the agent edited one.
 
 ## Security
 

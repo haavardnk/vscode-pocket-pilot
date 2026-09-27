@@ -111,7 +111,8 @@ export function initialWindows(now: number): MockWindow[] {
           }
         ],
         agents: AGENTS,
-        models: models()
+        models: models(),
+        folders: [{ id: 'f1', name: 'vscode-pocket-pilot' }]
       },
       [
         {
@@ -121,6 +122,7 @@ export function initialWindows(now: number): MockWindow[] {
           modelId: 'copilot/claude-opus',
           modeId: 'agent',
           permission: 'default',
+          editedFiles: 2,
           totalRequests: 1,
           requests: [
             {
@@ -173,6 +175,7 @@ export function initialWindows(now: number): MockWindow[] {
           modelId: 'copilot/gpt-5',
           modeId: 'file:///repo/.github/agents/reviewer.agent.md',
           permission: 'default',
+          editedFiles: 0,
           totalRequests: 1,
           requests: [
             {
@@ -197,6 +200,7 @@ export function initialWindows(now: number): MockWindow[] {
           modelId: 'copilot/claude-opus',
           modeId: 'agent',
           permission: 'autoApprove',
+          editedFiles: 0,
           totalRequests: 1,
           requests: [
             {
@@ -274,7 +278,8 @@ export function initialWindows(now: number): MockWindow[] {
           }
         ],
         agents: AGENTS,
-        models: models()
+        models: models(),
+        folders: [{ id: 'f2', name: 'immich-edit' }]
       },
       [
         {
@@ -284,6 +289,7 @@ export function initialWindows(now: number): MockWindow[] {
           modelId: 'copilot/claude-opus',
           modeId: 'agent',
           permission: 'default',
+          editedFiles: 0,
           totalRequests: 1,
           requests: [
             {

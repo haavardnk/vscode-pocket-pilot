@@ -35,11 +35,33 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globIgnores: ['assets/lang/**'],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/ws$/, /^\/internal$/]
+        navigateFallbackDenylist: [/^\/api\//, /^\/ws$/, /^\/internal$/],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/assets/lang/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'shiki-languages',
+              expiration: { maxEntries: 80 }
+            }
+          }
+        ]
       }
     })
   ],
+  worker: {
+    format: 'es',
+    rolldownOptions: {
+      output: {
+        chunkFileNames: (chunk) =>
+          chunk.moduleIds.some((id) => id.includes('/@shikijs/langs/'))
+            ? 'assets/lang/[name]-[hash].js'
+            : 'assets/[name]-[hash].js'
+      }
+    }
+  },
   server: {
     proxy: {
       '/api': `http://${MOCK}`,
