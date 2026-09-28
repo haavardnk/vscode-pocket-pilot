@@ -347,14 +347,22 @@ test.describe('paired', () => {
   });
 
   test('pins, archives and unarchives chats', async ({ page }) => {
-    const chats = page.getByRole('list', { name: 'Chats' });
+    const chats = page.getByRole('main');
+    await expect(chats.getByRole('heading')).toHaveText(['Needs input', 'Today']);
+    await expect(
+      page
+        .getByRole('list', { name: 'Needs input' })
+        .getByRole('link', { name: /Plan the release/ })
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Actions for Fix flaky cluster test' }).click();
     await page
       .getByRole('dialog', { name: 'Fix flaky cluster test' })
       .getByRole('button', { name: 'Pin', exact: true })
       .click();
-    await expect(chats.getByRole('listitem').first()).toHaveText('Pinned');
-    await expect(chats.getByRole('listitem').nth(1)).toContainText('Fix flaky cluster test');
+    await expect(chats.getByRole('heading')).toHaveText(['Needs input', 'Pinned', 'Today']);
+    await expect(page.getByRole('list', { name: 'Pinned' })).toContainText(
+      'Fix flaky cluster test'
+    );
 
     await openSession(page, 'Plan the release');
     await page.getByRole('button', { name: 'Chat actions' }).click();
@@ -375,6 +383,23 @@ test.describe('paired', () => {
       .click();
     await expect(chats.getByRole('link', { name: /Bump dependencies/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Archived (1)' })).toBeVisible();
+  });
+
+  test('searches chats including archived ones', async ({ page }) => {
+    const search = page.getByRole('searchbox', { name: 'Search chats' });
+    const results = page.getByRole('list', { name: 'Search results' });
+    await search.fill('dependencies');
+    await expect(results.getByRole('link')).toHaveCount(1);
+    await expect(
+      results
+        .getByRole('link', { name: /Bump dependencies/ })
+        .getByRole('img', { name: 'Archived' })
+    ).toBeVisible();
+    await search.fill('nothing like this');
+    await expect(page.getByText('No matching chats')).toBeVisible();
+    await search.fill('');
+    await expect(results).toHaveCount(0);
+    await expect(page.getByRole('list', { name: 'Today' })).toBeVisible();
   });
 
   test('changes agent, model and thinking effort', async ({ page }) => {

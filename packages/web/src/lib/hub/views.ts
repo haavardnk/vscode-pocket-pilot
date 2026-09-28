@@ -6,6 +6,7 @@ import type {
   SessionSummary,
   WindowState
 } from '@pocket-pilot/protocol';
+import { differenceInCalendarDays } from 'date-fns';
 
 export const ALL_REPOSITORIES = '*';
 export const NO_REPOSITORY = 'none';
@@ -26,11 +27,27 @@ export interface SessionEntry {
   session: SessionSummary;
 }
 
+export type SessionGroupId = 'needsInput' | 'pinned' | 'today' | 'yesterday' | 'week' | 'older';
+
+export interface SessionGroup {
+  id: SessionGroupId;
+  label: string;
+  entries: SessionEntry[];
+}
+
 export interface SessionSections {
-  pinned: SessionEntry[];
-  recent: SessionEntry[];
+  groups: SessionGroup[];
   archived: SessionEntry[];
 }
+
+const GROUP_LABELS: Record<SessionGroupId, string> = {
+  needsInput: 'Needs input',
+  pinned: 'Pinned',
+  today: 'Today',
+  yesterday: 'Yesterday',
+  week: 'Previous 7 days',
+  older: 'Older'
+};
 
 export interface TerminalTarget {
   windowId: string;
@@ -107,17 +124,48 @@ export function sessionEntries(
     .sort((a, b) => b.session.updatedAt - a.session.updatedAt);
 }
 
+function groupOf(session: SessionSummary, now: number): SessionGroupId {
+  if (session.status === 'needsInput') return 'needsInput';
+  if (session.pinned) return 'pinned';
+  const days = differenceInCalendarDays(now, session.updatedAt);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return days < 7 ? 'week' : 'older';
+}
+
 export function sessionSections(
   windows: WindowState[],
   groups: RepositoryGroup[],
-  key: string
+  key: string,
+  now: number
 ): SessionSections {
   const entries = sessionEntries(windows, groups, key);
+  const open = entries.filter((entry) => !entry.session.archived);
   return {
-    pinned: entries.filter((entry) => entry.session.pinned && !entry.session.archived),
-    recent: entries.filter((entry) => !entry.session.pinned && !entry.session.archived),
+    groups: (Object.keys(GROUP_LABELS) as SessionGroupId[])
+      .map((id) => ({
+        id,
+        label: GROUP_LABELS[id],
+        entries: open.filter((entry) => groupOf(entry.session, now) === id)
+      }))
+      .filter((group) => group.entries.length > 0),
     archived: entries.filter((entry) => entry.session.archived)
   };
+}
+
+export function searchSessions(
+  windows: WindowState[],
+  groups: RepositoryGroup[],
+  key: string,
+  query: string
+): SessionEntry[] {
+  const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  return sessionEntries(windows, groups, key).filter((entry) => {
+    const text = [entry.session.title, entry.session.preview ?? '', entry.windowName]
+      .join('\n')
+      .toLocaleLowerCase();
+    return words.every((word) => text.includes(word));
+  });
 }
 
 export function windowsForRepository(

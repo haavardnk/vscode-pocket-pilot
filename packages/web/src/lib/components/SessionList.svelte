@@ -1,98 +1,123 @@
 <script lang="ts">
+  import Archive from '@lucide/svelte/icons/archive';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
-  import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
+  import MessagesSquare from '@lucide/svelte/icons/messages-square';
+  import MonitorOff from '@lucide/svelte/icons/monitor-off';
+  import Search from '@lucide/svelte/icons/search';
 
-  import { ALL_REPOSITORIES, type SessionEntry, sessionSections } from '../hub/views';
-  import { routeHash } from '../routing';
+  import {
+    ALL_REPOSITORIES,
+    searchSessions,
+    type SessionEntry,
+    sessionSections
+  } from '../hub/views';
   import { clock } from '../stores/clock.svelte';
   import { hub } from '../stores/hub.svelte';
-  import { ago } from '../time';
   import Loading from './Loading.svelte';
   import SessionActionsSheet from './SessionActionsSheet.svelte';
-  import StatusBadge from './StatusBadge.svelte';
+  import SessionRow from './SessionRow.svelte';
 
   let target = $state<SessionEntry | null>(null);
   let showArchived = $state(false);
+  let query = $state('');
 
-  const sections = $derived(sessionSections(hub.windows, hub.groups, hub.repository));
-  const active = $derived(sections.pinned.length + sections.recent.length);
+  const sections = $derived(sessionSections(hub.windows, hub.groups, hub.repository, clock.now));
+  const results = $derived(
+    query.trim() ? searchSessions(hub.windows, hub.groups, hub.repository, query) : null
+  );
+  const total = $derived(
+    sections.groups.reduce((sum, group) => sum + group.entries.length, sections.archived.length)
+  );
   const showWindow = $derived(hub.repository === ALL_REPOSITORIES || hub.windows.length > 1);
+  const key = (entry: SessionEntry): string => `${entry.windowId}:${entry.session.id}`;
+  const actions = (entry: SessionEntry): void => {
+    target = entry;
+  };
 </script>
 
-{#snippet row(entry: SessionEntry)}
-  <li class="list-row items-center gap-0 p-0">
-    <a
-      class="min-w-0 rounded-box p-4 pe-2 list-col-grow active:bg-base-200"
-      href={routeHash({ name: 'session', windowId: entry.windowId, sessionId: entry.session.id })}
+{#snippet empty(Icon: typeof Search, title: string, hint: string)}
+  <div class="flex flex-col items-center gap-2 px-10 py-16 text-center">
+    <span
+      class="mb-2 grid size-14 place-items-center rounded-full bg-base-content/10 text-base-content/50"
     >
-      <div class="flex items-center gap-2">
-        <span class="truncate font-medium">{entry.session.title}</span>
-        <StatusBadge status={entry.session.status} />
-      </div>
-      {#if entry.session.preview}
-        <p class="truncate text-sm text-base-content/70">{entry.session.preview}</p>
-      {/if}
-      <p class="text-xs text-base-content/50">
-        {ago(entry.session.updatedAt, clock.now)}{showWindow ? ` · ${entry.windowName}` : ''}
-      </p>
-    </a>
-    {#if entry.canOrganize}
-      <button
-        class="btn me-2 btn-square btn-ghost btn-sm"
-        aria-label={`Actions for ${entry.session.title}`}
-        onclick={() => (target = entry)}
-      >
-        <EllipsisVertical class="size-4" />
-      </button>
-    {/if}
-  </li>
-{/snippet}
-
-{#snippet heading(label: string)}
-  <li class="px-4 pt-4 pb-1 text-xs font-medium text-base-content/60">{label}</li>
+      <Icon class="size-6" />
+    </span>
+    <p class="font-medium">{title}</p>
+    <p class="text-sm text-base-content/60">{hint}</p>
+  </div>
 {/snippet}
 
 {#if !hub.loaded}
   <Loading />
 {:else if hub.windows.length === 0}
-  <p class="p-10 text-center text-base-content/70">No VS Code windows are connected.</p>
-{:else if active === 0 && sections.archived.length === 0}
-  <p class="p-10 text-center text-base-content/70">No chats yet. Start one with the + button.</p>
+  {@render empty(
+    MonitorOff,
+    'No VS Code windows are connected.',
+    'Open a folder in VS Code with Pocket Pilot running.'
+  )}
+{:else if total === 0}
+  {@render empty(MessagesSquare, 'No chats yet', 'Start one with the + button.')}
 {:else}
-  {#if active === 0}
-    <p class="p-10 text-center text-base-content/70">All chats are archived.</p>
-  {:else}
-    <ul class="list" aria-label="Chats">
-      {#if sections.pinned.length > 0}
-        {@render heading('Pinned')}
-        {#each sections.pinned as entry (`${entry.windowId}:${entry.session.id}`)}
-          {@render row(entry)}
-        {/each}
-        {#if sections.recent.length > 0}{@render heading('Recent')}{/if}
-      {/if}
-      {#each sections.recent as entry (`${entry.windowId}:${entry.session.id}`)}
-        {@render row(entry)}
-      {/each}
-    </ul>
-  {/if}
-  {#if sections.archived.length > 0}
-    <button
-      class="btn m-2 gap-1 btn-ghost btn-sm"
-      aria-expanded={showArchived}
-      onclick={() => (showArchived = !showArchived)}
-    >
-      {#if showArchived}<ChevronDown class="size-4" />{:else}<ChevronRight class="size-4" />{/if}
-      Archived ({sections.archived.length})
-    </button>
-    {#if showArchived}
-      <ul class="list" aria-label="Archived chats">
-        {#each sections.archived as entry (`${entry.windowId}:${entry.session.id}`)}
-          {@render row(entry)}
+  <div class="px-4 pt-3 pb-1">
+    <label class="input w-full">
+      <Search class="size-4 opacity-50" />
+      <input
+        type="search"
+        class="grow"
+        placeholder="Search chats"
+        aria-label="Search chats"
+        bind:value={query}
+      />
+    </label>
+  </div>
+  {#if results}
+    {#if results.length === 0}
+      {@render empty(Search, 'No matching chats', 'Try a different word.')}
+    {:else}
+      <ul class="list" aria-label="Search results">
+        {#each results as entry (key(entry))}
+          <SessionRow {entry} {showWindow} onactions={actions} />
         {/each}
       </ul>
     {/if}
+  {:else}
+    {#if sections.groups.length === 0}
+      {@render empty(Archive, 'All chats are archived.', 'Start a new one with the + button.')}
+    {/if}
+    {#each sections.groups as group (group.id)}
+      <section>
+        <h2 class="px-4 pt-4 pb-1 text-xs font-semibold text-base-content/60">{group.label}</h2>
+        <ul class="list" aria-label={group.label}>
+          {#each group.entries as entry (key(entry))}
+            <SessionRow {entry} {showWindow} onactions={actions} />
+          {/each}
+        </ul>
+      </section>
+    {/each}
+    {#if sections.archived.length > 0}
+      <section>
+        <button
+          class="btn mx-2 mt-2 gap-1 btn-ghost text-base-content/60 btn-sm"
+          aria-expanded={showArchived}
+          onclick={() => (showArchived = !showArchived)}
+        >
+          {#if showArchived}<ChevronDown class="size-4" />{:else}<ChevronRight
+              class="size-4"
+            />{/if}
+          Archived ({sections.archived.length})
+        </button>
+        {#if showArchived}
+          <ul class="list" aria-label="Archived chats">
+            {#each sections.archived as entry (key(entry))}
+              <SessionRow {entry} {showWindow} onactions={actions} />
+            {/each}
+          </ul>
+        {/if}
+      </section>
+    {/if}
   {/if}
+  <div class="h-24"></div>
 {/if}
 
 <SessionActionsSheet {target} onclose={() => (target = null)} />

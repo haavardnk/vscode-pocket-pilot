@@ -218,7 +218,7 @@
         <h1 class="truncate font-semibold">{detail?.title ?? summary?.title ?? 'Chat'}</h1>
         {#if hostWindow || status !== 'idle'}
           <div class="flex min-w-0 items-center gap-1.5">
-            <StatusBadge {status} dot />
+            <StatusBadge {status} />
             {#if hostWindow}<p class="truncate text-xs text-base-content/60">
                 {branch ? `${hostWindow.name} · ${branch}` : hostWindow.name}
               </p>{/if}

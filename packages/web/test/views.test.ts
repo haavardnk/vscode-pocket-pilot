@@ -9,6 +9,7 @@ import {
   pendingTool,
   repositoryGroups,
   resolveRepository,
+  searchSessions,
   sessionEntries,
   sessionSections,
   terminalTargets
@@ -93,27 +94,64 @@ describe('repositoryGroups', () => {
     ).toEqual(['s2', 's3', 's1']);
   });
 
-  it('puts pinned chats first and archived chats last, archive winning over pin', () => {
+  it('groups chats by attention, pin and day, archive winning over everything', () => {
+    const now = new Date(2025, 5, 10, 12).getTime();
+    const hoursAgo = (hours: number): number => now - hours * 3_600_000;
     const windows = [
       window(
         'w1',
         [],
         [
-          session('recent', 40),
-          session('pinned', 10, 'idle', { pinned: true }),
-          session('archived', 50, 'idle', { archived: true }),
-          session('both', 30, 'idle', { pinned: true, archived: true })
+          session('today', hoursAgo(1)),
+          session('yesterday', hoursAgo(20)),
+          session('week', hoursAgo(24 * 5)),
+          session('older', hoursAgo(24 * 30)),
+          session('asking', hoursAgo(24 * 30), 'needsInput', { pinned: true }),
+          session('pinned', hoursAgo(24 * 30), 'idle', { pinned: true }),
+          session('archived', hoursAgo(2), 'needsInput', { archived: true }),
+          session('both', hoursAgo(3), 'idle', { pinned: true, archived: true })
         ]
       )
     ];
-    const { pinned, recent, archived } = sessionSections(
+    const { groups, archived } = sessionSections(
       windows,
       repositoryGroups(windows),
-      ALL_REPOSITORIES
+      ALL_REPOSITORIES,
+      now
     );
     expect(
-      [pinned, recent, archived].map((entries) => entries.map((entry) => entry.session.id))
-    ).toEqual([['pinned'], ['recent'], ['archived', 'both']]);
+      groups.map((group) => [group.label, group.entries.map((entry) => entry.session.id)])
+    ).toEqual([
+      ['Needs input', ['asking']],
+      ['Pinned', ['pinned']],
+      ['Today', ['today']],
+      ['Yesterday', ['yesterday']],
+      ['Previous 7 days', ['week']],
+      ['Older', ['older']]
+    ]);
+    expect(archived.map((entry) => entry.session.id)).toEqual(['archived', 'both']);
+  });
+
+  it('searches titles, previews and windows including archived chats', () => {
+    const windows = [
+      window(
+        'w1',
+        [],
+        [
+          { ...session('Fix login', 30), preview: 'Token expiry is off by one' },
+          { ...session('Old work', 20, 'idle', { archived: true }), preview: 'login page' },
+          session('Other', 10)
+        ]
+      )
+    ];
+    const search = (query: string): string[] =>
+      searchSessions(windows, repositoryGroups(windows), ALL_REPOSITORIES, query).map(
+        (entry) => entry.session.id
+      );
+    expect(search('LOGIN')).toEqual(['Fix login', 'Old work']);
+    expect(search('expiry fix')).toEqual(['Fix login']);
+    expect(search('w1 other')).toEqual(['Other']);
+    expect(search('missing')).toEqual([]);
   });
 });
 
