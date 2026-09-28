@@ -1,11 +1,13 @@
 <script lang="ts">
   import Bot from '@lucide/svelte/icons/bot';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import MonitorOff from '@lucide/svelte/icons/monitor-off';
   import SquareTerminal from '@lucide/svelte/icons/square-terminal';
 
   import { ALL_REPOSITORIES, windowsForRepository } from '../../hub/views';
   import { routeHash } from '../../routing';
   import { hub } from '../../stores/hub.svelte';
+  import EmptyState from '../EmptyState.svelte';
   import Loading from '../Loading.svelte';
 
   const windows = $derived(windowsForRepository(hub.windows, hub.groups, hub.repository));
@@ -15,7 +17,11 @@
 {#if !hub.loaded}
   <Loading />
 {:else if windows.length === 0}
-  <p class="p-10 text-center text-base-content/70">No VS Code windows are connected.</p>
+  <EmptyState
+    icon={MonitorOff}
+    title="No VS Code windows are connected."
+    hint="Open a folder in VS Code with Pocket Pilot running."
+  />
 {:else}
   {#each windows as window (window.windowId)}
     <section aria-label={window.name}>

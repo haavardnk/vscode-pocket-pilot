@@ -14,6 +14,7 @@
   } from '../hub/views';
   import { clock } from '../stores/clock.svelte';
   import { hub } from '../stores/hub.svelte';
+  import EmptyState from './EmptyState.svelte';
   import Loading from './Loading.svelte';
   import SessionActionsSheet from './SessionActionsSheet.svelte';
   import SessionRow from './SessionRow.svelte';
@@ -36,28 +37,16 @@
   };
 </script>
 
-{#snippet empty(Icon: typeof Search, title: string, hint: string)}
-  <div class="flex flex-col items-center gap-2 px-10 py-16 text-center">
-    <span
-      class="mb-2 grid size-14 place-items-center rounded-full bg-base-content/10 text-base-content/50"
-    >
-      <Icon class="size-6" />
-    </span>
-    <p class="font-medium">{title}</p>
-    <p class="text-sm text-base-content/60">{hint}</p>
-  </div>
-{/snippet}
-
 {#if !hub.loaded}
   <Loading />
 {:else if hub.windows.length === 0}
-  {@render empty(
-    MonitorOff,
-    'No VS Code windows are connected.',
-    'Open a folder in VS Code with Pocket Pilot running.'
-  )}
+  <EmptyState
+    icon={MonitorOff}
+    title="No VS Code windows are connected."
+    hint="Open a folder in VS Code with Pocket Pilot running."
+  />
 {:else if total === 0}
-  {@render empty(MessagesSquare, 'No chats yet', 'Start one with the + button.')}
+  <EmptyState icon={MessagesSquare} title="No chats yet" hint="Start one with the + button." />
 {:else}
   <div class="px-4 pt-3 pb-1">
     <label class="input w-full">
@@ -73,7 +62,7 @@
   </div>
   {#if results}
     {#if results.length === 0}
-      {@render empty(Search, 'No matching chats', 'Try a different word.')}
+      <EmptyState icon={Search} title="No matching chats" hint="Try a different word." />
     {:else}
       <ul class="list" aria-label="Search results">
         {#each results as entry (key(entry))}
@@ -83,7 +72,11 @@
     {/if}
   {:else}
     {#if sections.groups.length === 0}
-      {@render empty(Archive, 'All chats are archived.', 'Start a new one with the + button.')}
+      <EmptyState
+        icon={Archive}
+        title="All chats are archived."
+        hint="Start a new one with the + button."
+      />
     {/if}
     {#each sections.groups as group (group.id)}
       <section>
