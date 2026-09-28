@@ -18,6 +18,20 @@ export const commandSchema = z.discriminatedUnion('kind', [
     text: z.string().min(1).max(100_000),
     delivery: deliverySchema.nullable()
   }),
+  z.object({
+    kind: z.literal('setQueue'),
+    ...sessionTarget,
+    expected: z.array(z.string()).max(100),
+    queue: z
+      .array(
+        z.object({
+          id: z.string(),
+          delivery: deliverySchema,
+          text: z.string().min(1).max(100_000)
+        })
+      )
+      .max(100)
+  }),
   z.object({ kind: z.literal('stop'), ...sessionTarget }),
   z.object({ kind: z.literal('setMode'), ...sessionTarget, modeId: z.string().min(1) }),
   z.object({ kind: z.literal('setModel'), ...sessionTarget, modelId: z.string().min(1) }),

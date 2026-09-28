@@ -10,6 +10,7 @@ tunnel. It works with GitHub Copilot Chat in VS Code; other agents and editors a
 - All Copilot chats across every open VS Code window, grouped by repository
 - Live replies, thinking and tool calls as they stream
 - Send, queue, steer and stop requests; approve tools and answer the agent's questions
+- Edit, reorder and remove queued messages
 - Switch agent, model, thinking effort and approval level
 - Browse files, review diffs, and keep or undo the agent's edits
 - View, type into, create and kill terminals, including the ones the agent runs

@@ -2,7 +2,7 @@ import { appendFile, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { HookEvent } from '@pocket-pilot/protocol';
+import type { HookEvent, QueuedRequest } from '@pocket-pilot/protocol';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SessionStore } from '../src/sessions/sessionStore';
@@ -292,6 +292,42 @@ describe('SessionStore', () => {
     store.applyExport({ requests: [request('r1', 'Build it', 1), live] }, at);
     expect(store.summaries()[0]).toMatchObject({ status: 'running' });
     expect((await store.detail(SESSION_ID, 10))?.requests.at(-1)?.state).toBe('pending');
+  });
+
+  it('holds a phone queue change until the log catches up', async () => {
+    await store.start();
+    const queued = (id: string, text: string): QueuedRequest => ({
+      id,
+      delivery: 'queued',
+      text,
+      attachments: 0
+    });
+    const ids = async (): Promise<string[] | undefined> =>
+      (await store.detail(SESSION_ID, 10))?.queued.map((item) => item.id);
+
+    const at = Date.now();
+    await store.hook({ kind: 'prompt', sessionId: SESSION_ID, at, prompt: 'Build it' });
+    store.expectQueue(SESSION_ID, [queued('phone:1', 'Next'), queued('phone:2', 'Later')]);
+    expect(await ids()).toEqual(['phone:1', 'phone:2']);
+
+    await store.hook({ kind: 'prompt', sessionId: SESSION_ID, at: at + 1000, prompt: 'Next' });
+    expect(await ids()).toEqual(['phone:2']);
+
+    const logged = new Promise<void>((resolve) => {
+      store.onDidChange((sessionId) => {
+        if (sessionId === SESSION_ID) resolve();
+      });
+    });
+    await appendFile(
+      join(sessions, `${SESSION_ID}.jsonl`),
+      logLines({
+        kind: 1,
+        k: ['pendingRequests'],
+        v: [{ id: 'q2', kind: 'queued', request: { message: { text: 'Later' } } }]
+      })
+    );
+    await logged;
+    expect(await ids()).toEqual(['q2']);
   });
 });
 

@@ -1,9 +1,20 @@
+import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import type { Agent, Command, Model, PermissionLevel, SessionDetail } from '@pocket-pilot/protocol';
+import {
+  type Agent,
+  type Command,
+  type Model,
+  type PermissionLevel,
+  PHONE_QUEUE_PREFIX,
+  type QueuedRequest,
+  queuePlan,
+  type SessionDetail
+} from '@pocket-pilot/protocol';
 import * as vscode from 'vscode';
 
 import type { ModelSettingsFile } from '../models/modelSettings';
+import { withQueued } from '../sessions/queue';
 import type { SessionFlags } from '../sessions/sessionFlags';
 import {
   LOCAL_SESSION_AUTHORITY,
@@ -27,6 +38,7 @@ export interface ControllerSources {
   detail: (sessionId: string) => Promise<SessionDetail | null>;
   editedFiles: (sessionId: string) => Promise<string[]>;
   expectFlags: (sessionId: string, flags: Partial<SessionFlags>) => void;
+  expectQueue: (sessionId: string, items: QueuedRequest[]) => void;
   expectPermission: (sessionId: string, level: PermissionLevel) => void;
   canOrganize: boolean;
   settings: ModelSettingsFile;
@@ -45,12 +57,28 @@ export class Controller {
 
   async run(command: Command): Promise<void> {
     switch (command.kind) {
-      case 'send':
+      case 'send': {
+        const before = command.delivery ? await this.sources.detail(command.sessionId) : null;
         await this.focus(command.sessionId);
         await vscode.commands.executeCommand('workbench.action.chat.submit', {
           inputValue: command.text,
           ...(command.delivery ? { acceptInputOptions: { queue: command.delivery } } : {})
         });
+        if (command.delivery && (before?.status === 'running' || before?.status === 'needsInput')) {
+          this.sources.expectQueue(
+            command.sessionId,
+            withQueued(before.queued, {
+              id: PHONE_QUEUE_PREFIX + randomUUID(),
+              delivery: command.delivery,
+              text: command.text,
+              attachments: 0
+            })
+          );
+        }
+        return;
+      }
+      case 'setQueue':
+        await this.setQueue(command);
         return;
       case 'stop':
         await this.focus(command.sessionId);
@@ -197,6 +225,42 @@ export class Controller {
     for (const path of command.path === null ? files : [command.path]) {
       await vscode.commands.executeCommand(action, vscode.Uri.file(path));
     }
+  }
+
+  private async setQueue(command: Extract<Command, { kind: 'setQueue' }>): Promise<void> {
+    const current = (await this.sources.detail(command.sessionId))?.queued;
+    if (!current) throw new Error('Chat not found');
+    const plan = queuePlan(current, command.expected, command.queue);
+    if (plan.kind === 'remove') {
+      for (const id of plan.ids) {
+        await vscode.commands.executeCommand('workbench.action.chat.removePendingRequest', {
+          sessionResource: sessionResource(command.sessionId),
+          pendingRequestId: id
+        });
+      }
+      this.sources.expectQueue(
+        command.sessionId,
+        current.filter((item) => !plan.ids.includes(item.id))
+      );
+      return;
+    }
+    await this.focus(command.sessionId);
+    await vscode.commands.executeCommand('workbench.action.chat.removeAllPendingRequests');
+    for (const item of command.queue) {
+      await vscode.commands.executeCommand('workbench.action.chat.submit', {
+        inputValue: item.text,
+        acceptInputOptions: { queue: item.delivery }
+      });
+    }
+    this.sources.expectQueue(
+      command.sessionId,
+      command.queue.map((item) => ({
+        id: PHONE_QUEUE_PREFIX + randomUUID(),
+        delivery: item.delivery,
+        text: item.text,
+        attachments: 0
+      }))
+    );
   }
 
   private async submit(sessionId: string, text: string): Promise<void> {

@@ -321,13 +321,28 @@ function projectRequest(request: JsonRecord, latest: boolean, activity: Activity
   };
 }
 
+function attachmentCount(request: JsonRecord): number {
+  return asArray(asRecord(request.variableData).variables).filter((raw) => {
+    const variable = asRecord(raw);
+    return (
+      variable.kind !== 'implicit' &&
+      variable.kind !== 'workspace' &&
+      !(asString(variable.id) ?? '').startsWith('vscode.implicit') &&
+      variable.automaticallyAdded !== true &&
+      variable.range === undefined
+    );
+  }).length;
+}
+
 function projectQueued(root: JsonRecord): QueuedRequest[] {
   return asArray(root.pendingRequests).map((raw) => {
     const pending = asRecord(raw);
+    const request = asRecord(pending.request);
     return {
       id: asString(pending.id) ?? '',
       delivery: pending.kind === 'steering' ? 'steering' : 'queued',
-      text: requestText(asRecord(pending.request))
+      text: requestText(request),
+      attachments: attachmentCount(request)
     };
   });
 }

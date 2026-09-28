@@ -363,7 +363,11 @@ export function initialWindows(now: number): MockWindow[] {
               ]
             }
           ],
-          queued: []
+          queued: [
+            { id: 'q1', delivery: 'steering', text: 'Keep the changelog short', attachments: 0 },
+            { id: 'q2', delivery: 'queued', text: 'Draft the announcement', attachments: 2 },
+            { id: 'q3', delivery: 'queued', text: 'Tag the release', attachments: 0 }
+          ]
         },
         {
           id: 's5',

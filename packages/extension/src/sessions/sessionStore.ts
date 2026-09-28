@@ -1,7 +1,12 @@
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
-import type { HookEvent, PermissionLevel, SessionDetail } from '@pocket-pilot/protocol';
+import type {
+  HookEvent,
+  PermissionLevel,
+  QueuedRequest,
+  SessionDetail
+} from '@pocket-pilot/protocol';
 import type { FSWatcher } from 'chokidar';
 
 import { watchTargets } from '../fsWatch';
@@ -19,6 +24,7 @@ import {
   requestText,
   toolStatuses
 } from './projection';
+import { currentQueue, type QueueOverlay, type StartedTurn } from './queue';
 import { matchesRequest, TranscriptBuffer, type TranscriptTurn } from './transcript';
 import { type LogMark, pendingTurns, unloggedTurns, withUnlogged } from './unloggedTurns';
 
@@ -53,6 +59,7 @@ interface SessionEntry {
   hookedAt: number | null;
   stoppedAt: number | null;
   exported: Exported | null;
+  queue: QueueOverlay | null;
   permission: { level: PermissionLevel; at: number } | null;
 }
 
@@ -105,6 +112,20 @@ function markOf(entry: SessionEntry): LogMark {
     writtenAt: entry.exported.at,
     lastRequestAt: lastRequestAt({ requests: entry.exported.requests })
   };
+}
+
+function startedOf(entry: SessionEntry): StartedTurn[] {
+  const logged = new Set(
+    requestsOf(entry.root).flatMap((request) => asString(request.requestId) ?? [])
+  );
+  const exported = (entry.exported?.requests ?? []).flatMap((request) => {
+    const id = asString(request.requestId);
+    return id && !logged.has(id) ? [{ key: `request:${id}`, text: requestText(request) }] : [];
+  });
+  return [
+    ...exported,
+    ...entry.unlogged.map((turn) => ({ key: `turn:${turn.id}`, text: turn.content }))
+  ];
 }
 
 function settledOf(entry: SessionEntry): boolean {
@@ -210,8 +231,26 @@ export class SessionStore {
       permission:
         expected && Date.now() - expected.at < PERMISSION_OVERLAY_MS
           ? expected.level
-          : detail.permission
+          : detail.permission,
+      queued: currentQueue(
+        detail.queued,
+        entry.queue,
+        startedOf(entry),
+        entry.mark.writtenAt,
+        Date.now()
+      )
     };
+  }
+
+  expectQueue(sessionId: string, items: QueuedRequest[]): void {
+    const entry = this.entries.get(sessionId);
+    if (!entry) return;
+    entry.queue = {
+      items,
+      at: Date.now(),
+      seen: new Set(startedOf(entry).map((turn) => turn.key))
+    };
+    this.emit(sessionId);
   }
 
   expectPermission(sessionId: string, level: PermissionLevel): void {
@@ -353,6 +392,7 @@ export class SessionStore {
       hookedAt: null,
       stoppedAt: null,
       exported: null,
+      queue: null,
       permission: null
     };
     this.entries.set(sessionId, created);

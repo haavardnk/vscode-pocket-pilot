@@ -73,7 +73,25 @@ describe('projection', () => {
       { kind: 'undoStop' }
     ];
     const root = snapshot([request('r0', 'old', 1), request('r1', 'go', 4, response)], {
-      pendingRequests: [{ id: 'q1', kind: 'steering', request: { message: { text: 'faster' } } }]
+      pendingRequests: [
+        {
+          id: 'q1',
+          kind: 'steering',
+          request: {
+            message: { text: 'faster #file:a.ts' },
+            variableData: {
+              variables: [
+                { id: 'vscode.implicit.file', kind: 'file' },
+                { id: 'i', kind: 'implicit' },
+                { id: 'rules', kind: 'promptFile', automaticallyAdded: true },
+                { id: 'owner/repo', kind: 'workspace' },
+                { id: 'ref', kind: 'file', range: { start: 7, endExclusive: 17 } },
+                { id: 'shot', kind: 'image' }
+              ]
+            }
+          }
+        }
+      ]
     });
     const activity: Activity = {
       statuses: new Map([['c1', 'running']]),
@@ -88,7 +106,9 @@ describe('projection', () => {
     };
     const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, activity, []);
     expect(detail.totalRequests).toBe(2);
-    expect(detail.queued).toEqual([{ id: 'q1', delivery: 'steering', text: 'faster' }]);
+    expect(detail.queued).toEqual([
+      { id: 'q1', delivery: 'steering', text: 'faster #file:a.ts', attachments: 1 }
+    ]);
     expect(detail.requests).toHaveLength(1);
     expect(detail.requests[0]?.parts).toEqual([
       { kind: 'markdown', text: 'Looking at `a.ts` now.' },

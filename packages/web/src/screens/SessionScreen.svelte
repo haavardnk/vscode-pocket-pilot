@@ -10,7 +10,8 @@
     Model,
     ModelConfigOption,
     PermissionLevel,
-    QuestionAnswers
+    QuestionAnswers,
+    QueueEntry
   } from '@pocket-pilot/protocol';
   import { untrack } from 'svelte';
 
@@ -19,6 +20,7 @@
   import ModelSheet from '../lib/components/ModelSheet.svelte';
   import ModeSheet from '../lib/components/ModeSheet.svelte';
   import PermissionSheet from '../lib/components/PermissionSheet.svelte';
+  import QueuedMessages from '../lib/components/QueuedMessages.svelte';
   import RequestItem from '../lib/components/RequestItem.svelte';
   import SessionActionsSheet from '../lib/components/SessionActionsSheet.svelte';
   import StatusBadge from '../lib/components/StatusBadge.svelte';
@@ -102,6 +104,10 @@
     );
     if (!sent) echo = null;
     return sent;
+  }
+
+  function changeQueue(expected: string[], queue: QueueEntry[]): Promise<boolean> {
+    return run(() => hub.command({ kind: 'setQueue', windowId, sessionId, expected, queue }));
   }
 
   async function stop(): Promise<void> {
@@ -256,16 +262,7 @@
     <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
       <div class="flex flex-col gap-3 px-3 pt-3 pb-3">
         {#if detail.queued.length > 0}
-          <ul class="flex flex-col gap-1" aria-label="Queued messages">
-            {#each detail.queued as queued (queued.id)}
-              <li class="flex items-center gap-2 rounded-field bg-base-200 px-3 py-1.5 text-sm">
-                <span class="badge badge-ghost badge-xs"
-                  >{queued.delivery === 'steering' ? 'Steer' : 'Queued'}</span
-                >
-                <span class="truncate">{queued.text}</span>
-              </li>
-            {/each}
-          </ul>
+          <QueuedMessages queued={detail.queued} disabled={!connected} onchange={changeQueue} />
         {/if}
         {#if tool}
           <div

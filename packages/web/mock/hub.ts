@@ -4,6 +4,7 @@ import {
   type Command,
   diffDetail,
   type PullRequestState,
+  queuePlan,
   type ServerMessage,
   type SessionDetail,
   type TerminalExecution,
@@ -166,10 +167,20 @@ export class MockHub {
         detail.queued.push({
           id: this.id('queued'),
           delivery: command.delivery ?? 'queued',
-          text: command.text
+          text: command.text,
+          attachments: 0
         });
         this.changed(window, detail.id);
       }
+      return;
+    }
+    if (command.kind === 'setQueue') {
+      const plan = queuePlan(detail.queued, command.expected, command.queue);
+      detail.queued =
+        plan.kind === 'remove'
+          ? detail.queued.filter((item) => !plan.ids.includes(item.id))
+          : command.queue.map((item) => ({ ...item, id: this.id('queued'), attachments: 0 }));
+      this.changed(window, detail.id);
       return;
     }
     if (command.kind === 'stop') {

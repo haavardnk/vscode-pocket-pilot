@@ -157,6 +157,76 @@ test.describe('paired', () => {
     await expect(page.getByRole('list', { name: 'Queued messages' })).toHaveCount(0);
   });
 
+  test('reorders queued messages after warning about attachments', async ({ page }) => {
+    await openSession(page, 'Plan the release');
+    const queue = page.getByRole('list', { name: 'Queued messages' });
+    const row = (text: string) => queue.getByRole('listitem').filter({ hasText: text });
+    await expect(queue.getByRole('listitem')).toHaveText([
+      /Keep the changelog short/,
+      /Draft the announcement/,
+      /Tag the release/
+    ]);
+    await expect(
+      row('Draft the announcement').getByRole('img', { name: '2 attachments' })
+    ).toBeVisible();
+    await expect(
+      row('Keep the changelog short').getByRole('button', { name: 'Move down' })
+    ).toBeDisabled();
+    await expect(
+      row('Draft the announcement').getByRole('button', { name: 'Move up' })
+    ).toBeDisabled();
+
+    await row('Tag the release').getByRole('button', { name: 'Move up' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Drop attachments?' });
+    await expect(sheet.getByText('2 attachments will be dropped')).toBeVisible();
+    await sheet.getByRole('button', { name: 'Cancel' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(queue.getByRole('listitem').nth(1)).toContainText('Draft the announcement');
+
+    await row('Tag the release').getByRole('button', { name: 'Move up' }).click();
+    await sheet.getByRole('button', { name: 'Continue' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(queue.getByRole('listitem')).toHaveText([
+      /Keep the changelog short/,
+      /Tag the release/,
+      /Draft the announcement/
+    ]);
+    await expect(queue.getByRole('img', { name: /attachment/ })).toHaveCount(0);
+  });
+
+  test('edits, removes and collapses queued messages', async ({ page }) => {
+    await openSession(page, 'Plan the release');
+    const queue = page.getByRole('list', { name: 'Queued messages' });
+    await queue.getByRole('button', { name: 'Keep the changelog short' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Queued message' });
+    await sheet.getByRole('textbox', { name: 'Queued message' }).fill('Keep the changelog tiny');
+    await sheet.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('dialog', { name: 'Drop attachments?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(queue.getByRole('listitem').first()).toContainText('Keep the changelog tiny');
+
+    await queue.getByRole('button', { name: 'Draft the announcement' }).click();
+    await sheet.getByRole('button', { name: 'Remove' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(queue.getByRole('listitem')).toHaveCount(2);
+    await expect(queue).not.toContainText('Draft the announcement');
+
+    await queue
+      .getByRole('listitem')
+      .filter({ hasText: 'Tag the release' })
+      .getByRole('button', { name: 'Remove' })
+      .click();
+    await expect(queue.getByRole('listitem')).toHaveCount(1);
+    await expect(queue).not.toContainText('Tag the release');
+
+    const toggle = page.getByRole('button', { name: 'Queued (1)' });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(queue).toHaveCount(0);
+    await toggle.click();
+    await expect(queue.getByRole('listitem')).toHaveCount(1);
+  });
+
   test('sends a message to an idle chat', async ({ page }) => {
     await openSession(page, 'Fix flaky cluster test');
     await page.getByRole('textbox', { name: 'Message' }).fill('Try again');

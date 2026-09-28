@@ -124,7 +124,8 @@ export const deliverySchema = z.enum(['queued', 'steering']);
 export const queuedRequestSchema = z.object({
   id: z.string(),
   delivery: deliverySchema,
-  text: z.string()
+  text: z.string(),
+  attachments: z.number().int().nonnegative()
 });
 
 export const sessionDetailSchema = z.object({
