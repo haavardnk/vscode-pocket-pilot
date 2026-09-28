@@ -1,5 +1,7 @@
 <script lang="ts">
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+  import MessageSquarePlus from '@lucide/svelte/icons/message-square-plus';
+  import MonitorOff from '@lucide/svelte/icons/monitor-off';
   import type { Agent, ConfigValue, Model, ModelConfigOption } from '@pocket-pilot/protocol';
   import { onDestroy } from 'svelte';
 
@@ -107,31 +109,39 @@
     <ConnectionBanner />
   </header>
 
-  <main class="flex flex-1 flex-col gap-4 px-4 py-4">
+  <main class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10 text-center">
     {#if !target}
-      <p class="p-10 text-center text-base-content/70">
-        No VS Code window is open for this repository.
-      </p>
+      <MonitorOff class="size-10 text-base-content/40" />
+      <p class="text-base-content/70">No VS Code window is open for this repository.</p>
     {:else if pending}
-      <div class="flex flex-col items-center gap-3 p-10 text-center">
-        <span class="loading loading-spinner text-primary"></span>
-        <p class="text-base-content/70">Starting chat in {target.name}…</p>
-      </div>
-    {:else if candidates.length > 1}
-      <label class="flex flex-col gap-1">
-        <span class="text-sm text-base-content/60">Window</span>
-        <select
-          class="select w-full"
-          value={target.windowId}
-          onchange={(event) => selectWindow(event.currentTarget.value)}
-        >
-          {#each candidates as window (window.windowId)}
-            <option value={window.windowId}>{window.name}</option>
-          {/each}
-        </select>
-      </label>
+      <span class="loading loading-spinner text-primary"></span>
+      <p class="text-base-content/70">Starting chat in {target.name}…</p>
     {:else}
-      <p class="text-sm text-base-content/60">Starts in {target.name}</p>
+      <div class="grid size-14 place-items-center rounded-full bg-primary/15 text-primary">
+        <MessageSquarePlus class="size-7" />
+      </div>
+      <div class="flex flex-col gap-1">
+        <h2 class="text-lg font-semibold">Start a chat</h2>
+        <p class="text-sm text-base-content/60">
+          Describe the task below. Pick the agent and model before you send.
+        </p>
+      </div>
+      {#if candidates.length > 1}
+        <label class="flex w-full max-w-xs flex-col gap-1 text-left">
+          <span class="text-sm text-base-content/60">Window</span>
+          <select
+            class="select w-full"
+            value={target.windowId}
+            onchange={(event) => selectWindow(event.currentTarget.value)}
+          >
+            {#each candidates as window (window.windowId)}
+              <option value={window.windowId}>{window.name}</option>
+            {/each}
+          </select>
+        </label>
+      {:else}
+        <p class="text-sm text-base-content/60">Starts in {target.name}</p>
+      {/if}
     {/if}
   </main>
 

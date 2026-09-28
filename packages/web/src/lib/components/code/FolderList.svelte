@@ -18,7 +18,7 @@
 {:else}
   {#each windows as window (window.windowId)}
     <section aria-label={window.name}>
-      {#if showWindow}
+      {#if showWindow && !(window.folders.length === 1 && window.folders[0]?.name === window.name)}
         <h2 class="px-4 pt-4 pb-1 text-xs font-semibold text-base-content/60 uppercase">
           {window.name}
         </h2>

@@ -20,6 +20,7 @@
 
   const hostWindow = $derived(hub.windows.find((candidate) => candidate.windowId === windowId));
   const folder = $derived(hostWindow?.folders.find((candidate) => candidate.id === folderId));
+  const windowName = $derived(hostWindow?.name === folder?.name ? null : hostWindow?.name);
   const back = $derived<Route>(
     tab === 'files' && path
       ? { name: 'folder', windowId, folderId, tab, path: parentPath(path) }
@@ -39,7 +40,7 @@
 </script>
 
 <div class="flex flex-1 flex-col">
-  <ScreenHeader title={folder?.name ?? 'Folder'} subtitle={path || hostWindow?.name} {back}>
+  <ScreenHeader title={folder?.name ?? 'Folder'} subtitle={path || windowName} {back}>
     {#snippet actions()}
       <RefreshButton loading={active.loading} onrefresh={() => void active.refresh()} />
     {/snippet}
