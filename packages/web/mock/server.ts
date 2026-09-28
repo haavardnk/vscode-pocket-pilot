@@ -13,6 +13,7 @@ const DIST = join(import.meta.dirname, '..', 'dist');
 const COOKIE = 'pocket_pilot_token';
 const PAIRING_CODE = '123456';
 const PASSWORD = 'correct horse';
+const ACCESS_LOGIN = `http://127.0.0.1:${PORT}/__access/login`;
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -28,6 +29,7 @@ const hub = new MockHub();
 const devices = new Map<string, Device>();
 const pushes = new Map<string, { subscription: unknown; events: PushEvents }>();
 const pushTests: string[] = [];
+let accessGate = false;
 
 const PUSH_KEY =
   'BBbSzvfmzP9RzBcphct00u2qmFYTkZtBi63G1ymzZCRN1Vu7kqN5uFDQ0-TNu8K1uOVrCEtMZKTEG5x2Unvwqfw';
@@ -102,7 +104,22 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
     devices.clear();
     pushes.clear();
     pushTests.length = 0;
+    accessGate = false;
     return json(response, 200, {});
+  }
+  if (url === '/__access' && request.method === 'POST') {
+    accessGate = true;
+    for (const client of sockets.clients) client.terminate();
+    return json(response, 200, {});
+  }
+  if (url === '/__access/login') {
+    response.writeHead(200, { 'content-type': TYPES['.html'] ?? 'text/html' });
+    response.end('<!doctype html><title>Access</title><h1>Sign in with GitHub</h1>');
+    return;
+  }
+  if (accessGate) {
+    response.writeHead(302, { location: ACCESS_LOGIN }).end();
+    return;
   }
   if (url === '/__push') return json(response, 200, { pushes: [...pushes.values()], pushTests });
   if (url === '/api/auth')
@@ -173,6 +190,10 @@ const server = createServer((request, response) => {
 const sockets = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
+  if (accessGate) {
+    socket.end(`HTTP/1.1 302 Found\r\nLocation: ${ACCESS_LOGIN}\r\n\r\n`);
+    return;
+  }
   if (request.url !== '/ws' || !deviceOf(request)) {
     socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n');
     return;

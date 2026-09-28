@@ -1,9 +1,10 @@
 import { type PushPayload, pushPayloadSchema } from '@pocket-pilot/protocol';
 import { ExpirationPlugin } from 'workbox-expiration';
 import {
+  addRoute,
   cleanupOutdatedCaches,
   createHandlerBoundToURL,
-  precacheAndRoute
+  precache
 } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { CacheFirst } from 'workbox-strategies';
@@ -66,14 +67,23 @@ self.addEventListener('message', (event) => {
   if ((event.data as { type?: unknown } | null)?.type === 'SKIP_WAITING') void self.skipWaiting();
 });
 
-precacheAndRoute(self.__WB_MANIFEST);
+precache(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
+const shell = createHandlerBoundToURL('/index.html');
+
 registerRoute(
-  new NavigationRoute(createHandlerBoundToURL('/index.html'), {
-    denylist: [/^\/api\//, /^\/ws$/, /^\/internal$/]
-  })
+  new NavigationRoute(
+    async (options) => {
+      const response = await fetch(options.request).catch(() => null);
+      if (response?.ok || response?.type === 'opaqueredirect') return response;
+      return shell(options);
+    },
+    { denylist: [/^\/api\//, /^\/ws$/, /^\/internal$/] }
+  )
 );
+
+addRoute();
 
 registerRoute(
   ({ url }) => url.pathname.startsWith('/assets/lang/'),

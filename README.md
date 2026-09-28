@@ -59,6 +59,31 @@ Use your own Cloudflare tunnel for a fixed address that installs as an app:
 The token is kept in VS Code secret storage. **Pocket Pilot: Remove Cloudflare Tunnel** goes back
 to a quick tunnel.
 
+## Securing the tunnel
+
+Pairing already keeps strangers out, but you can add a GitHub login in front of the permanent
+address with Cloudflare Access. Requests without a valid login then stop at Cloudflare and never
+reach your machine.
+
+1. In GitHub, open **Settings → Developer settings → OAuth Apps** and create an app. Use
+   `https://<team>.cloudflareaccess.com` as the homepage URL and
+   `https://<team>.cloudflareaccess.com/cdn-cgi/access/callback` as the callback URL, where
+   `<team>` is your Zero Trust team name. Copy the client ID and generate a client secret.
+2. In the Zero Trust dashboard, open **Settings → Authentication → Login methods**, add GitHub
+   with the client ID and secret, and click **Test**.
+3. Open **Access → Applications** and add a self-hosted application for `agent.example.com`.
+   Select only GitHub as the identity provider and turn on **Instant Auth**. Pick a long session
+   duration, such as a month, so the app does not ask you to sign in every day.
+4. Add an **Allow** policy that includes your GitHub email address. Avoid a GitHub organization
+   rule unless you trust everyone in it.
+5. On the phone, open the address, sign in with GitHub and pair. If the app was used on this
+   address before, first close its tabs, quit the browser and remove the site's data, so the old
+   cached app does not hide the login.
+
+On iPhone, an app added to the home screen keeps its own cookies, so it asks for the GitHub login
+once more the first time it opens. When the Access session expires, the app reloads into the
+login page.
+
 ## Commands
 
 All commands are also in the **Pilot** status bar menu.
@@ -74,27 +99,13 @@ All commands are also in the **Pilot** status bar menu.
 
 ## Settings
 
-| Setting                              | Default | Meaning                                                  |
-| ------------------------------------ | ------- | -------------------------------------------------------- |
-| `pocketPilot.enabled`                | `false` | Run Pocket Pilot in every window.                        |
-| `pocketPilot.port`                   | `48111` | Loopback port between windows. The tunnel uses the next. |
-| `pocketPilot.tunnel.cloudflaredPath` | `""`    | Use this cloudflared binary instead of downloading one.  |
-| `pocketPilot.devices.expireDays`     | `30`    | Forget devices unused this long. `0` keeps them.         |
-| `pocketPilot.liveMirror`             | `full`  | `full`, `hooks` or `off`. See below.                     |
-
-## How it works
-
-- Every VS Code window runs Pocket Pilot. One window hosts the server and the others report to it.
-  If that window closes, another takes over and the phone reconnects.
-- Sending, stopping or approving from the phone opens that chat in an editor tab in VS Code,
-  because VS Code only accepts input into a visible chat.
-- For live updates Pocket Pilot installs a Copilot hook file, `~/.copilot/hooks/pocket-pilot.json`,
-  and removes it when it stops. Streaming text is available for the chat focused in each window;
-  other chats update at every tool call. Set `pocketPilot.liveMirror` to `hooks` to turn streaming
-  off, or to `off` to update chats only when VS Code saves them, about once a minute.
-- Terminal output relies on VS Code shell integration and covers commands started after Pocket
-  Pilot started.
-- On iPhone, push notifications only work in the installed app, which needs a permanent address.
+| Setting                              | Default | Meaning                                                                    |
+| ------------------------------------ | ------- | -------------------------------------------------------------------------- |
+| `pocketPilot.enabled`                | `false` | Run Pocket Pilot in every window.                                          |
+| `pocketPilot.port`                   | `48111` | Loopback port between windows. The tunnel uses the next.                   |
+| `pocketPilot.tunnel.cloudflaredPath` | `""`    | Use this cloudflared binary instead of downloading one.                    |
+| `pocketPilot.devices.expireDays`     | `30`    | Forget devices unused this long. `0` keeps them.                           |
+| `pocketPilot.liveMirror`             | `full`  | `full` streams replies, `hooks` updates at tool calls, `off` only on save. |
 
 ## Security
 

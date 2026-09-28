@@ -3,6 +3,7 @@
   import { onMount } from 'svelte';
 
   import { fetchAuth } from './lib/api/auth';
+  import { SignInRedirect } from './lib/api/http';
   import Toasts from './lib/components/Toasts.svelte';
   import { pairCode } from './lib/routing';
   import { hub } from './lib/stores/hub.svelte';
@@ -13,8 +14,22 @@
   const initialCode = pairCode(location.hash);
   if (initialCode) router.replace({ name: 'chats' });
 
+  const SIGN_IN_RELOAD = 'pocket-pilot:sign-in-reload';
+  const SIGN_IN_RELOAD_GAP_MS = 60_000;
+
   let auth = $state<AuthInfo | null>(null);
   let unreachable = $state(false);
+  let blocked = $state(false);
+
+  function reloadToSignIn(): void {
+    const last = Number(sessionStorage.getItem(SIGN_IN_RELOAD));
+    if (Date.now() - last < SIGN_IN_RELOAD_GAP_MS) {
+      blocked = true;
+      return;
+    }
+    sessionStorage.setItem(SIGN_IN_RELOAD, String(Date.now()));
+    location.reload();
+  }
 
   function signedIn(info: AuthInfo): void {
     auth = info;
@@ -27,7 +42,9 @@
     try {
       signedIn(await fetchAuth());
       unreachable = false;
-    } catch {
+      blocked = false;
+    } catch (error) {
+      if (error instanceof SignInRedirect) reloadToSignIn();
       unreachable = auth === null;
     }
   }
@@ -42,7 +59,11 @@
     {#if unreachable}
       <p class="text-lg font-semibold">Can't reach VS Code</p>
       <p class="text-sm text-base-content/70">
-        Check that Pocket Pilot is running in VS Code and this device can reach it.
+        {#if blocked}
+          A sign-in page in front of this address keeps redirecting. Check its access policy.
+        {:else}
+          Check that Pocket Pilot is running in VS Code and this device can reach it.
+        {/if}
       </p>
       <button class="btn btn-primary" onclick={() => void refresh()}>Try again</button>
     {:else}

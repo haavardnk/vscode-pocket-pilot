@@ -15,6 +15,7 @@ export default defineConfig({
       filename: 'sw.ts',
       registerType: 'autoUpdate',
       injectRegister: 'script',
+      useCredentials: true,
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'theme.js'],
       manifest: {
         name: 'Pocket Pilot',
