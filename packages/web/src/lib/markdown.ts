@@ -12,7 +12,7 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   node.setAttribute('rel', 'noopener noreferrer');
 });
 
-export function renderMarkdown(text: string): string {
+function renderMarkdown(text: string): string {
   return DOMPurify.sanitize(marked.parse(text, { async: false }), {
     FORBID_TAGS: ['style', 'form', 'input']
   });

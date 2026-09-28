@@ -1,6 +1,6 @@
 import type { RequestState, ResponsePart } from '@pocket-pilot/protocol';
 
-export type Step = Extract<ResponsePart, { kind: 'thinking' | 'tool' | 'edit' }>;
+type Step = Extract<ResponsePart, { kind: 'thinking' | 'tool' | 'edit' }>;
 type ToolPart = Extract<ResponsePart, { kind: 'tool' }>;
 
 export interface StepGroup {
@@ -22,7 +22,7 @@ export type ResponseItem = Exclude<ResponsePart, { kind: 'thinking' }> | StepGro
 
 const HEADER = /^\*\*([^*]+)\*\*/;
 
-export function mergeMarkdown(parts: ResponsePart[]): ResponsePart[] {
+function mergeMarkdown(parts: ResponsePart[]): ResponsePart[] {
   const merged: ResponsePart[] = [];
   for (const part of parts) {
     const previous = merged.at(-1);

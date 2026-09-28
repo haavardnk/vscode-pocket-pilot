@@ -14,7 +14,7 @@ import { type Connection, HubSocket, socketUrl } from '../api/socket';
 import { repositoryGroups, resolveRepository } from '../hub/views';
 
 const REPOSITORY_KEY = 'pocket-pilot-repository';
-export const PAGE_SIZE = 20;
+const PAGE_SIZE = 20;
 const MAX_LIMIT = 500;
 
 interface Subscription {

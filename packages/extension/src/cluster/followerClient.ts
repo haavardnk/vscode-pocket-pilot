@@ -13,14 +13,14 @@ import type { FollowerHandle } from './cluster';
 import type { Disposable, LocalWindow } from './localWindow';
 import { clusterSecret, LOOPBACK } from './sharedState';
 
-export interface FollowerOptions {
+interface FollowerOptions {
   url: string;
   secret: string;
 }
 
 const MAX_PAYLOAD = 16 * 1024 * 1024;
 
-export function connectFollower(
+function connectFollower(
   window: LocalWindow,
   options: FollowerOptions,
   report: (message: string) => void

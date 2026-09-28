@@ -42,7 +42,7 @@ const stateSchema = z.object({
 
 export type TextEdit = z.infer<typeof textEditSchema>;
 
-export interface TimelineOperation {
+interface TimelineOperation {
   type: string;
   path: string;
   requestId: string;
@@ -51,7 +51,7 @@ export interface TimelineOperation {
   initialContent: string | null;
 }
 
-export interface Checkpoint {
+interface Checkpoint {
   requestId: string | null;
   stopId: string | null;
   epoch: number;

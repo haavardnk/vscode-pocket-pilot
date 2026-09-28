@@ -113,7 +113,7 @@ export function line(text: string, fg: TerminalColor = null, flags = 0): Termina
   return [{ text, fg, bg: null, flags }];
 }
 
-export function newTerminal(
+function newTerminal(
   id: string,
   cwd: string | null,
   fields: Partial<TerminalSummary> = {}

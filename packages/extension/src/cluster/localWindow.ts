@@ -14,7 +14,7 @@ export interface Disposable {
   dispose(): void;
 }
 
-export type Subscribe<T> = (listener: (value: T) => void) => Disposable;
+type Subscribe<T> = (listener: (value: T) => void) => Disposable;
 
 export type TerminalUpdate =
   | { terminalId: string; detail: TerminalDetail | null }

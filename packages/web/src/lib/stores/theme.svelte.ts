@@ -6,7 +6,7 @@ export const THEMES = [
   { id: 'mocha', label: 'Mocha', color: '#1e1e2e' }
 ] as const;
 
-export type ThemeChoice = (typeof THEMES)[number]['id'];
+type ThemeChoice = (typeof THEMES)[number]['id'];
 
 const STORAGE_KEY = 'pocket-pilot-theme';
 const SYSTEM_COLORS = { light: '#eff1f5', dark: '#1e1e2e' };

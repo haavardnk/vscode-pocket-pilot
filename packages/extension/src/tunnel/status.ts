@@ -8,14 +8,14 @@ import { watchTargets } from '../fsWatch';
 import { parseJson } from '../json';
 import { readOptional, writeAtomic } from '../storage/sharedFile';
 
-export const tunnelStatusSchema = z.discriminatedUnion('state', [
+const tunnelStatusSchema = z.discriminatedUnion('state', [
   z.object({ state: z.literal('starting'), quick: z.boolean() }),
   z.object({ state: z.literal('ready'), quick: z.boolean(), url: z.string() }),
   z.object({ state: z.literal('error'), quick: z.boolean(), message: z.string() })
 ]);
 export type TunnelStatus = z.infer<typeof tunnelStatusSchema>;
 
-export async function readTunnelStatus(file: string): Promise<TunnelStatus | null> {
+async function readTunnelStatus(file: string): Promise<TunnelStatus | null> {
   const text = await readOptional(file);
   if (text === null) return null;
   const result = tunnelStatusSchema.safeParse(parseJson(text));

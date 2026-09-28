@@ -1,8 +1,8 @@
 import type { DiffHunk } from '@pocket-pilot/protocol';
 
-export type DiffLineKind = 'context' | 'added' | 'removed';
+type DiffLineKind = 'context' | 'added' | 'removed';
 
-export interface DiffLine {
+interface DiffLine {
   kind: DiffLineKind;
   oldLine: number | null;
   newLine: number | null;
@@ -11,12 +11,12 @@ export interface DiffLine {
   index: number;
 }
 
-export interface DiffGap {
+interface DiffGap {
   kind: 'gap';
   hidden: number;
 }
 
-export type DiffRow = DiffLine | DiffGap;
+type DiffRow = DiffLine | DiffGap;
 
 export interface DiffModel {
   rows: DiffRow[];

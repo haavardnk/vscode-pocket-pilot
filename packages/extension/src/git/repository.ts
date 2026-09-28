@@ -29,7 +29,7 @@ export function repositoryFor(remote: string | null, folder: string): Repository
   return { key: `local/${name}`, label: name, github: null };
 }
 
-export async function originUrl(folder: string): Promise<string | null> {
+async function originUrl(folder: string): Promise<string | null> {
   try {
     const { stdout } = await run('git', ['config', '--get', 'remote.origin.url'], {
       cwd: folder,

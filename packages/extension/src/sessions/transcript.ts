@@ -31,7 +31,7 @@ function argumentsText(value: unknown): string | null {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
-export function parseTranscriptLine(line: string): TranscriptEvent | null {
+function parseTranscriptLine(line: string): TranscriptEvent | null {
   let raw: unknown;
   try {
     raw = JSON.parse(line);

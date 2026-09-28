@@ -2,9 +2,9 @@ import type { Dirent } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-export const MAX_TREE_ENTRIES = 2000;
+const MAX_TREE_ENTRIES = 2000;
 
-export interface DirectoryEntry {
+interface DirectoryEntry {
   name: string;
   directory: boolean;
 }

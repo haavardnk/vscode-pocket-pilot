@@ -18,7 +18,7 @@ const REFERENCE =
   /(?<![\w#&/.-])(?:#(\d+)|(?=[0-9a-f]{0,39}[a-f])(?=[0-9a-f]{0,39}\d)[0-9a-f]{7,40})(?![\w-])(?!\.\w)/g;
 const COMMIT = /^(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,40}$/;
 
-export function repositoryUrl(github: GitHubRepository): string {
+function repositoryUrl(github: GitHubRepository): string {
   return `https://github.com/${encodeURIComponent(github.owner)}/${encodeURIComponent(github.name)}`;
 }
 

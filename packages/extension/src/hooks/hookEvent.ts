@@ -58,7 +58,7 @@ export function editPaths(toolName: string, input: unknown): string[] {
   return [...new Set(paths.filter((path) => path !== null))];
 }
 
-export function terminalCommand(toolName: string, input: unknown): string | null {
+function terminalCommand(toolName: string, input: unknown): string | null {
   if (toolName !== 'run_in_terminal') return null;
   return asString(asRecord(typeof input === 'string' ? parseJson(input) : input).command);
 }

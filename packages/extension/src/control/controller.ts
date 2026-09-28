@@ -44,7 +44,7 @@ export interface ControllerSources {
   settings: ModelSettingsFile;
 }
 
-export function sessionResource(sessionId: string): vscode.Uri {
+function sessionResource(sessionId: string): vscode.Uri {
   return vscode.Uri.from({
     scheme: LOCAL_SESSION_SCHEME,
     authority: LOCAL_SESSION_AUTHORITY,

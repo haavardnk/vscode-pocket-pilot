@@ -34,7 +34,7 @@ export function writtenPaths(part: JsonRecord): string[] | null {
   );
 }
 
-export function isHiddenTool(part: JsonRecord): boolean {
+function isHiddenTool(part: JsonRecord): boolean {
   return (
     part.presentation === 'hidden' ||
     (part.presentation === 'hiddenAfterComplete' && part.isComplete !== false)

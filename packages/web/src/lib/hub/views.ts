@@ -27,9 +27,9 @@ export interface SessionEntry {
   session: SessionSummary;
 }
 
-export type SessionGroupId = 'needsInput' | 'pinned' | 'today' | 'yesterday' | 'week' | 'older';
+type SessionGroupId = 'needsInput' | 'pinned' | 'today' | 'yesterday' | 'week' | 'older';
 
-export interface SessionGroup {
+interface SessionGroup {
   id: SessionGroupId;
   label: string;
   entries: SessionEntry[];
