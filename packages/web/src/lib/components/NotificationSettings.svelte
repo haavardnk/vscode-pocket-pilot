@@ -1,9 +1,16 @@
 <script lang="ts">
+  import Bell from '@lucide/svelte/icons/bell';
+  import BellOff from '@lucide/svelte/icons/bell-off';
+  import CircleCheck from '@lucide/svelte/icons/circle-check';
+  import CircleX from '@lucide/svelte/icons/circle-x';
+  import MessageCircleQuestionMark from '@lucide/svelte/icons/message-circle-question-mark';
+  import Send from '@lucide/svelte/icons/send';
   import type { Connection, PushEvent } from '@pocket-pilot/protocol';
   import { onMount } from 'svelte';
 
   import { notifications } from '../stores/notifications.svelte';
   import { toasts } from '../stores/toasts.svelte';
+  import SettingsGroup from './SettingsGroup.svelte';
 
   interface Props {
     connection: Connection;
@@ -11,10 +18,10 @@
 
   const { connection }: Props = $props();
 
-  const EVENTS: { id: PushEvent; label: string }[] = [
-    { id: 'finished', label: 'Agent finished' },
-    { id: 'needsInput', label: 'Agent needs input' },
-    { id: 'failed', label: 'Request failed' }
+  const EVENTS: { id: PushEvent; label: string; icon: typeof Bell }[] = [
+    { id: 'finished', label: 'Agent finished', icon: CircleCheck },
+    { id: 'needsInput', label: 'Agent needs input', icon: MessageCircleQuestionMark },
+    { id: 'failed', label: 'Request failed', icon: CircleX }
   ];
 
   onMount(() => {
@@ -36,17 +43,29 @@
   }
 </script>
 
-<section class="flex flex-col gap-2">
-  <h2 class="text-sm font-medium text-base-content/60">Notifications</h2>
-  <div class="flex flex-col gap-3 rounded-box bg-base-200 p-4 text-sm">
+<SettingsGroup title="Notifications">
+  {#snippet caption()}
     {#if !notifications.supported}
-      <p>
-        This browser cannot receive notifications. On iPhone and iPad, add Pocket Pilot to the Home
-        Screen and open it from there.
-      </p>
+      On iPhone and iPad, add Pocket Pilot to the Home Screen and open it from there.
+    {:else if notifications.permission === 'denied'}
+      Notifications are blocked for this site. Allow them in the browser settings.
     {:else}
-      <label class="flex items-center justify-between gap-3">
-        <span class="font-medium">Notify this device</span>
+      Sent while Pocket Pilot is closed or in the background.
+      {#if connection === 'quickTunnel'}
+        Tapping a notification only works while this temporary address stays the same.
+      {/if}
+    {/if}
+  {/snippet}
+  {#if !notifications.supported}
+    <li class="list-row items-center py-3">
+      <BellOff class="size-5 text-base-content/70" />
+      <span class="list-col-grow">This browser cannot receive notifications.</span>
+    </li>
+  {:else}
+    <li>
+      <label class="list-row items-center py-3">
+        <Bell class="size-5 text-base-content/70" />
+        <span class="list-col-grow">Notify this device</span>
         <input
           type="checkbox"
           class="toggle toggle-primary"
@@ -57,38 +76,35 @@
           onchange={(event) => void toggle(event.currentTarget)}
         />
       </label>
-      {#if notifications.permission === 'denied'}
-        <p>Notifications are blocked for this site. Allow them in the browser settings.</p>
-      {/if}
-      {#if notifications.events}
-        {@const events = notifications.events}
-        {#each EVENTS as item (item.id)}
-          <label class="flex items-center gap-3">
+    </li>
+    {#if notifications.events}
+      {@const events = notifications.events}
+      {#each EVENTS as item (item.id)}
+        <li>
+          <label class="list-row items-center py-3">
+            <item.icon class="size-5 text-base-content/70" />
+            <span class="list-col-grow">{item.label}</span>
             <input
               type="checkbox"
-              class="checkbox checkbox-sm"
+              class="toggle toggle-primary toggle-sm"
               checked={events[item.id]}
               disabled={notifications.busy}
               onchange={(event) =>
                 void attempt(() => notifications.setEvent(item.id, event.currentTarget.checked))}
             />
-            {item.label}
           </label>
-        {/each}
+        </li>
+      {/each}
+      <li>
         <button
-          class="btn self-start btn-sm"
+          class="list-row w-full items-center py-3 text-left text-primary active:bg-base-300 disabled:opacity-50"
           disabled={notifications.busy}
           onclick={() => void attempt(() => notifications.test(), 'Test notification sent')}
         >
-          Send test notification
+          <Send class="size-5" />
+          <span class="list-col-grow">Send test notification</span>
         </button>
-      {/if}
-      <p class="text-base-content/60">
-        Sent while Pocket Pilot is closed or in the background.
-        {#if connection === 'quickTunnel'}
-          Tapping a notification only works while this temporary address stays the same.
-        {/if}
-      </p>
+      </li>
     {/if}
-  </div>
-</section>
+  {/if}
+</SettingsGroup>
