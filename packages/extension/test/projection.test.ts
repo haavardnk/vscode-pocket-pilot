@@ -10,6 +10,16 @@ import {
 import { request, SESSION_ID, snapshot } from './fixtures';
 
 const quiet: Activity = { statuses: new Map(), events: [], toolsOnly: false, settled: false };
+const block = { kind: 'codeblockUri', uri: { path: '/repo/a.ts' }, isEdit: true };
+const group = { kind: 'textEditGroup', uri: { path: '/repo/a.ts' } };
+const edit = {
+  kind: 'edit',
+  path: '/repo/a.ts',
+  stopId: null,
+  callId: null,
+  additions: null,
+  deletions: null
+};
 
 describe('projection', () => {
   it.each([
@@ -123,7 +133,7 @@ describe('projection', () => {
         status: 'running',
         terminal: null
       },
-      { kind: 'edit', path: '/repo/a.ts' },
+      { ...edit, callId: 'c1' },
       { kind: 'thinking', text: 'Check first', title: null },
       { kind: 'markdown', text: 'All green' },
       {
@@ -138,6 +148,49 @@ describe('projection', () => {
       }
     ]);
     expect(detail.permission).toBe('default');
+  });
+
+  it.each([
+    [[{ value: '\n```\n' }, { kind: 'undoStop' }, block, group, { value: '\n```\n' }], [edit]],
+    [
+      [{ value: 'Editing:\n```ts\n' }, block, group, { value: '\n```\nDone.' }],
+      [{ kind: 'markdown', text: 'Editing:' }, edit, { kind: 'markdown', text: 'Done.' }]
+    ],
+    [
+      [{ value: '```ts\nx\n```\n\n```\n' }, block, group, { value: '\n```\n' }],
+      [{ kind: 'markdown', text: '```ts\nx\n```' }, edit]
+    ]
+  ])('drops the code fences around an edit %#', (response, expected) => {
+    const root = snapshot([request('r1', 'go', 1, response)]);
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []);
+    expect(detail.requests[0]?.parts).toEqual(expected);
+  });
+
+  it('anchors each edit to its undo stop and tool call', () => {
+    const call = (id: string) => ({
+      kind: 'toolInvocationSerialized',
+      toolCallId: id,
+      toolId: 'copilot_replaceString',
+      invocationMessage: { value: 'Edit' },
+      presentation: 'hidden',
+      isComplete: true
+    });
+    const response = [
+      call('c1__vscode-1'),
+      { kind: 'undoStop', id: 'u1' },
+      group,
+      group,
+      call('c2__vscode-2'),
+      { kind: 'undoStop', id: 'u2' },
+      group
+    ];
+    const root = snapshot([request('r1', 'go', 1, response)]);
+    const parts = projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []).requests[0]
+      ?.parts;
+    expect(parts?.filter((part) => part.kind === 'edit')).toEqual([
+      { ...edit, stopId: 'u1', callId: 'c1' },
+      { ...edit, stopId: 'u2', callId: 'c2' }
+    ]);
   });
 
   it('collects edited file paths across requests', () => {

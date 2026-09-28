@@ -17,7 +17,8 @@ import {
 } from '@pocket-pilot/protocol';
 
 import { asArray, asNumber, asRecord, asString, type JsonRecord, markdownText } from '../json';
-import type { TranscriptEvent } from './transcript';
+import { withoutEditFences } from './editFences';
+import { toolCallId, type TranscriptEvent } from './transcript';
 
 const TITLE_LENGTH = 80;
 const PREVIEW_LENGTH = 160;
@@ -39,6 +40,8 @@ interface PartContext {
   state: RequestState;
   latest: boolean;
   statuses: ReadonlyMap<string, ToolStatus>;
+  stopId: string | null;
+  callId: string | null;
 }
 
 function basename(path: string): string {
@@ -248,7 +251,16 @@ function projectPart(part: JsonRecord, context: PartContext): ResponsePart | nul
     case 'notebookEditGroup': {
       const uri = asRecord(part.uri);
       const path = asString(uri.fsPath) ?? asString(uri.path);
-      return path ? { kind: 'edit', path } : null;
+      return path
+        ? {
+            kind: 'edit',
+            path,
+            stopId: context.stopId,
+            callId: context.callId,
+            additions: null,
+            deletions: null
+          }
+        : null;
     }
     case 'progressTaskSerialized': {
       const text = plainMessage(asRecord(part.content).value);
@@ -295,7 +307,8 @@ function mergeParts(parts: ResponsePart[]): ResponsePart[] {
     } else if (!(
       previous?.kind === 'edit' &&
       part.kind === 'edit' &&
-      previous.path === part.path
+      previous.path === part.path &&
+      previous.stopId === part.stopId
     )) {
       merged.push(part);
     }
@@ -306,9 +319,22 @@ function mergeParts(parts: ResponsePart[]): ResponsePart[] {
 function projectRequest(request: JsonRecord, latest: boolean, activity: Activity): RequestView {
   const logged = requestState(request);
   const state = latest && activity.settled && logged === 'pending' ? 'complete' : logged;
-  const parts = asArray(request.response)
-    .map((part) => projectPart(asRecord(part), { state, latest, statuses: activity.statuses }))
-    .filter((part): part is ResponsePart => part !== null);
+  const context: PartContext = {
+    state,
+    latest,
+    statuses: activity.statuses,
+    stopId: null,
+    callId: null
+  };
+  const parts = withoutEditFences(asArray(request.response).map(asRecord)).flatMap((part) => {
+    if (part.kind === 'undoStop') context.stopId = asString(part.id);
+    if (part.kind === 'toolInvocationSerialized') {
+      const callId = asString(part.toolCallId);
+      context.callId = callId && toolCallId(callId);
+    }
+    const projected = projectPart(part, context);
+    return projected ? [projected] : [];
+  });
   const error = asRecord(asRecord(request.result).errorDetails);
   return {
     id: asString(request.requestId) ?? '',

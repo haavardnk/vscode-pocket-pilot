@@ -11,6 +11,7 @@ import { parseTimeline, type Timeline } from './timeline';
 
 export const EMPTY_HASH = 'da39a3e';
 const STATES: readonly EditState[] = ['pending', 'kept', 'undone'];
+const MAX_CACHED = 8;
 
 const hashSchema = z.string().regex(/^[0-9a-f]{7}$/);
 
@@ -35,6 +36,13 @@ export interface EditingEntry {
   deleted: boolean;
 }
 
+interface CachedState {
+  mtime: number;
+  size: number;
+  value: unknown;
+  timeline: Timeline | null;
+}
+
 function filePath(resource: string): string | null {
   try {
     const url = new URL(resource);
@@ -45,6 +53,8 @@ function filePath(resource: string): string | null {
 }
 
 export class EditingSessions {
+  private readonly cache = new Map<string, CachedState>();
+
   constructor(private readonly root: string | null) {}
 
   async entries(sessionId: string): Promise<EditingEntry[]> {
@@ -72,7 +82,10 @@ export class EditingSessions {
   }
 
   async timeline(sessionId: string): Promise<Timeline> {
-    return parseTimeline(await this.state(sessionId));
+    const entry = await this.load(sessionId);
+    if (!entry) return parseTimeline(undefined);
+    entry.timeline ??= parseTimeline(entry.value);
+    return entry.timeline;
   }
 
   async blob(sessionId: string, hash: string): Promise<Blob> {
@@ -85,8 +98,26 @@ export class EditingSessions {
   }
 
   private async state(sessionId: string): Promise<unknown> {
-    if (this.root === null) return undefined;
-    const raw = await readFile(join(this.root, sessionId, 'state.json'), 'utf8').catch(() => null);
-    return raw === null ? undefined : parseJson(raw);
+    return (await this.load(sessionId))?.value;
+  }
+
+  private async load(sessionId: string): Promise<CachedState | null> {
+    if (this.root === null) return null;
+    const file = join(this.root, sessionId, 'state.json');
+    const info = await stat(file).catch(() => null);
+    if (!info?.isFile()) return null;
+    const cached = this.cache.get(sessionId);
+    if (cached?.mtime === info.mtimeMs && cached.size === info.size) return cached;
+    const raw = await readFile(file, 'utf8').catch(() => null);
+    const entry: CachedState = {
+      mtime: info.mtimeMs,
+      size: info.size,
+      value: raw === null ? undefined : parseJson(raw),
+      timeline: null
+    };
+    this.cache.delete(sessionId);
+    this.cache.set(sessionId, entry);
+    for (const stale of [...this.cache.keys()].slice(0, -MAX_CACHED)) this.cache.delete(stale);
+    return entry;
   }
 }

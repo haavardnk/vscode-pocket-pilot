@@ -12,7 +12,8 @@ import { type EditingEntry, type EditingSessions, EMPTY_HASH } from '../sessions
 import type { LiveEdits, LiveSpan } from '../sessions/liveEdits';
 import { requestEdit, requestPaths, type Timeline } from '../sessions/timeline';
 import { diffBlobs, diffCounts } from './diff';
-import type { Blob } from './files';
+import type { EditChanges, EditTarget } from './editChanges';
+import { type Blob, textBlob } from './files';
 import { type CodeFolder, type FolderLocation, locate } from './folders';
 import { headBlob, repositoryInfo } from './git';
 import { isInside } from './paths';
@@ -30,6 +31,7 @@ export interface SessionChangeSources {
   detail: (sessionId: string, limit: number) => Promise<SessionDetail | null>;
   current: (path: string) => Promise<Blob>;
   live: LiveEdits;
+  edits: EditChanges;
   home: string;
 }
 
@@ -69,10 +71,6 @@ function changeKind(before: Blob, after: Blob, known: boolean): SessionChange['c
   return 'modified';
 }
 
-function textBlob(text: string | null): Blob {
-  return text === null ? 'missing' : Buffer.from(text);
-}
-
 export class SessionChanges {
   constructor(private readonly sources: SessionChangeSources) {}
 
@@ -105,6 +103,22 @@ export class SessionChanges {
     if (!target) throw new Error('File is not part of this request');
     const { file, diff } = await this.compareRequest(target);
     return { language: this.sources.language(path), file, diff };
+  }
+
+  async editDiff(sessionId: string, target: EditTarget): Promise<SessionDiff> {
+    const [edit, entries] = await Promise.all([
+      this.sources.edits.resolve(sessionId, target),
+      this.sources.editing.entries(sessionId)
+    ]);
+    if (!edit) return this.requestDiff(sessionId, target.requestId, target.path);
+    const state = entries.find((entry) => entry.path === target.path)?.state ?? 'pending';
+    const { file, diff } = this.describe(
+      target.path,
+      { kind: 'edit', blob: edit.before },
+      edit.after,
+      state
+    );
+    return { language: this.sources.language(target.path), file, diff };
   }
 
   private async targets(sessionId: string): Promise<Target[]> {

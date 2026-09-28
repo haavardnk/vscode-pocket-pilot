@@ -84,7 +84,14 @@ export const responsePartSchema = z.discriminatedUnion('kind', [
     status: toolStatusSchema,
     terminal: terminalRefSchema.nullable()
   }),
-  z.object({ kind: z.literal('edit'), path: z.string() }),
+  z.object({
+    kind: z.literal('edit'),
+    path: z.string(),
+    stopId: z.string().nullable(),
+    callId: z.string().nullable(),
+    additions: z.number().nullable(),
+    deletions: z.number().nullable()
+  }),
   z.object({ kind: z.literal('progress'), text: z.string() }),
   z.object({
     kind: z.literal('questions'),

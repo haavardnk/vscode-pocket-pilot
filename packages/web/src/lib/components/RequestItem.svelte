@@ -12,6 +12,7 @@
   import { mergeMarkdown } from '../hub/views';
   import { markdown } from '../markdown';
   import { routeHash } from '../routing';
+  import DiffStat from './code/DiffStat.svelte';
   import QuestionCard from './QuestionCard.svelte';
 
   interface Props {
@@ -107,17 +108,20 @@
       <a
         class="flex max-w-full items-center gap-2 self-start text-sm text-base-content/70 hover:text-primary"
         href={routeHash({
-          name: 'sessionDiff',
+          name: 'editDiff',
           windowId,
           sessionId,
+          requestId: request.id,
           path: part.path,
-          requestId: request.id
+          stopId: part.stopId,
+          callId: part.callId
         })}
       >
         <FilePen class="size-4 shrink-0" />
         <span class="truncate font-mono underline decoration-base-content/30"
           >{baseName(part.path)}</span
         >
+        <DiffStat additions={part.additions} deletions={part.deletions} />
       </a>
     {:else if part.kind === 'progress'}
       <p class="text-sm text-base-content/60 italic">{part.text}</p>

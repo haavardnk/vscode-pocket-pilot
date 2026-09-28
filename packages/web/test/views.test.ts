@@ -208,16 +208,24 @@ describe('labels', () => {
 
 describe('response parts', () => {
   it('merges adjacent markdown so split code fences render', () => {
+    const edit = {
+      kind: 'edit',
+      path: 'a.ts',
+      stopId: null,
+      callId: null,
+      additions: null,
+      deletions: null
+    } as const;
     expect(
       mergeMarkdown([
         { kind: 'markdown', text: '```ts\nconst a' },
         { kind: 'markdown', text: ' = 1;\n```' },
-        { kind: 'edit', path: 'a.ts' },
+        edit,
         { kind: 'markdown', text: 'done' }
       ])
     ).toEqual([
       { kind: 'markdown', text: '```ts\nconst a = 1;\n```' },
-      { kind: 'edit', path: 'a.ts' },
+      edit,
       { kind: 'markdown', text: 'done' }
     ]);
   });

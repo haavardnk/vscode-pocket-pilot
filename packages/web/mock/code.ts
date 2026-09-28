@@ -33,6 +33,7 @@ interface MockEdit {
   baseline: SessionChange['baseline'];
   requestId: string;
   hunks: DiffHunk[];
+  stops: Record<string, DiffHunk[]>;
 }
 
 const PIXEL =
@@ -179,7 +180,8 @@ const EDITS: Record<string, MockEdit[]> = {
       change: 'modified',
       baseline: 'session',
       requestId: 'r1',
-      hunks: APP_HUNKS
+      hunks: APP_HUNKS,
+      stops: { u1: APP_HUNKS.slice(1) }
     },
     {
       path: '/repo/packages/web/src/lib/routing.ts',
@@ -188,7 +190,8 @@ const EDITS: Record<string, MockEdit[]> = {
       change: 'modified',
       baseline: 'commit',
       requestId: 'r0',
-      hunks: ROUTING_HUNKS
+      hunks: ROUTING_HUNKS,
+      stops: {}
     }
   ]
 };
@@ -223,8 +226,8 @@ export class MockCode {
         )
       };
     }
-    if (query.kind === 'sessionDiff' || query.kind === 'requestDiff') {
-      const requestId = query.kind === 'requestDiff' ? query.requestId : null;
+    if (query.kind === 'sessionDiff' || query.kind === 'requestDiff' || query.kind === 'editDiff') {
+      const requestId = query.kind === 'sessionDiff' ? null : query.requestId;
       const edit = this.edits(query.sessionId, requestId).find(
         (candidate) => candidate.path === query.path
       );
@@ -232,12 +235,14 @@ export class MockCode {
         throw new Error(`File is not part of this ${requestId ? 'request' : 'chat'}`);
       }
       const undone = this.stateOf(query.sessionId, edit) === 'undone';
+      const stop = query.kind === 'editDiff' && query.stopId ? edit.stops[query.stopId] : undefined;
+      const file = this.sessionChange(query.sessionId, edit, requestId);
       return {
         kind: query.kind,
         language:
           this.folder(query.windowId, edit.folderId).files[edit.relativePath]?.language ?? null,
-        file: this.sessionChange(query.sessionId, edit, requestId),
-        diff: { kind: 'text', hunks: undone && !requestId ? [] : edit.hunks }
+        file: stop ? { ...file, baseline: 'edit', ...counts(stop) } : file,
+        diff: { kind: 'text', hunks: stop ?? (undone && !requestId ? [] : edit.hunks) }
       };
     }
     const folder = this.folder(query.windowId, query.folderId);

@@ -256,7 +256,14 @@ export function initialWindows(now: number): MockWindow[] {
                   status: 'done',
                   terminal: null
                 },
-                { kind: 'edit', path: '/repo/packages/web/src/App.svelte' },
+                {
+                  kind: 'edit',
+                  path: '/repo/packages/web/src/App.svelte',
+                  stopId: 'u1',
+                  callId: 'c-edit',
+                  additions: 1,
+                  deletions: 0
+                },
                 {
                   kind: 'tool',
                   callId: 'c1',

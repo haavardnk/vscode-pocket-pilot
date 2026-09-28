@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CodeService } from '../src/code/codeService';
 import { diffBlobs } from '../src/code/diff';
+import { EditChanges } from '../src/code/editChanges';
 import { type Blob, readBlob } from '../src/code/files';
 import { codeFolder } from '../src/code/folders';
 import { parseNumstat, parseStatus, statusChange } from '../src/code/git';
@@ -109,6 +110,7 @@ describe('code queries', () => {
   let editing: string;
   let service: CodeService;
   let live: LiveEdits;
+  let edits: EditChanges;
   let detail: SessionDetail;
   const fileUri = (fsPath: string): { scheme: string; fsPath: string } => ({
     scheme: 'file',
@@ -121,7 +123,14 @@ describe('code queries', () => {
     modelId: null,
     state: 'complete',
     error: null,
-    parts: paths.map((path) => ({ kind: 'edit', path }))
+    parts: paths.map((path) => ({
+      kind: 'edit',
+      path,
+      stopId: null,
+      callId: null,
+      additions: null,
+      deletions: null
+    }))
   });
   const folder = (): ReturnType<typeof codeFolder> => codeFolder('demo', workspace);
   const git = (...args: string[]): string =>
@@ -173,6 +182,12 @@ describe('code queries', () => {
         version: 2,
         initialFileContents: [],
         timeline: {
+          checkpoints: [
+            { checkpointId: 'k0', requestId: 'r1', epoch: 1, label: '' },
+            { checkpointId: 'k1', requestId: 'r1', undoStopId: 'u1', epoch: 2, label: '' },
+            { checkpointId: 'k2', requestId: 'r1', undoStopId: 'u2', epoch: 3, label: '' },
+            { checkpointId: 'k3', requestId: 'r2', epoch: 5, label: '' }
+          ],
           operations: [
             {
               type: 'textEdit',
@@ -237,13 +252,15 @@ describe('code queries', () => {
     const language = (path: string): string | null => (path.endsWith('.ts') ? 'typescript' : null);
     const current = async (path: string): Promise<Blob> => (await readBlob(path)).blob;
     live = new LiveEdits(current);
+    const sessions = new EditingSessions(editing);
+    edits = new EditChanges(sessions, live);
     service = new CodeService({
       folders,
       language,
       sessions: new SessionChanges({
         folders,
         language,
-        editing: new EditingSessions(editing),
+        editing: sessions,
         editedPaths: (sessionId) =>
           Promise.resolve(
             sessionId === 's1'
@@ -257,6 +274,7 @@ describe('code queries', () => {
         detail: (sessionId) => Promise.resolve(sessionId === 's1' ? detail : null),
         current,
         live,
+        edits,
         home: root
       })
     });
@@ -411,6 +429,62 @@ describe('code queries', () => {
       'request',
       1,
       0
+    ]);
+    const edit = await query({
+      kind: 'editDiff',
+      ...target,
+      sessionId: 's1',
+      requestId: 'r2',
+      path: docs,
+      stopId: 'u9',
+      callId: 'c1'
+    });
+    expect([edit.file.baseline, edit.file.additions, edit.file.deletions]).toEqual(['edit', 1, 0]);
+  });
+
+  it.each([
+    ['a logged stop', 'r1', 'src/a.ts', 'u1', null, ['edit', 1, 1]],
+    ['a created file', 'r1', 'src/new.ts', 'u2', null, ['edit', 1, 0]],
+    ['an unknown edit', 'r1', 'src/a.ts', 'u9', 'c9', ['request', 1, 1]]
+  ])('diffs %s', async (_, requestId, file, stopId, callId, expected) => {
+    const result = await query({
+      kind: 'editDiff',
+      ...target,
+      sessionId: 's1',
+      requestId,
+      path: join(workspace, file),
+      stopId,
+      callId
+    });
+    expect([result.file.baseline, result.file.additions, result.file.deletions]).toEqual(expected);
+  });
+
+  it('counts the lines of each edit in a chat', async () => {
+    const part = (path: string, stopId: string | null) => ({
+      kind: 'edit' as const,
+      path: join(workspace, path),
+      stopId,
+      callId: null,
+      additions: null,
+      deletions: null
+    });
+    const decorated = await edits.decorate({
+      ...detail,
+      requests: [
+        {
+          ...view('r1', 'Change a', 1_700_000_000_000, []),
+          parts: [part('src/a.ts', 'u1'), part('src/new.ts', 'u2'), part('src/a.ts', null)]
+        }
+      ]
+    });
+    expect(
+      decorated.requests[0]?.parts.map((edit) =>
+        edit.kind === 'edit' ? [edit.additions, edit.deletions] : null
+      )
+    ).toEqual([
+      [1, 1],
+      [1, 0],
+      [null, null]
     ]);
   });
 });

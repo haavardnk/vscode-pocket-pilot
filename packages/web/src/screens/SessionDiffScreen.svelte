@@ -12,7 +12,7 @@
   import QueryView from '../lib/components/QueryView.svelte';
   import RefreshButton from '../lib/components/RefreshButton.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
-  import { routeHash } from '../lib/routing';
+  import { parseRoute, routeHash } from '../lib/routing';
   import { clock } from '../lib/stores/clock.svelte';
   import { editDecisions } from '../lib/stores/editDecisions.svelte';
   import { hub } from '../lib/stores/hub.svelte';
@@ -23,19 +23,23 @@
     sessionId: string;
     path: string;
     requestId: string | null;
+    edit?: { stopId: string | null; callId: string | null } | null;
   }
 
-  const { windowId, sessionId, path, requestId }: Props = $props();
+  const { windowId, sessionId, path, requestId, edit = null }: Props = $props();
 
   let acting = $state(false);
 
   const hostWindow = $derived(hub.windows.find((candidate) => candidate.windowId === windowId));
   const connected = $derived(hub.connection === 'open' && hostWindow !== undefined);
-  const diff = new QueryResource<CodeResultFor<'sessionDiff' | 'requestDiff'>>(() =>
-    requestId
+  const diff = new QueryResource<CodeResultFor<'sessionDiff' | 'requestDiff' | 'editDiff'>>(() => {
+    if (requestId && edit) {
+      return hub.query({ kind: 'editDiff', windowId, sessionId, requestId, path, ...edit });
+    }
+    return requestId
       ? hub.query({ kind: 'requestDiff', windowId, sessionId, requestId, path })
-      : hub.query({ kind: 'sessionDiff', windowId, sessionId, path })
-  );
+      : hub.query({ kind: 'sessionDiff', windowId, sessionId, path });
+  });
   const file = $derived(diff.value?.file);
   const label = $derived(file?.label ?? path);
   const editState = $derived(
@@ -44,6 +48,16 @@
 
   $effect(() => {
     if (hub.connection === 'open') void diff.refresh();
+  });
+
+  $effect(() => {
+    if (!edit) return;
+    return () => {
+      const next = parseRoute(location.hash);
+      if (next.name !== 'session' || next.windowId !== windowId || next.sessionId !== sessionId) {
+        hub.unsubscribe();
+      }
+    };
   });
 
   async function decide(decision: 'keep' | 'undo'): Promise<void> {
@@ -57,7 +71,9 @@
   <ScreenHeader
     title={baseName(label)}
     subtitle={parentPath(label)}
-    back={{ name: 'sessionChanges', windowId, sessionId, requestId }}
+    back={edit
+      ? { name: 'session', windowId, sessionId }
+      : { name: 'sessionChanges', windowId, sessionId, requestId }}
   >
     {#snippet actions()}
       {#if file?.folderId && file.relativePath !== null && file.change !== 'deleted'}
@@ -89,6 +105,12 @@
           <DiffStat additions={result.file.additions} deletions={result.file.deletions} />
         </div>
         <BaselineNote baseline={result.file.baseline} />
+        {#if edit && result.file.baseline === 'request'}
+          <p class="px-4 pt-3 text-xs text-base-content/60">
+            This edit's own snapshot is not available, so this shows every change the request made
+            to the file.
+          </p>
+        {/if}
         <DiffView diff={result.diff} languageId={result.language} path={result.file.path} />
       {/snippet}
     </QueryView>

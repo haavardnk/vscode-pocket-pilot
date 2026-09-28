@@ -1,3 +1,7 @@
+<script module lang="ts">
+  let saved: { key: string; top: number } | null = null;
+</script>
+
 <script lang="ts">
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
@@ -13,7 +17,7 @@
     QuestionAnswers,
     QueueEntry
   } from '@pocket-pilot/protocol';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
 
   import Composer from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
@@ -26,7 +30,7 @@
   import SessionActionsSheet from '../lib/components/SessionActionsSheet.svelte';
   import StatusBadge from '../lib/components/StatusBadge.svelte';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
-  import { routeHash } from '../lib/routing';
+  import { parseRoute, routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -42,7 +46,9 @@
   let deciding = $state(false);
   let stopping = $state(false);
   let echo = $state<{ text: string; after: string | null } | null>(null);
+  let root = $state<HTMLElement>();
   let followBottom = true;
+  let scrolled = 0;
 
   const hostWindow = $derived(hub.windows.find((candidate) => candidate.windowId === windowId));
   const summary = $derived(hostWindow?.sessions.find((candidate) => candidate.id === sessionId));
@@ -56,36 +62,43 @@
   const echoing = $derived(
     echo && detail && (detail.requests.at(-1)?.id ?? null) === echo.after ? echo.text : null
   );
-  const tail = $derived.by(() => {
-    const last = detail?.requests.at(-1);
-    const part = last?.parts.at(-1);
-    return [
-      detail?.requests.length,
-      last?.parts.length,
-      part && 'text' in part ? part.text.length : 0,
-      detail?.queued.length,
-      echoing,
-      status
-    ].join();
-  });
 
   $effect(() => {
     echo = null;
+    const key = `${windowId}/${sessionId}`;
+    const restored =
+      saved?.key === key && untrack(() => hub.detail?.id) === sessionId ? saved.top : null;
+    saved = null;
     hub.subscribe(windowId, sessionId);
-    return () => hub.unsubscribe();
-  });
-
-  $effect.pre(() => {
-    void tail;
-    if (!hub.detail || untrack(() => router.tab) !== 'chats') return;
-    followBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 120;
+    if (restored !== null) {
+      followBottom = false;
+      void tick().then(() => scrollTo({ top: restored }));
+    }
+    return () => {
+      const next = parseRoute(location.hash);
+      if (next.name !== 'editDiff' || next.windowId !== windowId || next.sessionId !== sessionId) {
+        hub.unsubscribe();
+        return;
+      }
+      if (!followBottom) saved = { key, top: scrolled };
+    };
   });
 
   $effect(() => {
-    void tail;
-    if (!hub.detail || !followBottom || router.tab !== 'chats') return;
-    scrollTo({ top: document.documentElement.scrollHeight });
+    if (!root) return;
+    const observer = new ResizeObserver(() => {
+      if (!hub.detail || !followBottom || router.tab !== 'chats') return;
+      scrollTo({ top: document.documentElement.scrollHeight });
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
   });
+
+  function onscroll(): void {
+    if (router.tab !== 'chats') return;
+    scrolled = scrollY;
+    followBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 120;
+  }
 
   async function run(action: () => Promise<void>): Promise<boolean> {
     try {
@@ -161,7 +174,9 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col">
+<svelte:window {onscroll} />
+
+<div class="flex flex-1 flex-col" bind:this={root}>
   <header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">
     <div class="flex h-14 items-center gap-1 px-2">
       <button

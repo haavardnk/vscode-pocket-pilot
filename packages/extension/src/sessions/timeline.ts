@@ -26,8 +26,15 @@ const baselineSchema = z.object({
   content: z.string()
 });
 
+const checkpointSchema = z.object({
+  requestId: z.string().optional(),
+  undoStopId: z.string().optional(),
+  epoch: z.number()
+});
+
 const stateSchema = z.object({
   timeline: z.object({
+    checkpoints: z.array(z.unknown()).optional(),
     operations: z.array(z.unknown()),
     fileBaselines: z.array(z.tuple([z.string(), z.unknown()]))
   })
@@ -44,8 +51,15 @@ export interface TimelineOperation {
   initialContent: string | null;
 }
 
+export interface Checkpoint {
+  requestId: string | null;
+  stopId: string | null;
+  epoch: number;
+}
+
 export interface Timeline {
   baselines: Map<string, string>;
+  checkpoints: Checkpoint[];
   operations: TimelineOperation[];
 }
 
@@ -54,15 +68,27 @@ export interface RequestEdit {
   after: string | null;
 }
 
+export interface StopEdit extends RequestEdit {
+  final: boolean;
+}
+
 function baselineKey(requestId: string, path: string): string {
   return `${requestId}\n${path}`;
 }
 
 export function parseTimeline(raw: unknown): Timeline {
   const parsed = stateSchema.safeParse(raw);
-  if (!parsed.success) return { baselines: new Map(), operations: [] };
-  const { operations, fileBaselines } = parsed.data.timeline;
+  if (!parsed.success) return { baselines: new Map(), checkpoints: [], operations: [] };
+  const { checkpoints, operations, fileBaselines } = parsed.data.timeline;
   return {
+    checkpoints: (checkpoints ?? [])
+      .flatMap((value) => {
+        const checkpoint = checkpointSchema.safeParse(value);
+        if (!checkpoint.success) return [];
+        const { requestId, undoStopId, epoch } = checkpoint.data;
+        return [{ requestId: requestId ?? null, stopId: undoStopId ?? null, epoch }];
+      })
+      .sort((a, b) => a.epoch - b.epoch),
     baselines: new Map(
       fileBaselines.flatMap(([, value]) => {
         const baseline = baselineSchema.safeParse(value);
@@ -126,26 +152,77 @@ export function requestPaths(timeline: Timeline, requestId: string): string[] {
   ];
 }
 
+function fileOperations(timeline: Timeline, requestId: string, path: string): TimelineOperation[] {
+  return timeline.operations
+    .filter((operation) => operation.requestId === requestId && operation.path === path)
+    .sort((a, b) => a.epoch - b.epoch);
+}
+
+function replay(
+  content: string | null,
+  operations: readonly TimelineOperation[]
+): string | null | undefined {
+  let result = content;
+  for (const operation of operations) {
+    if (operation.type === 'create') result = operation.initialContent ?? '';
+    else if (operation.type === 'delete') result = null;
+    else if (operation.type === 'textEdit' && result !== null)
+      result = applyEdits(result, operation.edits);
+    else return undefined;
+  }
+  return result;
+}
+
+function requestBaseline(
+  timeline: Timeline,
+  requestId: string,
+  path: string,
+  first: TimelineOperation
+): string | null | undefined {
+  const baseline = timeline.baselines.get(baselineKey(requestId, path));
+  if (baseline === undefined && first.type !== 'create') return undefined;
+  return baseline ?? null;
+}
+
 export function requestEdit(
   timeline: Timeline,
   requestId: string,
   path: string
 ): RequestEdit | null {
-  const operations = timeline.operations
-    .filter((operation) => operation.requestId === requestId && operation.path === path)
-    .sort((a, b) => a.epoch - b.epoch);
+  const operations = fileOperations(timeline, requestId, path);
   const [first] = operations;
   if (!first) return null;
-  const baseline = timeline.baselines.get(baselineKey(requestId, path));
-  if (baseline === undefined && first.type !== 'create') return null;
-  const before = baseline ?? null;
-  let after = before;
-  for (const operation of operations) {
-    if (operation.type === 'create') after = operation.initialContent ?? '';
-    else if (operation.type === 'delete') after = null;
-    else if (operation.type === 'textEdit' && after !== null)
-      after = applyEdits(after, operation.edits);
-    else return null;
-  }
-  return { before, after };
+  const before = requestBaseline(timeline, requestId, path, first);
+  if (before === undefined) return null;
+  const after = replay(before, operations);
+  return after === undefined ? null : { before, after };
+}
+
+export function stopEdit(
+  timeline: Timeline,
+  requestId: string,
+  stopId: string,
+  path: string
+): StopEdit | null {
+  const index = timeline.checkpoints.findIndex(
+    (checkpoint) => checkpoint.requestId === requestId && checkpoint.stopId === stopId
+  );
+  const start = timeline.checkpoints[index];
+  if (!start) return null;
+  const end = timeline.checkpoints[index + 1]?.epoch ?? Infinity;
+  const operations = fileOperations(timeline, requestId, path);
+  const inside = operations.filter(
+    (operation) => operation.epoch >= start.epoch && operation.epoch < end
+  );
+  const [first] = operations;
+  if (!first || inside.length === 0) return null;
+  const baseline = requestBaseline(timeline, requestId, path, first);
+  if (baseline === undefined) return null;
+  const before = replay(
+    baseline,
+    operations.filter((operation) => operation.epoch < start.epoch)
+  );
+  if (before === undefined) return null;
+  const after = replay(before, inside);
+  return after === undefined ? null : { before, after, final: end !== Infinity };
 }

@@ -88,6 +88,11 @@ export class CodeService {
           kind: 'requestDiff',
           ...(await this.sources.sessions.requestDiff(query.sessionId, query.requestId, query.path))
         };
+      case 'editDiff':
+        return {
+          kind: 'editDiff',
+          ...(await this.sources.sessions.editDiff(query.sessionId, query))
+        };
     }
   }
 

@@ -551,6 +551,57 @@ test.describe('paired', () => {
     await expect(page.getByRole('button', { name: /Keep all/ })).toHaveCount(0);
   });
 
+  test('opens one edit from the chat and returns to the same spot', async ({ page }) => {
+    await page.setViewportSize({ width: 412, height: 480 });
+    await openSession(page, 'Build the phone app');
+    const link = page.locator('[data-request="r1"]').getByRole('link', { name: /App\.svelte/ });
+    await expect(link).toContainText('+1 −0');
+    const bottom = (): Promise<number> =>
+      page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+    expect(await bottom()).toBeGreaterThan(250);
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          scrollTo({ top: 100 });
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        })
+    );
+    await link.dispatchEvent('click');
+    const added = page.getByTestId('diff').locator('[data-kind="added"]');
+    await expect(added).toHaveCount(1);
+    await expect(added).toContainText('<Composer bind:value');
+    await expect(page.getByTestId('diff')).not.toContainText('import Composer');
+    await page.getByRole('button', { name: 'Back' }).click();
+    await expect(page.getByRole('heading', { name: 'Build the phone app' })).toBeVisible();
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    );
+    expect(await page.evaluate(() => scrollY)).toBe(100);
+  });
+
+  test('stays at the bottom while earlier messages grow', async ({ page }) => {
+    await openSession(page, 'Build the phone app');
+    const grow = (height: number): Promise<void> =>
+      page.evaluate((px) => {
+        const spacer = document.createElement('div');
+        spacer.style.height = `${px}px`;
+        document.querySelector('[data-request="r1"]')?.append(spacer);
+      }, height);
+    const gap = (): Promise<number> =>
+      page.evaluate(() => document.documentElement.scrollHeight - innerHeight - scrollY);
+    const frames = (): Promise<unknown> =>
+      page.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      );
+    await grow(1500);
+    await expect.poll(gap).toBeLessThan(2);
+    await page.evaluate(() => scrollTo({ top: 0 }));
+    await frames();
+    await grow(500);
+    await frames();
+    expect(await page.evaluate(() => scrollY)).toBe(0);
+  });
+
   test('keeps each tab where it was left', async ({ page }) => {
     const tabs = page.getByRole('navigation');
     await openSession(page, 'Build the phone app');

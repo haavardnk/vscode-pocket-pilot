@@ -70,6 +70,16 @@
       requestId={route.requestId}
     />
   {/key}
+{:else if route.name === 'editDiff'}
+  {#key hash}
+    <SessionDiffScreen
+      windowId={route.windowId}
+      sessionId={route.sessionId}
+      path={route.path}
+      requestId={route.requestId}
+      edit={{ stopId: route.stopId, callId: route.callId }}
+    />
+  {/key}
 {:else}
   <HomeScreen tab={route.name} {device} {connection} {onsignedout} />
 {/if}

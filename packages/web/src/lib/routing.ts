@@ -23,6 +23,15 @@ export type Route =
       sessionId: string;
       path: string;
       requestId: string | null;
+    }
+  | {
+      name: 'editDiff';
+      windowId: string;
+      sessionId: string;
+      requestId: string;
+      path: string;
+      stopId: string | null;
+      callId: string | null;
     };
 
 const STATIC: Record<string, Route> = {
@@ -35,7 +44,7 @@ const STATIC: Record<string, Route> = {
 
 export function parseRoute(hash: string): Route {
   const segments = hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent);
-  const [head = '', first, second, third = '', fourth] = segments;
+  const [head = '', first, second, third = '', fourth, fifth, sixth] = segments;
   if (!first || !second) return STATIC[head] ?? { name: 'chats' };
   switch (head) {
     case 'session':
@@ -65,6 +74,18 @@ export function parseRoute(hash: string): Route {
         path: third,
         requestId: fourth || null
       };
+    case 'change':
+      return third && fourth
+        ? {
+            name: 'editDiff',
+            windowId: first,
+            sessionId: second,
+            requestId: third,
+            path: fourth,
+            stopId: fifth || null,
+            callId: sixth || null
+          }
+        : { name: 'session', windowId: first, sessionId: second };
     default:
       return { name: 'chats' };
   }
@@ -107,6 +128,16 @@ export function routeHash(route: Route): string {
       return route.requestId
         ? hashOf('edit', route.windowId, route.sessionId, route.path, route.requestId)
         : hashOf('edit', route.windowId, route.sessionId, route.path);
+    case 'editDiff':
+      return hashOf(
+        'change',
+        route.windowId,
+        route.sessionId,
+        route.requestId,
+        route.path,
+        route.stopId ?? '',
+        route.callId ?? ''
+      );
   }
 }
 
@@ -124,6 +155,7 @@ export function tabOf(route: Route): Tab {
     case 'session':
     case 'sessionChanges':
     case 'sessionDiff':
+    case 'editDiff':
       return 'chats';
     case 'folder':
     case 'file':

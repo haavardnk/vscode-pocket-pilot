@@ -21,6 +21,7 @@ import { AgentSource } from './agents/agentSource';
 import { EMPTY_WINDOW } from './cluster/hub';
 import type { TerminalUpdate } from './cluster/localWindow';
 import { CodeService } from './code/codeService';
+import { EditChanges } from './code/editChanges';
 import { type Blob, MAX_FILE_BYTES, readBlob } from './code/files';
 import { type CodeFolder, codeFolder } from './code/folders';
 import { LanguageIndex } from './code/languageIndex';
@@ -73,6 +74,7 @@ export class WindowAgent implements vscode.Disposable {
   private readonly controller: Controller;
   private readonly code: CodeService;
   private readonly edits: LiveEdits;
+  private readonly editChanges: EditChanges;
   private readonly mirror: LiveMirror;
   private readonly terminals: TerminalService;
   private readonly paths: ChatPaths;
@@ -125,14 +127,17 @@ export class WindowAgent implements vscode.Disposable {
       report
     });
     const languages = new LanguageIndex();
+    const editing = new EditingSessions(this.paths.editingSessions);
+    this.editChanges = new EditChanges(editing, this.edits);
     const sessionChanges = new SessionChanges({
       folders: () => this.folders,
       language: (path) => languages.resolve(path),
-      editing: new EditingSessions(this.paths.editingSessions),
+      editing,
       editedPaths: (sessionId) => this.store.editedPaths(sessionId),
       detail: (sessionId, limit) => this.store.detail(sessionId, limit),
       current: currentBlob,
       live: this.edits,
+      edits: this.editChanges,
       home: homedir()
     });
     this.code = new CodeService({
@@ -266,11 +271,10 @@ export class WindowAgent implements vscode.Disposable {
         const limit = this.watches.get(sessionId);
         if (limit === undefined) return;
         const detail = await this.store.detail(sessionId, limit);
+        const decorated =
+          detail && (await this.editChanges.decorate(this.terminals.decorate(detail)));
         if (!this.watches.has(sessionId)) return;
-        this.sessionChanged.fire({
-          sessionId,
-          detail: detail && this.terminals.decorate(detail)
-        });
+        this.sessionChanged.fire({ sessionId, detail: decorated });
       })
       .catch((error: unknown) => this.report(`Session detail failed: ${String(error)}`))
       .finally(() => {

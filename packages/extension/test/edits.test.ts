@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { Blob } from '../src/code/files';
 import { LiveEdits, type RequestWindow } from '../src/sessions/liveEdits';
-import { applyEdits, parseTimeline, requestEdit, type TextEdit } from '../src/sessions/timeline';
+import {
+  applyEdits,
+  parseTimeline,
+  requestEdit,
+  stopEdit,
+  type TextEdit
+} from '../src/sessions/timeline';
 
 const range = (
   startLineNumber: number,
@@ -13,8 +19,13 @@ const range = (
 
 const uri = (fsPath: string): { scheme: string; fsPath: string } => ({ scheme: 'file', fsPath });
 
-const timeline = (operations: unknown[], baselines: [string, string][]): unknown => ({
+const timeline = (
+  operations: unknown[],
+  baselines: [string, string][],
+  checkpoints: unknown[] = []
+): unknown => ({
   timeline: {
+    checkpoints,
     operations,
     fileBaselines: baselines.map(([requestId, content]) => [
       `file:///a.ts::${requestId}`,
@@ -89,6 +100,31 @@ describe('edit timeline', () => {
   ])('rebuilds a %s file', (_, raw, expected) => {
     expect(requestEdit(parseTimeline(raw), 'r1', '/a.ts')).toEqual(expected);
   });
+
+  const stops = [
+    { checkpointId: 'k0', requestId: 'r1', epoch: 0, label: '' },
+    { checkpointId: 'k1', requestId: 'r1', undoStopId: 'u1', epoch: 1, label: '' },
+    { checkpointId: 'k2', requestId: 'r1', undoStopId: 'u2', epoch: 3, label: '' },
+    { checkpointId: 'k3', requestId: 'r1', undoStopId: 'u3', epoch: 5, label: '' }
+  ];
+
+  it.each([
+    ['a middle stop', 'u2', { before: 'ab', after: 'abc', final: true }],
+    ['the last stop', 'u3', { before: 'abc', after: 'abcd', final: false }],
+    ['a stop without edits to the file', 'u1', null],
+    ['an unknown stop', 'u9', null]
+  ])('rebuilds %s', (_, stopId, expected) => {
+    const raw = timeline(
+      [
+        text('r1', 0, [{ text: 'b', range: range(1, 2, 1, 2) }]),
+        text('r1', 4, [{ text: 'c', range: range(1, 3, 1, 3) }]),
+        text('r1', 6, [{ text: 'd', range: range(1, 4, 1, 4) }])
+      ],
+      [['r1', 'a']],
+      [stops[3], stops[1], stops[0], stops[2], { epoch: 'bad' }]
+    );
+    expect(stopEdit(parseTimeline(raw), 'r1', stopId, '/a.ts')).toEqual(expected);
+  });
 });
 
 describe('live edits', () => {
@@ -152,5 +188,37 @@ describe('live edits', () => {
     expect(read(span?.files.get('/b.ts'))).toBe('missing');
     expect(read(await span?.after('/a.ts'))).toBe('second');
     expect(read(await span?.after('/b.ts'))).toBe('missing');
+  });
+
+  it('separates the edits of each tool call', async () => {
+    const live = new LiveEdits(current);
+    const start = (callId: string): Promise<void> =>
+      live.hook({
+        kind: 'toolStart',
+        sessionId: 's1',
+        at,
+        callId,
+        toolName: 'replace_string_in_file',
+        paths: ['/a.ts'],
+        command: null
+      });
+    const edit = async (callId: string): Promise<[string?, string?, boolean?]> => {
+      const result = await live.edit('s1', callId, '/a.ts');
+      return [read(result?.before), read(result?.after), result?.final];
+    };
+    files.set('/a.ts', 'one');
+    await live.hook({ kind: 'prompt', sessionId: 's1', at, prompt: 'Edit' });
+    await start('c1');
+    files.set('/a.ts', 'two');
+    await live.hook({ kind: 'toolEnd', sessionId: 's1', at, callId: 'c1' });
+    files.set('/a.ts', 'user');
+    await start('c2');
+    files.set('/a.ts', 'three');
+    await start('c3');
+    files.set('/a.ts', 'four');
+    expect(await edit('c1')).toEqual(['one', 'two', true]);
+    expect(await edit('c2')).toEqual(['user', 'three', true]);
+    expect(await edit('c3')).toEqual(['three', 'four', false]);
+    expect(await live.edit('s1', 'c9', '/a.ts')).toBeNull();
   });
 });

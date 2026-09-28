@@ -27,6 +27,10 @@ export function isBinary(data: Buffer): boolean {
   return data.subarray(0, BINARY_PROBE_BYTES).includes(0);
 }
 
+export function textBlob(text: string | null): Blob {
+  return text === null ? 'missing' : Buffer.from(text);
+}
+
 export async function readBlob(path: string): Promise<FileBlob> {
   const info = await stat(path).catch((error: NodeJS.ErrnoException) => {
     if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return null;
