@@ -2,12 +2,19 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import type { Readable } from 'node:stream';
 
+import { errorMessage } from '../errors';
 import type { NamedTunnel } from './named';
+import { clearPid, recordPid } from './stalePid';
 import type { TunnelStatus } from './status';
 
 const ERROR = /^\S+ (?:ERR|FTL) (.+)$/;
 const QUICK_URL = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/;
 const CONNECTED = /Registered tunnel connection/;
+const TUNNEL_GONE = /Tunnel not found/;
+const QUICK_GONE =
+  'Cloudflare deleted the quick tunnel while the connection was down. Starting a new one; phones need to pair again.';
+const NAMED_GONE =
+  'Cloudflare does not know this tunnel. Check it in the Cloudflare dashboard or set it up again.';
 const MIN_RESTART_MS = 2_000;
 const MAX_RESTART_MS = 60_000;
 const KILL_TIMEOUT_MS = 5_000;
@@ -19,6 +26,7 @@ export interface CloudflaredOptions {
   binary: string;
   origin: string;
   named: NamedTunnel | null;
+  pidFile: string;
   onStatus: (status: TunnelStatus) => void;
   report: (message: string) => void;
 }
@@ -57,22 +65,41 @@ export function runCloudflared(options: CloudflaredOptions): Cloudflared {
   let closed = false;
   let failures = 0;
   let timer: NodeJS.Timeout | undefined;
+  let pidWrites = Promise.resolve();
+
+  const track = (task: () => Promise<void>): void => {
+    pidWrites = pidWrites
+      .then(task)
+      .catch((error: unknown) =>
+        options.report(`Could not save the cloudflared pid: ${errorMessage(error)}`)
+      );
+  };
 
   const launch = (): void => {
     let url = named ? `https://${named.hostname}` : null;
     let ready = false;
+    let gone = false;
     let lastError = '';
     const child = spawn(options.binary, args, {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true
     });
+    const pid = child.pid;
+    if (pid !== undefined) track(() => recordPid(options.pidFile, { pid, binary: options.binary }));
     const onLine = (line: string): void => {
       const event = readLogLine(line);
       if (!event) return;
       if (event.kind === 'error') {
-        lastError = event.message;
         options.report(`cloudflared: ${event.message}`);
+        if (gone) return;
+        if (TUNNEL_GONE.test(event.message)) {
+          gone = true;
+          lastError = quick ? QUICK_GONE : NAMED_GONE;
+          child.kill('SIGTERM');
+          return;
+        }
+        lastError = event.message;
         return;
       }
       if (event.kind === 'url') {
@@ -92,6 +119,7 @@ export function runCloudflared(options: CloudflaredOptions): Cloudflared {
         if (ended) return;
         ended = true;
         running = null;
+        track(() => clearPid(options.pidFile));
         resolve();
         if (closed) return;
         options.onStatus({ state: 'error', quick, message });
@@ -111,11 +139,12 @@ export function runCloudflared(options: CloudflaredOptions): Cloudflared {
       closed = true;
       clearTimeout(timer);
       const current = running;
-      if (!current) return;
+      if (!current) return pidWrites;
       const kill = setTimeout(() => current.child.kill('SIGKILL'), KILL_TIMEOUT_MS);
       current.child.kill('SIGTERM');
       await current.exited;
       clearTimeout(kill);
+      await pidWrites;
     }
   };
 }

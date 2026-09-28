@@ -38,6 +38,7 @@ const EMPTY_PULL_REQUESTS: PullRequestState = {
 
 class HubStore {
   connection = $state<Connection>('connecting');
+  quickTunnel = $state(false);
   loaded = $state(false);
   version = $state<string | null>(null);
   windows = $state<WindowState[]>([]);
@@ -64,6 +65,7 @@ class HubStore {
         this.mismatch = true;
       },
       connection: (state) => {
+        if (state === 'connecting' && this.connection === 'offline') return;
         this.connection = state;
         if (state !== 'open') return;
         this.reportPresence();
@@ -84,6 +86,7 @@ class HubStore {
     this.socket = null;
     document.removeEventListener('visibilitychange', this.wake);
     removeEventListener('online', this.wake);
+    this.connection = 'connecting';
     this.loaded = false;
     this.windows = [];
     this.mismatch = false;

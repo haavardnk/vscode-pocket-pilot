@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   access,
@@ -22,12 +22,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readLogLine, runCloudflared } from '../src/tunnel/cloudflared';
 import { installCloudflared } from '../src/tunnel/install';
 import { type NamedTunnel, normalizeHostname, parseTunnelToken } from '../src/tunnel/named';
+import { reapStale, recordPid } from '../src/tunnel/stalePid';
 import type { TunnelStatus } from '../src/tunnel/status';
 
 const TOKEN = Buffer.from(JSON.stringify({ a: 'account', t: 'tunnel', s: 'secret' })).toString(
   'base64'
 );
 const BINARY = Buffer.from('#!/bin/sh\necho cloudflared\n');
+const SPAWNED = { timeout: 5000 };
 
 let folder: string;
 
@@ -52,6 +54,13 @@ async function fakeCloudflared(name: string, script: string): Promise<string> {
   await writeFile(file, `#!/bin/sh\n${script}\n`);
   await chmod(file, 0o755);
   return file;
+}
+
+function exists(file: string): Promise<boolean> {
+  return access(file).then(
+    () => true,
+    () => false
+  );
 }
 
 describe('tunnel input', () => {
@@ -174,10 +183,11 @@ describe('runCloudflared', () => {
       binary,
       origin: 'http://127.0.0.1:1',
       named,
+      pidFile: join(folder, `${name}.pid`),
       onStatus: (status) => statuses.push(status),
       report: () => undefined
     });
-    await expect.poll(() => statuses.length).toBe(1);
+    await expect.poll(() => statuses.length, SPAWNED).toBe(1);
     await tunnel.close();
     expect(statuses).toEqual([{ state: 'ready', quick: named === null, url }]);
     expect((await readFile(record, 'utf8')).trim()).toBe(invocation);
@@ -193,18 +203,54 @@ describe('runCloudflared', () => {
       binary,
       origin: 'http://127.0.0.1:1',
       named: { hostname: 'agent.example.com', token: TOKEN },
+      pidFile: join(folder, 'failing.pid'),
       onStatus: (status) => statuses.push(status),
       report: () => undefined
     });
-    await expect.poll(() => statuses.length).toBe(1);
+    await expect.poll(() => statuses.length, SPAWNED).toBe(1);
     await tunnel.close();
     expect(statuses).toEqual([
       { state: 'error', quick: false, message: 'Unauthorized: Invalid tunnel secret' }
     ]);
   });
 
+  it.each<[NamedTunnel | null, RegExp]>([
+    [null, /deleted the quick tunnel/],
+    [{ hostname: 'agent.example.com', token: TOKEN }, /does not know this tunnel/]
+  ])('restarts a tunnel Cloudflare no longer knows (%o)', async (named, message) => {
+    const name = `gone-cloudflared-${named ? 'named' : 'quick'}`;
+    const program = join(folder, `${name}.cjs`);
+    await writeFile(
+      program,
+      [
+        "process.on('SIGTERM', () => {",
+        "  console.error('2026-09-28T07:39:10Z ERR Connection terminated');",
+        '  process.exit(0);',
+        '});',
+        `console.error(${JSON.stringify('2026-09-28T07:39:07Z ERR Register tunnel error from server side error="Unauthorized: Tunnel not found" connIndex=0')});`,
+        'setInterval(() => undefined, 1000);'
+      ].join('\n')
+    );
+    const binary = await fakeCloudflared(name, `exec "${process.execPath}" "${program}"`);
+    const statuses: TunnelStatus[] = [];
+    const tunnel = runCloudflared({
+      binary,
+      origin: 'http://127.0.0.1:1',
+      named,
+      pidFile: join(folder, `${name}.pid`),
+      onStatus: (status) => statuses.push(status),
+      report: () => undefined
+    });
+    await expect.poll(() => statuses.length, SPAWNED).toBe(1);
+    await tunnel.close();
+    expect(statuses).toEqual([
+      { state: 'error', quick: named === null, message: expect.stringMatching(message) }
+    ]);
+  });
+
   it('stops the process on close', async () => {
     const pidFile = join(folder, 'pid');
+    const record = join(folder, 'sleeping.pid');
     const binary = await fakeCloudflared(
       'sleeping-cloudflared',
       `echo $$ > "${pidFile}"\nexec sleep 60`
@@ -213,19 +259,44 @@ describe('runCloudflared', () => {
       binary,
       origin: 'http://127.0.0.1:1',
       named: null,
+      pidFile: record,
       onStatus: () => undefined,
       report: () => undefined
     });
-    await expect
-      .poll(() =>
-        access(pidFile).then(
-          () => true,
-          () => false
-        )
-      )
-      .toBe(true);
-    await tunnel.close();
+    await expect.poll(() => exists(pidFile), SPAWNED).toBe(true);
+    await expect.poll(() => exists(record), SPAWNED).toBe(true);
     const pid = Number(await readFile(pidFile, 'utf8'));
+    expect(JSON.parse(await readFile(record, 'utf8'))).toEqual({ pid, binary });
+    await tunnel.close();
     expect(() => process.kill(pid, 0)).toThrow();
+    expect(await exists(record)).toBe(false);
+  });
+});
+
+describe('reapStale', () => {
+  it.each([
+    ['stops cloudflared left behind', true],
+    ['leaves an unrelated process alone', false]
+  ])('%s', async (_name, matches) => {
+    const binary = join(folder, `stale-${matches}`);
+    await writeFile(binary, `#!${process.execPath}\nsetInterval(() => undefined, 1000);\n`);
+    await chmod(binary, 0o755);
+    const child = spawn(binary, ['tunnel'], { stdio: 'ignore' });
+    const exited = new Promise<boolean>((resolve) => child.once('exit', () => resolve(true)));
+    const pid = child.pid;
+    if (pid === undefined) throw new Error('fake cloudflared did not start');
+    const file = join(folder, `stale-${matches}.pid`);
+    await recordPid(file, { pid, binary: matches ? binary : join(folder, 'other') });
+    try {
+      await reapStale(file, () => undefined);
+      const stopped = await Promise.race([
+        exited,
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 500))
+      ]);
+      expect(stopped).toBe(matches);
+      expect(await exists(file)).toBe(false);
+    } finally {
+      child.kill('SIGKILL');
+    }
   });
 });

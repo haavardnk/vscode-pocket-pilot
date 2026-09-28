@@ -16,8 +16,12 @@ const ANSI_REDS: Record<string, string> = {
 };
 
 const CONNECTIONS = [
-  { connection: 'quickTunnel', note: /temporary Cloudflare address/ },
-  { connection: 'tunnel', note: /your Cloudflare tunnel/ }
+  {
+    connection: 'quickTunnel',
+    note: /temporary Cloudflare address/,
+    down: /restarted with a new address: pair again from VS Code/
+  },
+  { connection: 'tunnel', note: /your Cloudflare tunnel/, down: /computer is awake/ }
 ] as const;
 
 async function signIn(page: Page): Promise<void> {
@@ -395,7 +399,7 @@ test.describe('paired', () => {
     await expect(page.getByRole('checkbox', { name: 'Agent finished' })).toHaveCount(0);
   });
 
-  for (const { connection, note } of CONNECTIONS) {
+  for (const { connection, note, down } of CONNECTIONS) {
     test(`describes a ${connection} connection in settings`, async ({ page }) => {
       await page.route('**/api/auth', async (route) => {
         const response = await route.fetch();
@@ -404,6 +408,21 @@ test.describe('paired', () => {
       await page.reload();
       await page.getByRole('button', { name: 'Settings' }).click();
       await expect(page.getByText(note)).toBeVisible();
+    });
+
+    test(`explains why VS Code is unreachable through a ${connection}`, async ({ page }) => {
+      await page.route('**/api/auth', async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { ...(await response.json()), connection } });
+      });
+      await page.routeWebSocket('**/ws', (socket) => socket.close());
+      await page.reload();
+      await expect(page.getByRole('status').filter({ hasText: down })).toBeVisible();
+      await page.context().setOffline(true);
+      await expect(
+        page.getByRole('status').filter({ hasText: 'This phone is offline' })
+      ).toBeVisible();
+      await page.context().setOffline(false);
     });
   }
 
@@ -420,7 +439,7 @@ test.describe('paired', () => {
 
     await page.routeWebSocket('**/ws', (socket) => socket.close());
     await page.reload();
-    await expect(page.getByText(/Offline, reconnecting|Connecting to VS Code/)).toBeVisible();
+    await expect(page.getByText(/Can't reach VS Code|Connecting to VS Code/)).toBeVisible();
   });
 
   test('explains a version mismatch and recovers after a reload', async ({ page }) => {

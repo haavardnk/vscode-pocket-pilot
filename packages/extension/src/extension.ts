@@ -8,6 +8,7 @@ import { errorMessage } from './errors';
 import { DeviceStore } from './server/devices';
 import { PocketPilotService } from './service';
 import { readSettings, SECTION, setEnabled } from './settings';
+import { watchQuickAddress } from './ui/addressNotice';
 import { manageDevices } from './ui/devicesPicker';
 import { showMenu } from './ui/menu';
 import { showPairing } from './ui/pairingPanel';
@@ -47,6 +48,7 @@ export function activate(context: vscode.ExtensionContext): void {
     password,
     tunnel,
     createStatusBar(pilot),
+    watchQuickAddress(pilot, devices),
     register('pocketPilot.menu', () => showMenu(pilot, password, tunnel)),
     register('pocketPilot.start', start),
     register('pocketPilot.stop', () => setEnabled(false)),

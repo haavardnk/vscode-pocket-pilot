@@ -6,6 +6,7 @@ import { type Cloudflared, runCloudflared } from './cloudflared';
 import { installCloudflared } from './install';
 import type { NamedTunnel } from './named';
 import { cloudflaredRelease } from './release';
+import { reapStale } from './stalePid';
 import { clearTunnelStatus, type TunnelStatus, writeTunnelStatus } from './status';
 
 export interface TunnelSettings {
@@ -51,8 +52,9 @@ async function resolveBinary(options: TunnelOptions, signal: AbortSignal): Promi
   return installCloudflared(join(options.storage, 'cloudflared'), release, signal, options.report);
 }
 
-export function startTunnel(options: TunnelOptions): Tunnel {
+export async function startTunnel(options: TunnelOptions): Promise<Tunnel> {
   const quick = !options.named;
+  const pidFile = join(options.storage, 'cloudflared.pid');
   const abort = new AbortController();
   let writing = Promise.resolve();
 
@@ -68,23 +70,26 @@ export function startTunnel(options: TunnelOptions): Tunnel {
   };
 
   const launch = async (): Promise<Cloudflared | null> => {
-    publish({ state: 'starting', quick });
-    await listen(options.origin, options.port);
+    await reapStale(pidFile, options.report);
     const binary = await resolveBinary(options, abort.signal);
     if (abort.signal.aborted) return null;
     return runCloudflared({
       binary,
       origin: `http://127.0.0.1:${options.port}`,
       named: options.named,
+      pidFile,
       onStatus: publish,
       report: options.report
     });
   };
 
-  const running = launch().catch((error: unknown) => {
+  publish({ state: 'starting', quick });
+  const listening = listen(options.origin, options.port);
+  const running = listening.then(launch).catch((error: unknown) => {
     publish({ state: 'error', quick, message: errorMessage(error) });
     return null;
   });
+  await listening.catch(() => undefined);
 
   return {
     close: async () => {

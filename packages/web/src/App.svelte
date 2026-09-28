@@ -18,6 +18,7 @@
 
   function signedIn(info: AuthInfo): void {
     auth = info;
+    hub.quickTunnel = info.connection === 'quickTunnel';
     if (info.device) hub.start(() => void refresh());
     else hub.stop();
   }

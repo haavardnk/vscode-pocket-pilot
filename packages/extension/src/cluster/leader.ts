@@ -86,7 +86,7 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
   });
 
   const local = attachLocalWindow(hub, options.window);
-  const tunnel = startTunnel({
+  const tunnel = await startTunnel({
     ...options.tunnel,
     origin: server.tunnel,
     port: options.port + 1,
