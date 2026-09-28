@@ -8,6 +8,7 @@ import {
   diffDetail,
   type ExecutionPatch,
   followerMessageSchema,
+  mismatchReply,
   parseMessage,
   pushRegistrationSchema,
   type RequestView,
@@ -18,6 +19,7 @@ import {
   type TerminalDetail,
   type TerminalExecution,
   type TerminalLine,
+  VERSION_MISMATCH,
   type WindowState
 } from '../src';
 
@@ -129,6 +131,7 @@ describe('protocol', () => {
         type: 'snapshot',
         version: '0.1.0',
         windows: [window],
+        incompatibleWindows: ['old'],
         pullRequests: { status: 'disabled', fetchedAt: null, errors: [], pullRequests: [] }
       }
     ],
@@ -171,6 +174,20 @@ describe('protocol', () => {
     JSON.stringify({ type: 'unknown' })
   ])('rejects %s', (raw) => {
     expect(parseMessage(clientMessageSchema, raw)).toBeNull();
+  });
+
+  it.each([
+    [
+      { type: 'query', requestId: 'q', query: { kind: 'hologram' } },
+      { type: 'queryResult', requestId: 'q', result: null, error: VERSION_MISMATCH }
+    ],
+    [
+      { type: 'command', requestId: 'c', command: { kind: 'teleport' } },
+      { type: 'result', requestId: 'c', ok: false, error: VERSION_MISMATCH }
+    ],
+    [{ type: 'presence', visible: 'yes' }, null]
+  ])('answers unreadable request %#', (message, reply) => {
+    expect(mismatchReply(JSON.stringify(message))).toEqual(reply);
   });
 
   it.each([

@@ -8,6 +8,7 @@
   import { clock } from '../stores/clock.svelte';
   import { hub } from '../stores/hub.svelte';
   import { ago } from '../time';
+  import Loading from './Loading.svelte';
   import SessionActionsSheet from './SessionActionsSheet.svelte';
   import StatusBadge from './StatusBadge.svelte';
 
@@ -53,9 +54,7 @@
 {/snippet}
 
 {#if !hub.loaded}
-  <div class="flex justify-center p-10">
-    <span class="loading loading-spinner text-primary"></span>
-  </div>
+  <Loading />
 {:else if hub.windows.length === 0}
   <p class="p-10 text-center text-base-content/70">No VS Code windows are connected.</p>
 {:else if active === 0 && sections.archived.length === 0}

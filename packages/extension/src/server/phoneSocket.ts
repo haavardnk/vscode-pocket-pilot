@@ -1,4 +1,9 @@
-import { clientMessageSchema, parseMessage, type ServerMessage } from '@pocket-pilot/protocol';
+import {
+  clientMessageSchema,
+  mismatchReply,
+  parseMessage,
+  type ServerMessage
+} from '@pocket-pilot/protocol';
 import type { WebSocket } from 'ws';
 
 import type { Hub, HubClient } from '../cluster/hub';
@@ -15,6 +20,7 @@ export function acceptPhone(
   report: (message: string) => void
 ): void {
   let alive = true;
+  let warned = false;
   const client: HubClient = {
     send: (message: ServerMessage) => {
       if (socket.readyState !== socket.OPEN) return;
@@ -39,10 +45,19 @@ export function acceptPhone(
     alive = true;
   });
 
+  const unreadable = (text: string): void => {
+    const reply = mismatchReply(text);
+    if (reply) client.send(reply);
+    if (warned) return;
+    warned = true;
+    report('The phone runs a different Pocket Pilot version. Reload the Pocket Pilot app.');
+  };
+
   socket.on('message', (data) => {
-    const message = parseMessage(clientMessageSchema, data.toString());
+    const text = data.toString();
+    const message = parseMessage(clientMessageSchema, text);
     if (!message) {
-      report('Ignoring malformed phone message');
+      unreadable(text);
       return;
     }
     if (message.type === 'subscribe') {

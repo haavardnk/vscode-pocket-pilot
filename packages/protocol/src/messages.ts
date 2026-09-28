@@ -50,10 +50,12 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('snapshot'),
     version: z.string(),
     windows: z.array(windowStateSchema),
+    incompatibleWindows: z.array(z.string()),
     pullRequests: pullRequestStateSchema
   }),
   z.object({ type: z.literal('window'), window: windowStateSchema }),
   z.object({ type: z.literal('windowRemoved'), windowId: z.string() }),
+  z.object({ type: z.literal('incompatibleWindows'), names: z.array(z.string()) }),
   z.object({
     type: z.literal('session'),
     windowId: z.string(),
@@ -123,6 +125,17 @@ export const leaderMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('hook'), requestId: z.string(), event: hookEventSchema })
 ]);
 
+export const VERSION_MISMATCH =
+  "Pocket Pilot versions don't match. Reload every VS Code window, then reload this app.";
+
+export const stableRequestSchema = z.object({ type: z.string(), requestId: z.string() });
+
+export const stableRegisterSchema = z.object({
+  type: z.literal('register'),
+  secret: z.string(),
+  window: z.object({ name: z.string() })
+});
+
 export type HookEvent = z.infer<typeof hookEventSchema>;
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
@@ -138,4 +151,14 @@ export function parseMessage<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
   const result = schema.safeParse(json);
   return result.success ? result.data : null;
+}
+
+export function mismatchReply(
+  raw: string
+): Extract<ServerMessage, { type: 'result' | 'queryResult' }> | null {
+  const request = parseMessage(stableRequestSchema, raw);
+  if (!request) return null;
+  return request.type === 'query'
+    ? { type: 'queryResult', requestId: request.requestId, result: null, error: VERSION_MISMATCH }
+    : { type: 'result', requestId: request.requestId, ok: false, error: VERSION_MISMATCH };
 }

@@ -5,15 +5,14 @@
   import { ALL_REPOSITORIES, windowsForRepository } from '../../hub/views';
   import { routeHash } from '../../routing';
   import { hub } from '../../stores/hub.svelte';
+  import Loading from '../Loading.svelte';
 
   const windows = $derived(windowsForRepository(hub.windows, hub.groups, hub.repository));
   const showWindow = $derived(hub.repository === ALL_REPOSITORIES || windows.length > 1);
 </script>
 
 {#if !hub.loaded}
-  <div class="flex justify-center p-10">
-    <span class="loading loading-spinner text-primary"></span>
-  </div>
+  <Loading />
 {:else if windows.length === 0}
   <p class="p-10 text-center text-base-content/70">No VS Code windows are connected.</p>
 {:else}

@@ -17,6 +17,7 @@
 
   import Composer from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
+  import Loading from '../lib/components/Loading.svelte';
   import ModelSheet from '../lib/components/ModelSheet.svelte';
   import ModeSheet from '../lib/components/ModeSheet.svelte';
   import PermissionSheet from '../lib/components/PermissionSheet.svelte';
@@ -222,9 +223,7 @@
         >
       </div>
     {:else if !detail}
-      <div class="flex justify-center p-10">
-        <span class="loading loading-spinner text-primary"></span>
-      </div>
+      <Loading />
     {:else}
       {#if detail.totalRequests > detail.requests.length}
         <button class="btn self-center btn-ghost btn-sm" onclick={() => hub.loadEarlier()}>

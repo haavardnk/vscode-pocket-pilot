@@ -5,7 +5,9 @@ import {
   type Command,
   parseMessage,
   type ServerMessage,
-  serverMessageSchema
+  serverMessageSchema,
+  stableRequestSchema,
+  VERSION_MISMATCH
 } from '@pocket-pilot/protocol';
 
 export type Connection = 'connecting' | 'open' | 'offline';
@@ -25,6 +27,7 @@ interface Pending extends Handlers {
 
 export interface SocketHandlers {
   message(message: ServerMessage): void;
+  unreadable(): void;
   connection(state: Connection): void;
   rejected(): void;
 }
@@ -56,7 +59,12 @@ export class HubSocket {
     });
     socket.addEventListener('message', (event: MessageEvent<string>) => {
       const message = parseMessage(serverMessageSchema, event.data);
-      if (!message) return;
+      if (!message) {
+        const reply = parseMessage(stableRequestSchema, event.data);
+        if (reply) this.settle(reply.requestId, VERSION_MISMATCH);
+        this.handlers.unreadable();
+        return;
+      }
       if (message.type === 'result')
         this.settle(message.requestId, message.ok ? null : (message.error ?? 'Failed'));
       else if (message.type === 'queryResult')

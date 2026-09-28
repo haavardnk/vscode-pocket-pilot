@@ -9,6 +9,7 @@
   import { clock } from '../stores/clock.svelte';
   import { hub } from '../stores/hub.svelte';
   import { ago } from '../time';
+  import Loading from './Loading.svelte';
 
   const state = $derived(hub.pullRequests);
   const items = $derived(pullRequestsFor(state, hub.repository));
@@ -71,9 +72,7 @@
     Run "Pocket Pilot: Sign In to GitHub" in VS Code to see pull requests.
   </p>
 {:else if state.status === 'loading' && items.length === 0}
-  <div class="flex justify-center p-10">
-    <span class="loading loading-spinner text-primary"></span>
-  </div>
+  <Loading />
 {:else}
   {#each errors as error (error.repositoryKey)}
     <div role="alert" class="mx-4 mb-2 alert alert-soft text-sm alert-warning">{error.message}</div>

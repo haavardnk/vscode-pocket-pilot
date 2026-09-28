@@ -41,6 +41,8 @@ class HubStore {
   loaded = $state(false);
   version = $state<string | null>(null);
   windows = $state<WindowState[]>([]);
+  mismatch = $state(false);
+  incompatibleWindows = $state<string[]>([]);
   pullRequests = $state<PullRequestState>(EMPTY_PULL_REQUESTS);
   detail = $state<SessionDetail | null>(null);
   detailMissing = $state(false);
@@ -58,6 +60,9 @@ class HubStore {
     if (this.socket) return;
     this.socket = new HubSocket(socketUrl(location), {
       message: (message) => this.apply(message),
+      unreadable: () => {
+        this.mismatch = true;
+      },
       connection: (state) => {
         this.connection = state;
         if (state !== 'open') return;
@@ -81,6 +86,8 @@ class HubStore {
     removeEventListener('online', this.wake);
     this.loaded = false;
     this.windows = [];
+    this.mismatch = false;
+    this.incompatibleWindows = [];
     this.detail = null;
     this.subscription = null;
     this.terminal = null;
@@ -163,8 +170,14 @@ class HubStore {
     if (message.type === 'snapshot') {
       this.version = message.version;
       this.windows = message.windows;
+      this.incompatibleWindows = message.incompatibleWindows;
       this.pullRequests = message.pullRequests;
       this.loaded = true;
+      this.mismatch = false;
+      return;
+    }
+    if (message.type === 'incompatibleWindows') {
+      this.incompatibleWindows = message.names;
       return;
     }
     if (message.type === 'window') {

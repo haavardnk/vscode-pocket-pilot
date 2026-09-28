@@ -4,15 +4,16 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type {
-  CodeQuery,
-  CodeResult,
-  Command,
-  HookEvent,
-  ServerMessage,
-  SessionDetail,
-  SessionWatch,
-  WindowState
+import {
+  type CodeQuery,
+  type CodeResult,
+  type Command,
+  type HookEvent,
+  type ServerMessage,
+  type SessionDetail,
+  type SessionWatch,
+  VERSION_MISMATCH,
+  type WindowState
 } from '@pocket-pilot/protocol';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
@@ -21,7 +22,7 @@ import { Cluster, type Role } from '../src/cluster/cluster';
 import { followLeader } from '../src/cluster/followerClient';
 import { type Leader, startLeader } from '../src/cluster/leader';
 import type { Disposable, LocalWindow, TerminalUpdate } from '../src/cluster/localWindow';
-import { hookSecret, sharedFiles } from '../src/cluster/sharedState';
+import { clusterSecret, hookSecret, sharedFiles } from '../src/cluster/sharedState';
 import { HOOK_HEADER } from '../src/hooks/hookFile';
 import { PairingStore } from '../src/server/pairing';
 
@@ -359,6 +360,38 @@ describe('cluster', () => {
         error: null
       },
       { type: 'queryResult', requestId: 'd', result: null, error: 'Not a git repository' }
+    ]);
+
+    client.socket.send(
+      JSON.stringify({ type: 'command', requestId: 'e', command: { kind: 'teleport' } })
+    );
+    await waitFor(() =>
+      client.messages.some((message) => message.type === 'result' && message.requestId === 'e')
+    );
+    expect(client.messages.at(-1)).toEqual({
+      type: 'result',
+      requestId: 'e',
+      ok: false,
+      error: VERSION_MISMATCH
+    });
+
+    const outdated = new WebSocket(`ws://127.0.0.1:${port}/internal`);
+    await new Promise((resolve) => outdated.once('open', resolve));
+    outdated.send(
+      JSON.stringify({
+        type: 'register',
+        secret: await clusterSecret(storage),
+        window: { windowId: 'old', name: 'Old window' }
+      })
+    );
+    await waitFor(() => client.messages.some((message) => message.type === 'incompatibleWindows'));
+    outdated.close();
+    await waitFor(
+      () => client.messages.filter((message) => message.type === 'incompatibleWindows').length === 2
+    );
+    expect(client.messages.filter((message) => message.type === 'incompatibleWindows')).toEqual([
+      { type: 'incompatibleWindows', names: ['Old window'] },
+      { type: 'incompatibleWindows', names: [] }
     ]);
 
     await leader.stop();

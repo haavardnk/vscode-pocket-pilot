@@ -88,6 +88,22 @@ describe('Hub', () => {
     ]);
   });
 
+  it('lists windows running another version', () => {
+    const hub = new Hub('1.0.0', noPullRequests);
+    const first = {};
+    const second = {};
+    hub.addIncompatible(first, 'Old');
+    hub.addIncompatible(second, 'Older');
+    const phone = client();
+    hub.connect(phone);
+    hub.removeIncompatible(first);
+    hub.removeIncompatible(first);
+    expect(phone.messages).toEqual([
+      expect.objectContaining({ type: 'snapshot', incompatibleWindows: ['Old', 'Older'] }),
+      { type: 'incompatibleWindows', names: ['Older'] }
+    ]);
+  });
+
   it('watches the largest limit per session and trims details per client', () => {
     const hub = new Hub('1.0.0', noPullRequests);
     const window = link();

@@ -5,7 +5,10 @@ import {
   type FollowerMessage,
   followerMessageSchema,
   type LeaderMessage,
-  parseMessage
+  parseMessage,
+  stableRegisterSchema,
+  stableRequestSchema,
+  VERSION_MISMATCH
 } from '@pocket-pilot/protocol';
 import type { WebSocket } from 'ws';
 
@@ -34,6 +37,11 @@ function queryOutcome(reply: Reply): CodeResult {
   return reply.result;
 }
 
+function registeringName(text: string, secret: string): string | null {
+  const register = parseMessage(stableRegisterSchema, text);
+  return register && sameSecret(secret, register.secret) ? register.window.name : null;
+}
+
 export function acceptFollower(
   socket: WebSocket,
   hub: Hub,
@@ -42,6 +50,7 @@ export function acceptFollower(
 ): void {
   const pending = new Map<string, Pending>();
   let windowId: string | null = null;
+  let incompatible = false;
   const send = (message: LeaderMessage): void => socket.send(JSON.stringify(message));
 
   const request = <T>(
@@ -91,7 +100,7 @@ export function acceptFollower(
       return;
     }
     if (windowId === null) {
-      socket.close(4003, 'forbidden');
+      if (!incompatible) socket.close(4003, 'forbidden');
       return;
     }
     if (message.type === 'window') {
@@ -117,17 +126,36 @@ export function acceptFollower(
     waiting.settle(message);
   };
 
-  socket.on('message', (data) => {
-    const message = parseMessage(followerMessageSchema, data.toString());
-    if (!message) {
-      report('Ignoring malformed follower message');
-      return;
+  const unreadable = (text: string): void => {
+    const reply = parseMessage(stableRequestSchema, text);
+    const waiting = reply ? pending.get(reply.requestId) : undefined;
+    if (reply && waiting) {
+      pending.delete(reply.requestId);
+      clearTimeout(waiting.timer);
+      waiting.reject(new Error(VERSION_MISMATCH));
     }
-    handle(message);
+    if (incompatible) return;
+    const name =
+      windowId === null
+        ? registeringName(text, secret)
+        : (hub.windowStates().find((state) => state.windowId === windowId)?.name ?? windowId);
+    if (name === null) return;
+    incompatible = true;
+    clearTimeout(registerTimer);
+    hub.addIncompatible(socket, name);
+    report(`${name} runs a different Pocket Pilot version. Reload every VS Code window.`);
+  };
+
+  socket.on('message', (data) => {
+    const text = data.toString();
+    const message = parseMessage(followerMessageSchema, text);
+    if (message) handle(message);
+    else unreadable(text);
   });
 
   socket.on('close', () => {
     clearTimeout(registerTimer);
+    hub.removeIncompatible(socket);
     for (const waiting of pending.values()) {
       clearTimeout(waiting.timer);
       waiting.reject(new Error('The window disconnected'));

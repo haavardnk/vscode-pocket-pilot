@@ -63,6 +63,7 @@ export class Hub {
   private readonly clients = new Map<HubClient, Subscription | null>();
   private readonly sent = new Map<HubClient, SessionDetail | null>();
   private readonly terminalWatches = new Map<HubClient, TerminalWatch>();
+  private readonly incompatible = new Map<object, string>();
   private pullRequests: PullRequestState;
 
   constructor(
@@ -111,6 +112,16 @@ export class Hub {
     this.events.windowsChanged?.();
   }
 
+  addIncompatible(key: object, name: string): void {
+    this.incompatible.set(key, name);
+    this.broadcast({ type: 'incompatibleWindows', names: [...this.incompatible.values()] });
+  }
+
+  removeIncompatible(key: object): void {
+    if (!this.incompatible.delete(key)) return;
+    this.broadcast({ type: 'incompatibleWindows', names: [...this.incompatible.values()] });
+  }
+
   sessionUpdate(windowId: string, sessionId: string, detail: SessionDetail | null): void {
     const entry = this.windows.get(windowId);
     if (!entry) return;
@@ -150,6 +161,7 @@ export class Hub {
       type: 'snapshot',
       version: this.version,
       windows: this.windowStates(),
+      incompatibleWindows: [...this.incompatible.values()],
       pullRequests: this.pullRequests
     });
     this.events.clientsChanged?.(this.clients.size);

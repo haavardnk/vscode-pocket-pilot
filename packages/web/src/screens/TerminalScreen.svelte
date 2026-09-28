@@ -7,6 +7,7 @@
   import type { TerminalLine } from '@pocket-pilot/protocol';
   import { untrack } from 'svelte';
 
+  import Loading from '../lib/components/Loading.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
   import { routeHash } from '../lib/routing';
@@ -162,9 +163,7 @@
         </button>
       </div>
     {:else if !detail}
-      <div class="flex justify-center p-10">
-        <span class="loading loading-spinner text-primary"></span>
-      </div>
+      <Loading />
     {:else}
       {#if summary && !summary.shellIntegration}
         <div role="status" class="alert alert-soft text-sm alert-info">

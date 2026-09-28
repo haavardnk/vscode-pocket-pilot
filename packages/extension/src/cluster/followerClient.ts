@@ -2,6 +2,7 @@ import {
   type FollowerMessage,
   type LeaderMessage,
   leaderMessageSchema,
+  mismatchReply,
   parseMessage
 } from '@pocket-pilot/protocol';
 import WebSocket from 'ws';
@@ -26,6 +27,7 @@ export function connectFollower(
 ): { opened: Promise<void>; closed: Promise<void>; close: () => void } {
   const socket = new WebSocket(options.url, { maxPayload: MAX_PAYLOAD });
   const subscriptions: Disposable[] = [];
+  let warned = false;
   const send = (message: FollowerMessage): void => {
     if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
   };
@@ -84,10 +86,19 @@ export function connectFollower(
   socket.on('error', (error) => {
     if (subscriptions.length > 0) report(`Leader connection error: ${error.message}`);
   });
+  const unreadable = (text: string): void => {
+    const reply = mismatchReply(text);
+    if (reply) send(reply);
+    if (warned) return;
+    warned = true;
+    report('The leader window runs a different Pocket Pilot version. Reload every VS Code window.');
+  };
+
   socket.on('message', (data) => {
-    const message = parseMessage(leaderMessageSchema, data.toString());
+    const text = data.toString();
+    const message = parseMessage(leaderMessageSchema, text);
     if (!message) {
-      report('Ignoring malformed leader message');
+      unreadable(text);
       return;
     }
     if (message.type === 'watch') window.setWatches(message.sessions);

@@ -2,8 +2,14 @@
   import { hub } from '../stores/hub.svelte';
 
   const GRACE_MS = 1500;
+  const names = new Intl.ListFormat('en', { type: 'conjunction' });
 
   let late = $state(false);
+  const incompatible = $derived(
+    hub.incompatibleWindows.length === 1
+      ? `${hub.incompatibleWindows[0]} runs a different Pocket Pilot version. Reload that window.`
+      : `${names.format(hub.incompatibleWindows)} run a different Pocket Pilot version. Reload those windows.`
+  );
 
   $effect(() => {
     if (hub.connection === 'open') {
@@ -22,5 +28,13 @@
   >
     <span class="loading loading-xs loading-spinner"></span>
     {hub.connection === 'connecting' ? 'Connecting to VS Code…' : 'Offline, reconnecting…'}
+  </div>
+{:else if hub.mismatch}
+  <div class="bg-error px-4 py-1 text-center text-xs text-error-content" role="alert">
+    Pocket Pilot versions don't match
+  </div>
+{:else if hub.incompatibleWindows.length > 0}
+  <div class="bg-warning px-4 py-1 text-center text-xs text-warning-content" role="status">
+    {incompatible}
   </div>
 {/if}

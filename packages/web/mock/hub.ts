@@ -498,7 +498,13 @@ export class MockHub {
 
   private snapshot(): ServerMessage {
     const windows: WindowState[] = this.windows.map((window) => window.state);
-    return { type: 'snapshot', version: '0.0.0-mock', windows, pullRequests: this.pullRequests };
+    return {
+      type: 'snapshot',
+      version: '0.0.0-mock',
+      windows,
+      incompatibleWindows: [],
+      pullRequests: this.pullRequests
+    };
   }
 }
 
