@@ -29,6 +29,13 @@ const queryResult = {
   error: z.string().nullable()
 };
 
+const commandResult = {
+  type: z.literal('result'),
+  requestId: z.string(),
+  ok: z.boolean(),
+  error: z.string().nullable()
+};
+
 export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('subscribe'),
@@ -78,12 +85,7 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
     terminalId: z.string(),
     patch: terminalPatchSchema
   }),
-  z.object({
-    type: z.literal('result'),
-    requestId: z.string(),
-    ok: z.boolean(),
-    error: z.string().nullable()
-  }),
+  z.object(commandResult),
   z.object(queryResult)
 ]);
 
@@ -105,12 +107,7 @@ export const followerMessageSchema = z.discriminatedUnion('type', [
     terminalId: z.string(),
     patch: terminalPatchSchema
   }),
-  z.object({
-    type: z.literal('result'),
-    requestId: z.string(),
-    ok: z.boolean(),
-    error: z.string().nullable()
-  }),
+  z.object(commandResult),
   z.object(queryResult)
 ]);
 
