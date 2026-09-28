@@ -12,8 +12,8 @@
     "test:e2e": "vite build && playwright test"
   },
   "dependencies": {
-    "@pocket-pilot/protocol": "0.1.0",
     "@lucide/svelte": "^1.48.0",
+    "@pocket-pilot/protocol": "0.1.0",
     "date-fns": "^4.4.0",
     "dompurify": "^3.4.16",
     "marked": "^18.0.14",
@@ -25,7 +25,6 @@
     "@playwright/test": "1.63.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "^4.3.3",
-    "@tsconfig/svelte": "^5.0.8",
     "@types/ws": "^8.18.1",
     "daisyui": "^5.7.46",
     "svelte": "^5.57.1",
