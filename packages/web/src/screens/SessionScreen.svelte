@@ -32,7 +32,7 @@
   import TodoList from '../lib/components/TodoList.svelte';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { getPane } from '../lib/pane';
-  import { parseRoute, routeHash } from '../lib/routing';
+  import { inChat, parseRoute, routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -79,13 +79,13 @@
       saved?.key === key && untrack(() => hub.detail?.id) === sessionId ? saved.top : null;
     saved = null;
     hub.subscribe(windowId, sessionId);
-    if (restored !== null) {
-      followBottom = false;
-      void tick().then(() => pane.element?.scrollTo({ top: restored }));
-    }
+    followBottom = restored === null;
+    void tick().then(() => {
+      if (restored === null) followEnd();
+      else pane.element?.scrollTo({ top: restored });
+    });
     return () => {
-      const next = parseRoute(location.hash);
-      if (next.name !== 'editDiff' || next.windowId !== windowId || next.sessionId !== sessionId) {
+      if (!inChat(parseRoute(location.hash), windowId, sessionId)) {
         hub.unsubscribe();
         return;
       }

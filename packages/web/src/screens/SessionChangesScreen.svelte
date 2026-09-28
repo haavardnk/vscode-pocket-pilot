@@ -9,7 +9,7 @@
   import QueryView from '../lib/components/QueryView.svelte';
   import RefreshButton from '../lib/components/RefreshButton.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
-  import { routeHash } from '../lib/routing';
+  import { inChat, parseRoute, routeHash } from '../lib/routing';
   import { clock } from '../lib/stores/clock.svelte';
   import { editDecisions } from '../lib/stores/editDecisions.svelte';
   import { hub } from '../lib/stores/hub.svelte';
@@ -46,6 +46,10 @@
   $effect(() => {
     void updatedAt;
     if (hub.connection === 'open') void changes.refresh();
+  });
+
+  $effect(() => () => {
+    if (!inChat(parseRoute(location.hash), windowId, sessionId)) hub.unsubscribe();
   });
 
   function stateOf(file: SessionChange): SessionChange['state'] {

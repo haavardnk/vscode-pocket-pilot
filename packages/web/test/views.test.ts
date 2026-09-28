@@ -19,7 +19,7 @@ import {
   sessionSections,
   terminalTargets
 } from '../src/lib/hub/views';
-import { pairCode, parseRoute, type Route, routeHash } from '../src/lib/routing';
+import { inChat, pairCode, parseRoute, type Route, routeHash } from '../src/lib/routing';
 
 function session(
   id: string,
@@ -288,6 +288,30 @@ describe('routing', () => {
     { name: 'terminal', windowId: 'w', terminalId: 't', executionId: 'e#1' }
   ])('round-trips $name routes', (route) => {
     expect(parseRoute(routeHash(route))).toEqual(route);
+  });
+
+  it.each<[Route, boolean]>([
+    [{ name: 'session', windowId: 'w', sessionId: 's' }, true],
+    [{ name: 'sessionChanges', windowId: 'w', sessionId: 's', requestId: 'r1' }, true],
+    [{ name: 'sessionDiff', windowId: 'w', sessionId: 's', path: 'a.ts', requestId: null }, true],
+    [
+      {
+        name: 'editDiff',
+        windowId: 'w',
+        sessionId: 's',
+        requestId: 'r1',
+        path: 'a.ts',
+        stopId: null,
+        callId: null
+      },
+      true
+    ],
+    [{ name: 'sessionChanges', windowId: 'w', sessionId: 'other', requestId: null }, false],
+    [{ name: 'session', windowId: 'other', sessionId: 's' }, false],
+    [{ name: 'chats' }, false],
+    [{ name: 'terminal', windowId: 'w', terminalId: 's', executionId: null }, false]
+  ])('keeps %o inside chat w/s: %s', (route, expected) => {
+    expect(inChat(route, 'w', 's')).toBe(expected);
   });
 
   it.each([

@@ -164,6 +164,18 @@ export function tabOf(route: Route): Tab {
   }
 }
 
+export function inChat(route: Route, windowId: string, sessionId: string): boolean {
+  switch (route.name) {
+    case 'session':
+    case 'sessionChanges':
+    case 'sessionDiff':
+    case 'editDiff':
+      return route.windowId === windowId && route.sessionId === sessionId;
+    default:
+      return false;
+  }
+}
+
 export function pairCode(hash: string): string | null {
   return /^#pair=(\d{6})$/.exec(hash)?.[1] ?? null;
 }

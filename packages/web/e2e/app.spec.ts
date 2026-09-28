@@ -694,6 +694,73 @@ test.describe('paired', () => {
     expect(await pane.evaluate((element) => element.scrollTop)).toBe(100);
   });
 
+  for (const [where, spot] of [
+    ['the same spot', 100],
+    ['the bottom', 100_000]
+  ] as const) {
+    test(`returns to ${where} after a message's changes`, async ({ page }) => {
+      await openSession(page, 'Build the phone app');
+      const request = page.locator('[data-request="r1"]');
+      await request.getByText('Updated the app shell').click();
+      await page.setViewportSize({ width: 412, height: 480 });
+      const pane = page.locator('[data-tab="chats"]');
+      const gap = (): Promise<number> =>
+        pane.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop);
+      const frames = (): Promise<unknown> =>
+        page.evaluate(
+          () =>
+            new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        );
+      await pane.evaluate((element, top) => element.scrollTo({ top }), spot);
+      await frames();
+      if (spot === 100) expect(await gap()).toBeGreaterThan(150);
+      await request.getByRole('link', { name: 'Files changed (1)' }).dispatchEvent('click');
+      await page
+        .getByRole('list', { name: 'Changed files' })
+        .getByRole('link', { name: /App\.svelte/ })
+        .click();
+      await expect(page.getByTestId('diff').locator('[data-kind="added"]').first()).toBeVisible();
+      await page.getByRole('button', { name: 'Back' }).click();
+      await expect(page.getByRole('heading', { name: 'Message changes' })).toBeVisible();
+      await page.getByRole('button', { name: 'Back' }).click();
+      await expect(request.getByRole('link', { name: /App\.svelte/ })).toBeAttached();
+      await frames();
+      if (spot === 100) expect(await pane.evaluate((element) => element.scrollTop)).toBe(100);
+      else expect(await gap()).toBeLessThan(2);
+    });
+
+    test(`returns to ${where} after scrolling the chat's changes`, async ({ page }) => {
+      await openSession(page, 'Build the phone app');
+      await page.setViewportSize({ width: 412, height: 480 });
+      const pane = page.locator('[data-tab="chats"]');
+      const gap = (): Promise<number> =>
+        pane.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop);
+      const frames = (): Promise<unknown> =>
+        page.evaluate(
+          () =>
+            new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        );
+      await frames();
+      await pane.evaluate((element, top) => element.scrollTo({ top }), spot);
+      await frames();
+      if (spot === 100) expect(await gap()).toBeGreaterThan(150);
+      await page.getByRole('banner').getByRole('link', { name: 'Changes (2)' }).click();
+      await expect(page.getByRole('heading', { name: 'Changes', exact: true })).toBeVisible();
+      await page.locator('main').evaluate((main) => {
+        const spacer = document.createElement('div');
+        spacer.style.height = '2000px';
+        main.append(spacer);
+      });
+      await pane.evaluate((element) => element.scrollTo({ top: 600 }));
+      await frames();
+      await page.getByRole('button', { name: 'Back' }).click();
+      await expect(page.getByRole('heading', { name: 'Build the phone app' })).toBeVisible();
+      await frames();
+      if (spot === 100) expect(await pane.evaluate((element) => element.scrollTop)).toBe(100);
+      else expect(await gap()).toBeLessThan(2);
+    });
+  }
+
   test('stays at the bottom while earlier messages grow', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     const grow = (height: number): Promise<void> =>

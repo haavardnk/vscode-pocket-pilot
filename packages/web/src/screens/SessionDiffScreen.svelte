@@ -12,7 +12,7 @@
   import QueryView from '../lib/components/QueryView.svelte';
   import RefreshButton from '../lib/components/RefreshButton.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
-  import { parseRoute, routeHash } from '../lib/routing';
+  import { inChat, parseRoute, routeHash } from '../lib/routing';
   import { clock } from '../lib/stores/clock.svelte';
   import { editDecisions } from '../lib/stores/editDecisions.svelte';
   import { hub } from '../lib/stores/hub.svelte';
@@ -50,14 +50,8 @@
     if (hub.connection === 'open') void diff.refresh();
   });
 
-  $effect(() => {
-    if (!edit) return;
-    return () => {
-      const next = parseRoute(location.hash);
-      if (next.name !== 'session' || next.windowId !== windowId || next.sessionId !== sessionId) {
-        hub.unsubscribe();
-      }
-    };
+  $effect(() => () => {
+    if (!inChat(parseRoute(location.hash), windowId, sessionId)) hub.unsubscribe();
   });
 
   async function decide(decision: 'keep' | 'undo'): Promise<void> {
