@@ -47,6 +47,63 @@ async function openTerminal(page: Page, name: string): Promise<void> {
   await expect(page.getByRole('heading', { name })).toBeVisible();
 }
 
+async function fakeKeyboard(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const data = (): DOMStringMap => document.documentElement.dataset;
+    const visual = new EventTarget();
+    Object.defineProperties(visual, {
+      width: { get: () => innerWidth },
+      height: { get: () => innerHeight - Number(data().keyboard ?? 0) },
+      scale: { value: 1 },
+      offsetLeft: { value: 0 },
+      offsetTop: { get: () => Number(data().pan ?? 0) }
+    });
+    Object.defineProperty(window, 'visualViewport', { value: visual });
+  });
+  await page.reload();
+}
+
+async function openKeyboard(page: Page, height: number, pan: number): Promise<void> {
+  await page.evaluate(
+    ([keyboard, offset]) => {
+      document.documentElement.dataset.keyboard = String(keyboard);
+      document.documentElement.dataset.pan = String(offset);
+      visualViewport?.dispatchEvent(new Event('resize'));
+    },
+    [height, pan]
+  );
+}
+
+const KEYBOARD_SCREENS = [
+  {
+    screen: 'terminal',
+    tab: 'terminals',
+    heading: 'zsh',
+    open: (page: Page): Promise<void> => openTerminal(page, 'zsh'),
+    input: 'Terminal input',
+    follows: true,
+    latest: '✖ 1 problem'
+  },
+  {
+    screen: 'chat',
+    tab: 'chats',
+    heading: 'Build the phone app',
+    open: (page: Page): Promise<void> => openSession(page, 'Build the phone app'),
+    input: 'Message',
+    follows: true,
+    latest: null
+  },
+  {
+    screen: 'new chat',
+    tab: 'chats',
+    heading: 'New chat',
+    open: (page: Page): Promise<void> => page.getByRole('button', { name: 'New chat' }).click(),
+    input: 'Message',
+    follows: false,
+    latest: 'Start a chat'
+  }
+] as const;
+
 test.describe('pairing', () => {
   test.beforeEach(async ({ page }) => {
     await page.request.post('/__reset');
@@ -581,6 +638,30 @@ test.describe('paired', () => {
     await expect(result).toBeVisible();
   });
 
+  test('never scrolls a tab sideways', async ({ page }) => {
+    await openSession(page, 'Fix flaky cluster test');
+    await page.getByRole('button', { name: 'Code' }).click();
+    await page.getByRole('button', { name: 'Terminals', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
+    for (const tab of ['chats', 'code', 'terminals', 'settings']) {
+      const pane = page.locator(`[data-tab="${tab}"]`);
+      await pane.evaluate((element: HTMLElement) => {
+        element.hidden = false;
+        const wide = document.createElement('div');
+        wide.style.width = '200vw';
+        wide.style.height = '1px';
+        element.firstElementChild?.prepend(wide);
+      });
+      await pane.hover({ position: { x: 100, y: 200 } });
+      await page.mouse.wheel(300, 0);
+      await page.waitForTimeout(100);
+      expect(await pane.evaluate((element) => element.scrollLeft)).toBe(0);
+      await pane.evaluate((element: HTMLElement) => {
+        element.hidden = true;
+      });
+    }
+  });
+
   test('opens one edit from the chat and returns to the same spot', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     const request = page.locator('[data-request="r1"]');
@@ -588,13 +669,14 @@ test.describe('paired', () => {
     await page.setViewportSize({ width: 412, height: 480 });
     const link = request.getByRole('link', { name: /App\.svelte/ });
     await expect(link).toContainText('+1 −0');
+    const pane = page.locator('[data-tab="chats"]');
     const bottom = (): Promise<number> =>
-      page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+      pane.evaluate((element) => element.scrollHeight - element.clientHeight);
     expect(await bottom()).toBeGreaterThan(250);
-    await page.evaluate(
-      () =>
+    await pane.evaluate(
+      (element) =>
         new Promise((resolve) => {
-          scrollTo({ top: 100 });
+          element.scrollTo({ top: 100 });
           requestAnimationFrame(() => requestAnimationFrame(resolve));
         })
     );
@@ -609,7 +691,7 @@ test.describe('paired', () => {
     await page.evaluate(
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     );
-    expect(await page.evaluate(() => scrollY)).toBe(100);
+    expect(await pane.evaluate((element) => element.scrollTop)).toBe(100);
   });
 
   test('stays at the bottom while earlier messages grow', async ({ page }) => {
@@ -620,19 +702,20 @@ test.describe('paired', () => {
         spacer.style.height = `${px}px`;
         document.querySelector('[data-request="r1"]')?.append(spacer);
       }, height);
+    const pane = page.locator('[data-tab="chats"]');
     const gap = (): Promise<number> =>
-      page.evaluate(() => document.documentElement.scrollHeight - innerHeight - scrollY);
+      pane.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop);
     const frames = (): Promise<unknown> =>
       page.evaluate(
         () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
       );
     await grow(1500);
     await expect.poll(gap).toBeLessThan(2);
-    await page.evaluate(() => scrollTo({ top: 0 }));
+    await pane.evaluate((element) => element.scrollTo({ top: 0 }));
     await frames();
     await grow(500);
     await frames();
-    expect(await page.evaluate(() => scrollY)).toBe(0);
+    expect(await pane.evaluate((element) => element.scrollTop)).toBe(0);
   });
 
   test('keeps each tab where it was left', async ({ page }) => {
@@ -751,4 +834,47 @@ test.describe('paired', () => {
     await page.getByRole('link', { name: 'Open chat Build the phone app' }).click();
     await expect(page.getByRole('heading', { name: 'Build the phone app' })).toBeVisible();
   });
+
+  for (const { screen, tab, heading, open, input, follows, latest } of KEYBOARD_SCREENS) {
+    test(`keeps the ${screen} in view above the keyboard`, async ({ page }) => {
+      await fakeKeyboard(page);
+      await page.setViewportSize({ width: 412, height: 600 });
+      await open(page);
+      await page.getByRole('textbox', { name: input }).focus();
+      await openKeyboard(page, 300, 120);
+      const pane = page.locator(`[data-tab="${tab}"]`);
+      await expect
+        .poll(() =>
+          pane.evaluate((element) => {
+            const top = visualViewport?.offsetTop ?? 0;
+            const bottom = top + (visualViewport?.height ?? innerHeight);
+            const header = element.querySelector('header')?.getBoundingClientRect().top ?? NaN;
+            const footer = element.querySelector('footer')?.getBoundingClientRect().bottom ?? NaN;
+            return Math.max(Math.abs(header - top), Math.abs(bottom - footer));
+          })
+        )
+        .toBeLessThan(2);
+      if (follows) {
+        await expect
+          .poll(() =>
+            pane.evaluate(
+              (element) => element.scrollHeight - element.clientHeight - element.scrollTop
+            )
+          )
+          .toBeLessThan(2);
+      }
+      if (latest) {
+        const shown = pane.getByText(latest).evaluate((node) => {
+          const pane = node.closest('[data-tab]');
+          const header = pane?.querySelector('header')?.getBoundingClientRect().bottom ?? NaN;
+          const footer = pane?.querySelector('footer')?.getBoundingClientRect().top ?? NaN;
+          const rect = node.getBoundingClientRect();
+          return rect.top >= header && rect.bottom <= footer;
+        });
+        expect(await shown).toBe(true);
+      }
+      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+      await expect(page.getByRole('navigation')).toBeHidden();
+    });
+  }
 });

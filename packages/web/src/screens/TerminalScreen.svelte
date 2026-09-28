@@ -10,6 +10,7 @@
   import Sheet from '../lib/components/Sheet.svelte';
   import TerminalExecutions from '../lib/components/terminal/TerminalExecutions.svelte';
   import TerminalStream from '../lib/components/terminal/TerminalStream.svelte';
+  import { getPane } from '../lib/pane';
   import { routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
@@ -22,6 +23,8 @@
   }
 
   const { windowId, terminalId, executionId }: Props = $props();
+
+  const pane = getPane();
 
   const KEYS = [
     { label: 'Ctrl+C', text: '^C', data: '\x03' },
@@ -71,8 +74,9 @@
 
   $effect.pre(() => {
     void tail;
-    if (!hub.terminal || untrack(() => router.tab) !== 'terminals') return;
-    followBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 120;
+    const element = pane.element;
+    if (!element || !hub.terminal || untrack(() => router.tab) !== 'terminals') return;
+    followBottom = element.clientHeight + element.scrollTop >= element.scrollHeight - 120;
   });
 
   $effect(() => {
@@ -87,9 +91,22 @@
 
   $effect(() => {
     void tail;
-    if (!hub.terminal || !followBottom || router.tab !== 'terminals') return;
-    scrollTo({ top: document.documentElement.scrollHeight });
+    pin();
   });
+
+  $effect(() => {
+    const element = pane.element;
+    if (!element) return;
+    const observer = new ResizeObserver(pin);
+    observer.observe(element);
+    return () => observer.disconnect();
+  });
+
+  function pin(): void {
+    const element = pane.element;
+    if (!element || !hub.terminal || !followBottom || router.tab !== 'terminals') return;
+    element.scrollTop = element.scrollHeight;
+  }
 
   function send(data: string, execute: boolean): Promise<boolean> {
     followBottom = true;
@@ -206,6 +223,7 @@
             spellcheck="false"
             enterkeyhint="send"
             disabled={!ready}
+            onfocus={() => (followBottom = true)}
             bind:value={text}
           />
           <button

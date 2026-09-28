@@ -31,6 +31,7 @@
   import StatusBadge from '../lib/components/StatusBadge.svelte';
   import TodoList from '../lib/components/TodoList.svelte';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
+  import { getPane } from '../lib/pane';
   import { parseRoute, routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
@@ -42,6 +43,8 @@
   }
 
   const { windowId, sessionId }: Props = $props();
+
+  const pane = getPane();
 
   let sheet = $state<'mode' | 'model' | 'permission' | 'actions' | null>(null);
   let deciding = $state(false);
@@ -78,7 +81,7 @@
     hub.subscribe(windowId, sessionId);
     if (restored !== null) {
       followBottom = false;
-      void tick().then(() => scrollTo({ top: restored }));
+      void tick().then(() => pane.element?.scrollTo({ top: restored }));
     }
     return () => {
       const next = parseRoute(location.hash);
@@ -91,19 +94,29 @@
   });
 
   $effect(() => {
-    if (!root) return;
-    const observer = new ResizeObserver(() => {
-      if (!hub.detail || !followBottom || router.tab !== 'chats') return;
-      scrollTo({ top: document.documentElement.scrollHeight });
-    });
+    const element = pane.element;
+    if (!root || !element) return;
+    const observer = new ResizeObserver(followEnd);
     observer.observe(root);
-    return () => observer.disconnect();
+    observer.observe(element);
+    element.addEventListener('scroll', onscroll, { passive: true });
+    return () => {
+      observer.disconnect();
+      element.removeEventListener('scroll', onscroll);
+    };
   });
 
+  function followEnd(): void {
+    const element = pane.element;
+    if (!element || !hub.detail || !followBottom || router.tab !== 'chats') return;
+    element.scrollTop = element.scrollHeight;
+  }
+
   function onscroll(): void {
-    if (router.tab !== 'chats') return;
-    scrolled = scrollY;
-    followBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 120;
+    const element = pane.element;
+    if (!element || router.tab !== 'chats') return;
+    scrolled = element.scrollTop;
+    followBottom = element.clientHeight + element.scrollTop >= element.scrollHeight - 120;
   }
 
   async function run(action: () => Promise<void>): Promise<boolean> {
@@ -179,8 +192,6 @@
     );
   }
 </script>
-
-<svelte:window {onscroll} />
 
 <div class="flex flex-1 flex-col" bind:this={root}>
   <header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">

@@ -17,6 +17,8 @@ html {
 
 :root {
   --dock-height: calc(4rem + env(safe-area-inset-bottom));
+  --viewport-top: 0px;
+  --viewport-height: 100dvh;
 }
 
 @media (pointer: coarse) {
