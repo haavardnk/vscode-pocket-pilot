@@ -4,7 +4,6 @@
 
   import FolderList from '../lib/components/code/FolderList.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
-  import PullRequestList from '../lib/components/PullRequestList.svelte';
   import RepositoryPicker from '../lib/components/RepositoryPicker.svelte';
   import SessionList from '../lib/components/SessionList.svelte';
   import NewTerminalSheet from '../lib/components/terminal/NewTerminalSheet.svelte';
@@ -41,8 +40,6 @@
   <main class="flex-1">
     {#if tab === 'chats'}
       <SessionList />
-    {:else if tab === 'pullRequests'}
-      <PullRequestList />
     {:else if tab === 'code'}
       <FolderList />
     {:else if tab === 'terminals'}

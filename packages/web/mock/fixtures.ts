@@ -1,6 +1,5 @@
 import {
   type Model,
-  type PullRequestState,
   SEGMENT_BOLD,
   type SessionDetail,
   type TerminalColor,
@@ -520,62 +519,4 @@ export function initialWindows(now: number): MockWindow[] {
       now - 40 * MINUTE
     )
   ];
-}
-
-export function initialPullRequests(now: number): PullRequestState {
-  return {
-    status: 'ready',
-    fetchedAt: now - MINUTE,
-    errors: [],
-    pullRequests: [
-      {
-        repositoryKey: 'github.com/haavardnk/vscode-pocket-pilot',
-        number: 12,
-        title: 'feat: add phone app',
-        url: 'https://github.com/haavardnk/vscode-pocket-pilot/pull/12',
-        author: 'haavardnk',
-        isDraft: false,
-        headRef: 'feat/web',
-        baseRef: 'main',
-        updatedAt: new Date(now - 5 * MINUTE).toISOString(),
-        checks: 'success',
-        review: 'approved',
-        mergeable: 'mergeable',
-        additions: 1200,
-        deletions: 40
-      },
-      {
-        repositoryKey: 'github.com/haavardnk/vscode-pocket-pilot',
-        number: 11,
-        title: 'fix: follower reconnect',
-        url: 'https://github.com/haavardnk/vscode-pocket-pilot/pull/11',
-        author: 'haavardnk',
-        isDraft: true,
-        headRef: 'fix/reconnect',
-        baseRef: 'main',
-        updatedAt: new Date(now - 90 * MINUTE).toISOString(),
-        checks: 'failure',
-        review: 'none',
-        mergeable: 'conflicting',
-        additions: 30,
-        deletions: 12
-      },
-      {
-        repositoryKey: 'github.com/haavardnk/immich-edit',
-        number: 88,
-        title: 'perf: faster demosaic',
-        url: 'https://github.com/haavardnk/immich-edit/pull/88',
-        author: 'haavardnk',
-        isDraft: false,
-        headRef: 'perf/demosaic',
-        baseRef: 'main',
-        updatedAt: new Date(now - 20 * MINUTE).toISOString(),
-        checks: 'pending',
-        review: 'reviewRequired',
-        mergeable: 'mergeable',
-        additions: 210,
-        deletions: 180
-      }
-    ]
-  };
 }

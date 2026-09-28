@@ -1,5 +1,4 @@
 import type {
-  PullRequestState,
   ServerMessage,
   SessionDetail,
   SessionWatch,
@@ -8,13 +7,6 @@ import type {
 import { describe, expect, it, vi } from 'vitest';
 
 import { EMPTY_WINDOW, Hub, type HubClient, type WindowLink } from '../src/cluster/hub';
-
-const noPullRequests: PullRequestState = {
-  status: 'disabled',
-  fetchedAt: null,
-  errors: [],
-  pullRequests: []
-};
 
 function windowState(windowId: string): WindowState {
   return {
@@ -75,7 +67,7 @@ function client(): HubClient & { messages: ServerMessage[] } {
 
 describe('Hub', () => {
   it('sends a snapshot on connect and broadcasts window changes', () => {
-    const hub = new Hub('1.0.0', noPullRequests);
+    const hub = new Hub('1.0.0');
     const phone = client();
     hub.connect(phone);
     const window = link();
@@ -90,7 +82,7 @@ describe('Hub', () => {
   });
 
   it('lists windows running another version', () => {
-    const hub = new Hub('1.0.0', noPullRequests);
+    const hub = new Hub('1.0.0');
     const first = {};
     const second = {};
     hub.addIncompatible(first, 'Old');
@@ -106,7 +98,7 @@ describe('Hub', () => {
   });
 
   it('watches the largest limit per session and trims details per client', () => {
-    const hub = new Hub('1.0.0', noPullRequests);
+    const hub = new Hub('1.0.0');
     const window = link();
     hub.addWindow(windowState('w1'), window);
     const small = client();
@@ -140,7 +132,7 @@ describe('Hub', () => {
   });
 
   it('sends patches after the first full detail', () => {
-    const hub = new Hub('1.0.0', noPullRequests);
+    const hub = new Hub('1.0.0');
     hub.addWindow(windowState('w1'), link());
     const phone = client();
     hub.connect(phone);
@@ -165,7 +157,7 @@ describe('Hub', () => {
   });
 
   it('caches watched terminals and fans out their patches', () => {
-    const hub = new Hub('1.0.0', noPullRequests);
+    const hub = new Hub('1.0.0');
     const window = link();
     hub.addWindow(windowState('w1'), window);
     const first = client();
@@ -216,7 +208,7 @@ describe('Hub', () => {
   });
 
   it('routes hooks to their window or to every empty window', async () => {
-    const hub = new Hub('1.0.0', noPullRequests);
+    const hub = new Hub('1.0.0');
     const windows = ['w1', `${EMPTY_WINDOW}a`, `${EMPTY_WINDOW}b`].map((id) => {
       const window = link();
       hub.addWindow(windowState(id), window);
@@ -230,7 +222,7 @@ describe('Hub', () => {
   });
 
   it('routes commands to the owning window', async () => {
-    const hub = new Hub('1.0.0', noPullRequests);
+    const hub = new Hub('1.0.0');
     const window = link();
     hub.addWindow(windowState('w1'), window);
     const command = { kind: 'stop' as const, windowId: 'w1', sessionId: 's1' };

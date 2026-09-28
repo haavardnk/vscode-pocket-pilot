@@ -211,34 +211,6 @@ export const windowStateSchema = z.object({
   models: z.array(modelSchema)
 });
 
-export const checkStateSchema = z.enum(['success', 'failure', 'pending', 'none']);
-
-export const reviewStateSchema = z.enum(['approved', 'changesRequested', 'reviewRequired', 'none']);
-
-export const pullRequestSchema = z.object({
-  repositoryKey: z.string(),
-  number: z.number(),
-  title: z.string(),
-  url: z.string(),
-  author: z.string().nullable(),
-  isDraft: z.boolean(),
-  headRef: z.string(),
-  baseRef: z.string(),
-  updatedAt: z.string(),
-  checks: checkStateSchema,
-  review: reviewStateSchema,
-  mergeable: z.enum(['mergeable', 'conflicting', 'unknown']),
-  additions: z.number(),
-  deletions: z.number()
-});
-
-export const pullRequestStateSchema = z.object({
-  status: z.enum(['disabled', 'signedOut', 'loading', 'ready']),
-  fetchedAt: z.number().nullable(),
-  errors: z.array(z.object({ repositoryKey: z.string(), message: z.string() })),
-  pullRequests: z.array(pullRequestSchema)
-});
-
 export type Repository = z.infer<typeof repositorySchema>;
 export type WorkspaceFolder = z.infer<typeof workspaceFolderSchema>;
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
@@ -264,7 +236,3 @@ export type ConfigValue = z.infer<typeof configValueSchema>;
 export type ModelConfigOption = z.infer<typeof modelConfigOptionSchema>;
 export type Model = z.infer<typeof modelSchema>;
 export type WindowState = z.infer<typeof windowStateSchema>;
-export type CheckState = z.infer<typeof checkStateSchema>;
-export type ReviewState = z.infer<typeof reviewStateSchema>;
-export type PullRequest = z.infer<typeof pullRequestSchema>;
-export type PullRequestState = z.infer<typeof pullRequestStateSchema>;

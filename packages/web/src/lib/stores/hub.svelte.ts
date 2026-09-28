@@ -4,7 +4,6 @@ import {
   type CodeQuery,
   type CodeResultFor,
   type Command,
-  type PullRequestState,
   type ServerMessage,
   type SessionDetail,
   type TerminalDetail,
@@ -29,13 +28,6 @@ interface TerminalWatch {
   terminalId: string;
 }
 
-const EMPTY_PULL_REQUESTS: PullRequestState = {
-  status: 'loading',
-  fetchedAt: null,
-  errors: [],
-  pullRequests: []
-};
-
 class HubStore {
   connection = $state<Connection>('connecting');
   quickTunnel = $state(false);
@@ -44,7 +36,6 @@ class HubStore {
   windows = $state<WindowState[]>([]);
   mismatch = $state(false);
   incompatibleWindows = $state<string[]>([]);
-  pullRequests = $state<PullRequestState>(EMPTY_PULL_REQUESTS);
   detail = $state<SessionDetail | null>(null);
   detailMissing = $state(false);
   limit = $state(PAGE_SIZE);
@@ -144,10 +135,6 @@ class HubStore {
     this.socket?.send({ type: 'unwatchTerminal' });
   }
 
-  refreshPullRequests(): void {
-    this.socket?.send({ type: 'refreshPullRequests' });
-  }
-
   command(command: Command): Promise<void> {
     if (!this.socket) return Promise.reject(new Error('Not connected'));
     return this.socket.command(command);
@@ -174,7 +161,6 @@ class HubStore {
       this.version = message.version;
       this.windows = message.windows;
       this.incompatibleWindows = message.incompatibleWindows;
-      this.pullRequests = message.pullRequests;
       this.loaded = true;
       this.mismatch = false;
       return;
@@ -191,10 +177,6 @@ class HubStore {
     }
     if (message.type === 'windowRemoved') {
       this.windows = this.windows.filter((window) => window.windowId !== message.windowId);
-      return;
-    }
-    if (message.type === 'pullRequests') {
-      this.pullRequests = message.state;
       return;
     }
     if (message.type === 'terminal' || message.type === 'terminalPatch') {

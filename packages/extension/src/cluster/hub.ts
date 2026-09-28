@@ -5,7 +5,6 @@ import {
   type Command,
   diffDetail,
   type HookEvent,
-  type PullRequestState,
   type ServerMessage,
   type SessionDetail,
   type SessionWatch,
@@ -29,7 +28,6 @@ export interface HubClient {
 }
 
 export interface HubEvents {
-  clientsChanged(count: number): void;
   windowsChanged(): void;
 }
 
@@ -64,15 +62,11 @@ export class Hub {
   private readonly sent = new Map<HubClient, SessionDetail | null>();
   private readonly terminalWatches = new Map<HubClient, TerminalWatch>();
   private readonly incompatible = new Map<object, string>();
-  private pullRequests: PullRequestState;
 
   constructor(
     private readonly version: string,
-    initialPullRequests: PullRequestState,
     private readonly events: Partial<HubEvents> = {}
-  ) {
-    this.pullRequests = initialPullRequests;
-  }
+  ) {}
 
   get clientCount(): number {
     return this.clients.size;
@@ -150,21 +144,14 @@ export class Hub {
     }
   }
 
-  setPullRequests(state: PullRequestState): void {
-    this.pullRequests = state;
-    this.broadcast({ type: 'pullRequests', state });
-  }
-
   connect(client: HubClient): void {
     this.clients.set(client, null);
     client.send({
       type: 'snapshot',
       version: this.version,
       windows: this.windowStates(),
-      incompatibleWindows: [...this.incompatible.values()],
-      pullRequests: this.pullRequests
+      incompatibleWindows: [...this.incompatible.values()]
     });
-    this.events.clientsChanged?.(this.clients.size);
   }
 
   disconnect(client: HubClient): void {
@@ -175,7 +162,6 @@ export class Hub {
     const terminal = this.terminalWatches.get(client);
     this.terminalWatches.delete(client);
     if (terminal) this.syncTerminalWatches(terminal.windowId);
-    this.events.clientsChanged?.(this.clients.size);
   }
 
   subscribe(client: HubClient, next: Subscription | null): void {

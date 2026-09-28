@@ -147,11 +147,6 @@ function cluster(window: FakeWindow, roles: Role[]): Cluster<Leader> {
         webRoot: storage,
         password: { enabled: () => Promise.resolve(false), verify: () => Promise.resolve(false) },
         expireDays: () => 30,
-        pullRequests: {
-          enabled: () => false,
-          intervalMs: () => 60_000,
-          token: () => Promise.resolve(null)
-        },
         report
       }),
     follow: () => followLeader(window, storage, port, report),

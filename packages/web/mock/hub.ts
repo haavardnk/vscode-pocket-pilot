@@ -3,7 +3,6 @@ import {
   type CodeResult,
   type Command,
   diffDetail,
-  type PullRequestState,
   queuePlan,
   type ServerMessage,
   type SessionDetail,
@@ -17,7 +16,6 @@ import {
 import { MockCode } from './code.ts';
 import {
   GREEN,
-  initialPullRequests,
   initialWindows,
   line,
   type MockWindow,
@@ -46,7 +44,6 @@ export interface MockClient {
 
 export class MockHub {
   private windows: MockWindow[] = [];
-  private pullRequests: PullRequestState = initialPullRequests(Date.now());
   private readonly clients = new Set<MockClient>();
   private readonly sent = new Map<MockClient, SessionDetail>();
   private readonly code = new MockCode();
@@ -67,7 +64,6 @@ export class MockHub {
     this.nextId = 1;
     const now = Date.now();
     this.windows = initialWindows(now);
-    this.pullRequests = initialPullRequests(now);
     this.code.reset();
     this.sent.clear();
     for (const client of this.clients) {
@@ -102,11 +98,6 @@ export class MockHub {
         .find((window) => window.state.windowId === windowId)
         ?.terminals.get(terminalId) ?? null;
     client.send({ type: 'terminal', windowId, terminalId, detail });
-  }
-
-  refreshPullRequests(): void {
-    this.pullRequests = { ...this.pullRequests, fetchedAt: Date.now() };
-    this.broadcast({ type: 'pullRequests', state: this.pullRequests });
   }
 
   query(query: CodeQuery): CodeResult {
@@ -548,8 +539,7 @@ export class MockHub {
       type: 'snapshot',
       version: '0.0.0-mock',
       windows,
-      incompatibleWindows: [],
-      pullRequests: this.pullRequests
+      incompatibleWindows: []
     };
   }
 }

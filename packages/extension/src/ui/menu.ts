@@ -52,11 +52,6 @@ export async function showMenu(
     ...(hasPassword
       ? [{ label: '$(trash) Remove Password', command: 'pocketPilot.clearPassword' }]
       : []),
-    {
-      label: '$(github) Sign In to GitHub',
-      description: 'For pull request status',
-      command: 'pocketPilot.signInGitHub'
-    },
     { label: '$(output) Show Log', command: 'pocketPilot.showLog' }
   ];
   const picked = await vscode.window.showQuickPick(items, {

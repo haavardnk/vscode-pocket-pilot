@@ -1,12 +1,11 @@
 export type FolderTab = 'files' | 'changes';
 
-export type Tab = 'chats' | 'pullRequests' | 'code' | 'terminals' | 'settings';
+export type Tab = 'chats' | 'code' | 'terminals' | 'settings';
 
-export const TABS: Tab[] = ['chats', 'pullRequests', 'code', 'terminals', 'settings'];
+export const TABS: Tab[] = ['chats', 'code', 'terminals', 'settings'];
 
 export type Route =
   | { name: 'chats' }
-  | { name: 'pullRequests' }
   | { name: 'code' }
   | { name: 'terminals' }
   | { name: 'settings' }
@@ -35,7 +34,6 @@ export type Route =
     };
 
 const STATIC: Record<string, Route> = {
-  prs: { name: 'pullRequests' },
   code: { name: 'code' },
   terminals: { name: 'terminals' },
   settings: { name: 'settings' },
@@ -99,8 +97,6 @@ export function routeHash(route: Route): string {
   switch (route.name) {
     case 'chats':
       return '#/';
-    case 'pullRequests':
-      return '#/prs';
     case 'code':
     case 'terminals':
     case 'settings':
@@ -144,7 +140,6 @@ export function routeHash(route: Route): string {
 export function tabOf(route: Route): Tab {
   switch (route.name) {
     case 'chats':
-    case 'pullRequests':
     case 'code':
     case 'terminals':
     case 'settings':

@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 
-import { onDidChangeGitHubSessions, signInGitHub } from './auth/github';
 import { PasswordSecret } from './auth/passwordSecret';
 import { TunnelSecret } from './auth/tunnelSecret';
 import { sharedFiles } from './cluster/sharedState';
@@ -85,14 +84,10 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     register('pocketPilot.setUpTunnel', () => setUpTunnel(tunnel)),
     register('pocketPilot.removeTunnel', () => removeTunnel(tunnel)),
-    register('pocketPilot.signInGitHub', async () => {
-      if (await signInGitHub()) pilot.refreshPullRequests();
-    }),
     register('pocketPilot.showLog', async () => log.show()),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration(SECTION)) void pilot.settingsChanged();
     }),
-    onDidChangeGitHubSessions(() => pilot.refreshPullRequests()),
     tunnel.onDidChange(() => void pilot.tunnelSecretChanged())
   );
 

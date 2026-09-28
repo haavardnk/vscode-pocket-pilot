@@ -15,7 +15,6 @@ const MAX_BUFFERED_BYTES = 8 * 1024 * 1024;
 export function acceptPhone(
   socket: WebSocket,
   hub: Hub,
-  refreshPullRequests: () => void,
   presence: (visible: boolean) => void,
   report: (message: string) => void
 ): void {
@@ -78,10 +77,6 @@ export function acceptPhone(
     }
     if (message.type === 'unwatchTerminal') {
       hub.watchTerminal(client, null);
-      return;
-    }
-    if (message.type === 'refreshPullRequests') {
-      refreshPullRequests();
       return;
     }
     if (message.type === 'presence') {

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { codeQuerySchema, codeResultSchema } from './code.ts';
 import { commandSchema, sessionWatchSchema } from './commands.ts';
-import { pullRequestStateSchema, sessionDetailSchema, windowStateSchema } from './domain.ts';
+import { sessionDetailSchema, windowStateSchema } from './domain.ts';
 import { sessionPatchSchema } from './patch.ts';
 import { terminalDetailSchema, terminalPatchSchema } from './terminal.ts';
 
@@ -41,7 +41,6 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('unwatchTerminal') }),
   z.object({ type: z.literal('command'), requestId: z.string(), command: commandSchema }),
   z.object({ type: z.literal('query'), requestId: z.string(), query: codeQuerySchema }),
-  z.object({ type: z.literal('refreshPullRequests') }),
   z.object({ type: z.literal('presence'), visible: z.boolean() })
 ]);
 
@@ -50,8 +49,7 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('snapshot'),
     version: z.string(),
     windows: z.array(windowStateSchema),
-    incompatibleWindows: z.array(z.string()),
-    pullRequests: pullRequestStateSchema
+    incompatibleWindows: z.array(z.string())
   }),
   z.object({ type: z.literal('window'), window: windowStateSchema }),
   z.object({ type: z.literal('windowRemoved'), windowId: z.string() }),
@@ -80,7 +78,6 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
     terminalId: z.string(),
     patch: terminalPatchSchema
   }),
-  z.object({ type: z.literal('pullRequests'), state: pullRequestStateSchema }),
   z.object({
     type: z.literal('result'),
     requestId: z.string(),

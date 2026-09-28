@@ -133,8 +133,7 @@ describe('protocol', () => {
         type: 'snapshot',
         version: '0.1.0',
         windows: [window],
-        incompatibleWindows: ['old'],
-        pullRequests: { status: 'disabled', fetchedAt: null, errors: [], pullRequests: [] }
+        incompatibleWindows: ['old']
       }
     ],
     [followerMessageSchema, { type: 'register', secret: 'x', window }],

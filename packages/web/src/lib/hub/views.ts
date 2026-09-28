@@ -1,8 +1,6 @@
 import type {
   Agent,
   Model,
-  PullRequest,
-  PullRequestState,
   Repository,
   SessionDetail,
   SessionSummary,
@@ -136,14 +134,6 @@ export function terminalTargets(windows: WindowState[]): TerminalTarget[] {
       ? [{ windowId, windowName, folderId: null, name: windowName }]
       : folders.map((folder) => ({ windowId, windowName, folderId: folder.id, name: folder.name }))
   );
-}
-
-export function pullRequestsFor(state: PullRequestState, key: string): PullRequest[] {
-  const pullRequests =
-    key === ALL_REPOSITORIES
-      ? state.pullRequests
-      : state.pullRequests.filter((pullRequest) => pullRequest.repositoryKey === key);
-  return pullRequests.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 function basename(value: string): string {

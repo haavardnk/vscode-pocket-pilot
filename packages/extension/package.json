@@ -93,11 +93,6 @@
         "category": "Pocket Pilot"
       },
       {
-        "command": "pocketPilot.signInGitHub",
-        "title": "Sign In to GitHub",
-        "category": "Pocket Pilot"
-      },
-      {
         "command": "pocketPilot.showLog",
         "title": "Show Log",
         "category": "Pocket Pilot"
@@ -165,17 +160,6 @@
           "scope": "machine",
           "description": "Forget paired devices that have not connected for this many days. 0 keeps them forever."
         },
-        "pocketPilot.pullRequests.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Fetch open pull requests for the repositories of open windows."
-        },
-        "pocketPilot.pullRequests.pollSeconds": {
-          "type": "integer",
-          "default": 60,
-          "minimum": 15,
-          "description": "Pull request refresh interval while a phone is connected."
-        },
         "pocketPilot.liveMirror": {
           "type": "string",
           "enum": [
@@ -207,7 +191,6 @@
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/static": "^10.1.5",
     "@fastify/websocket": "^11.3.1",
-    "@octokit/graphql": "^9.0.5",
     "@pocket-pilot/protocol": "0.1.0",
     "@xterm/headless": "^6.0.0",
     "chokidar": "^5.0.0",

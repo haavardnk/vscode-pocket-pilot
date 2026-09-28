@@ -5,7 +5,7 @@ import { type AddressInfo, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { authInfoSchema, type PullRequestState } from '@pocket-pilot/protocol';
+import { authInfoSchema } from '@pocket-pilot/protocol';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
@@ -46,13 +46,6 @@ const PUBLIC_HOST = 'abc.trycloudflare.com';
 const PUBLIC_ORIGIN = `https://${PUBLIC_HOST}`;
 const HOOK_SECRET = 'hook-secret';
 
-const noPullRequests: PullRequestState = {
-  status: 'disabled',
-  fetchedAt: null,
-  errors: [],
-  pullRequests: []
-};
-
 function closedPort(): Promise<number> {
   const probe = createServer();
   return new Promise((resolve) =>
@@ -70,7 +63,7 @@ async function start(namedTunnel = false): Promise<Fixture> {
   const sent: string[] = [];
   const devices = new DeviceStore(join(folder, 'devices.json'), () => 30);
   const phones = new PhoneRegistry();
-  const hub = new Hub('1.0.0', noPullRequests);
+  const hub = new Hub('1.0.0');
   const server = await startServer({
     port: 0,
     namedTunnel,
@@ -93,7 +86,6 @@ async function start(namedTunnel = false): Promise<Fixture> {
     }),
     password: { enabled: async () => false, verify: async () => false },
     expireDays: () => 30,
-    refreshPullRequests: () => undefined,
     report: () => undefined
   });
   await new Promise<void>((resolve) => server.tunnel.listen(0, '127.0.0.1', resolve));

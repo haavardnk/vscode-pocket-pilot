@@ -1,9 +1,4 @@
-import type {
-  PullRequestState,
-  SessionDetail,
-  SessionSummary,
-  WindowState
-} from '@pocket-pilot/protocol';
+import type { SessionDetail, SessionSummary, WindowState } from '@pocket-pilot/protocol';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -12,7 +7,6 @@ import {
   modelLabel,
   NO_REPOSITORY,
   pendingTool,
-  pullRequestsFor,
   repositoryGroups,
   resolveRepository,
   sessionEntries,
@@ -143,36 +137,6 @@ describe('terminalTargets', () => {
   });
 });
 
-describe('pullRequestsFor', () => {
-  it('filters by repository and sorts by update time', () => {
-    const base = {
-      title: 't',
-      url: 'u',
-      author: null,
-      isDraft: false,
-      headRef: 'h',
-      baseRef: 'main',
-      checks: 'none',
-      review: 'none',
-      mergeable: 'unknown',
-      additions: 0,
-      deletions: 0
-    } as const;
-    const state: PullRequestState = {
-      status: 'ready',
-      fetchedAt: 1,
-      errors: [],
-      pullRequests: [
-        { ...base, repositoryKey: 'a', number: 1, updatedAt: '2026-01-01T00:00:00Z' },
-        { ...base, repositoryKey: 'b', number: 2, updatedAt: '2026-01-03T00:00:00Z' },
-        { ...base, repositoryKey: 'a', number: 3, updatedAt: '2026-01-02T00:00:00Z' }
-      ]
-    };
-    expect(pullRequestsFor(state, 'a').map((pr) => pr.number)).toEqual([3, 1]);
-    expect(pullRequestsFor(state, ALL_REPOSITORIES).map((pr) => pr.number)).toEqual([2, 3, 1]);
-  });
-});
-
 describe('labels', () => {
   const agents = [{ id: 'agent', name: 'Agent', description: null, builtin: true }];
   const models = [
@@ -253,7 +217,6 @@ describe('response parts', () => {
 describe('routing', () => {
   it.each([
     ['', { name: 'chats' }],
-    ['#/prs', { name: 'pullRequests' }],
     ['#/settings', { name: 'settings' }],
     ['#/new', { name: 'new' }],
     ['#/code', { name: 'code' }],
@@ -317,7 +280,7 @@ describe('routing', () => {
   it.each([
     ['#pair=123456', '123456'],
     ['#pair=12345', null],
-    ['#/prs', null]
+    ['#/code', null]
   ])('reads pairing code from %s', (hash, code) => {
     expect(pairCode(hash)).toBe(code);
   });

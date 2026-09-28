@@ -144,22 +144,17 @@ test.describe('paired', () => {
       'Chats',
       'Terminals',
       'Code',
-      'Pull requests',
       'Settings'
     ]);
   });
 
-  test('filters chats and pull requests by repository', async ({ page }) => {
+  test('filters chats by repository', async ({ page }) => {
     const picker = page.getByRole('combobox', { name: 'Repository' });
     await picker.selectOption({ label: 'immich-edit' });
     await expect(page.getByRole('link', { name: /Tune the RAW pipeline/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /Build the phone app/ })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Pull requests' }).click();
-    await expect(page.getByRole('link', { name: /perf: faster demosaic/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /feat: add phone app/ })).toHaveCount(0);
     await picker.selectOption({ label: 'All repositories' });
-    await expect(page.getByRole('link', { name: /feat: add phone app/ })).toBeVisible();
-    await expect(page.getByText('Conflicts')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Build the phone app/ })).toBeVisible();
   });
 
   test('approves a waiting tool', async ({ page }) => {

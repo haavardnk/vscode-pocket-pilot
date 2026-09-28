@@ -51,7 +51,6 @@ export interface ServerOptions {
   push: PushEndpoint;
   password: PasswordCheck;
   expireDays: () => number;
-  refreshPullRequests: () => void;
   report: (message: string) => void;
 }
 
@@ -195,13 +194,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       const device = request.device;
       if (!device) return socket.close(4401, 'unauthorized');
       phones.add(socket, device.id);
-      acceptPhone(
-        socket,
-        hub,
-        options.refreshPullRequests,
-        (visible) => phones.setVisible(socket, visible),
-        report
-      );
+      acceptPhone(socket, hub, (visible) => phones.setVisible(socket, visible), report);
     });
     registerPushRoutes(scope, options.push);
   });

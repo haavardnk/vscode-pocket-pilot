@@ -191,7 +191,6 @@ server.on('upgrade', (request, socket, head) => {
       else if (message.type === 'unsubscribe') hub.subscribe(client, null);
       else if (message.type === 'watchTerminal') hub.watchTerminal(client, message);
       else if (message.type === 'unwatchTerminal') hub.watchTerminal(client, null);
-      else if (message.type === 'refreshPullRequests') hub.refreshPullRequests();
       else if (message.type === 'query') {
         try {
           const result = hub.query(message.query);

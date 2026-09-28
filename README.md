@@ -15,7 +15,6 @@ tunnel. It works with GitHub Copilot Chat in VS Code; other agents and editors a
 - Browse files, review diffs, and keep or undo the agent's edits
 - View, type into, create and kill terminals, including the ones the agent runs
 - Push notifications when an agent finishes, needs input or fails
-- Open pull requests with check and review status
 
 ## Requirements
 
@@ -71,20 +70,17 @@ All commands are also in the **Pilot** status bar menu.
 | Pocket Pilot: Manage Paired Devices    | Revoke one or all devices.               |
 | Pocket Pilot: Set Password             | Allow sign-in with a password.           |
 | Pocket Pilot: Set Up Cloudflare Tunnel | Use a permanent address.                 |
-| Pocket Pilot: Sign In to GitHub        | Load pull requests.                      |
 | Pocket Pilot: Show Log                 | Open the output channel.                 |
 
 ## Settings
 
-| Setting                                | Default | Meaning                                                  |
-| -------------------------------------- | ------- | -------------------------------------------------------- |
-| `pocketPilot.enabled`                  | `false` | Run Pocket Pilot in every window.                        |
-| `pocketPilot.port`                     | `48111` | Loopback port between windows. The tunnel uses the next. |
-| `pocketPilot.tunnel.cloudflaredPath`   | `""`    | Use this cloudflared binary instead of downloading one.  |
-| `pocketPilot.devices.expireDays`       | `30`    | Forget devices unused this long. `0` keeps them.         |
-| `pocketPilot.pullRequests.enabled`     | `true`  | Load open pull requests for the open repositories.       |
-| `pocketPilot.pullRequests.pollSeconds` | `60`    | How often pull requests refresh while a phone is open.   |
-| `pocketPilot.liveMirror`               | `full`  | `full`, `hooks` or `off`. See below.                     |
+| Setting                              | Default | Meaning                                                  |
+| ------------------------------------ | ------- | -------------------------------------------------------- |
+| `pocketPilot.enabled`                | `false` | Run Pocket Pilot in every window.                        |
+| `pocketPilot.port`                   | `48111` | Loopback port between windows. The tunnel uses the next. |
+| `pocketPilot.tunnel.cloudflaredPath` | `""`    | Use this cloudflared binary instead of downloading one.  |
+| `pocketPilot.devices.expireDays`     | `30`    | Forget devices unused this long. `0` keeps them.         |
+| `pocketPilot.liveMirror`             | `full`  | `full`, `hooks` or `off`. See below.                     |
 
 ## How it works
 

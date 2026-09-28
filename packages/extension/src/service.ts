@@ -3,7 +3,6 @@ import { homedir } from 'node:os';
 import type { FSWatcher } from 'chokidar';
 import * as vscode from 'vscode';
 
-import { githubToken } from './auth/github';
 import type { PasswordSecret } from './auth/passwordSecret';
 import type { TunnelSecret } from './auth/tunnelSecret';
 import { Cluster, type Role } from './cluster/cluster';
@@ -69,10 +68,6 @@ export class PocketPilotService {
     });
   }
 
-  refreshPullRequests(): void {
-    this.cluster?.leader?.refreshPullRequests();
-  }
-
   settingsChanged(): Promise<void> {
     const previous = this.settings;
     this.settings = readSettings();
@@ -84,7 +79,6 @@ export class PocketPilotService {
       previous.cloudflaredPath !== this.settings.cloudflaredPath
     )
       return this.restart();
-    this.refreshPullRequests();
     return Promise.resolve();
   }
 
@@ -136,11 +130,6 @@ export class PocketPilotService {
           webRoot: this.context.asAbsolutePath('media/web'),
           password: this.password,
           expireDays: () => readSettings().expireDays,
-          pullRequests: {
-            enabled: () => readSettings().pullRequestsEnabled,
-            intervalMs: () => readSettings().pollSeconds * 1000,
-            token: githubToken
-          },
           report
         }),
       follow: () => followLeader(window, this.storage, port, report),
