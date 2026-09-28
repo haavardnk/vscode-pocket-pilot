@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SessionStatus } from '@pocket-pilot/protocol';
 
-  const { status }: { status: SessionStatus } = $props();
+  const { status, dot = false }: { status: SessionStatus; dot?: boolean } = $props();
 
   const labels: Record<SessionStatus, string> = {
     idle: 'Idle',
@@ -11,7 +11,18 @@
   };
 </script>
 
-{#if status !== 'idle'}
+{#if status !== 'idle' && dot}
+  <span
+    role="img"
+    aria-label={labels[status]}
+    class={[
+      'status shrink-0',
+      status === 'running' && 'animate-pulse status-info',
+      status === 'needsInput' && 'status-warning',
+      status === 'failed' && 'status-error'
+    ]}
+  ></span>
+{:else if status !== 'idle'}
   <span
     class={[
       'badge shrink-0 gap-1 badge-sm',

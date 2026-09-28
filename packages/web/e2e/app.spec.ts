@@ -254,7 +254,7 @@ test.describe('paired', () => {
     await expect(page.getByRole('list', { name: 'Queued messages' })).toContainText(
       'Also add tests'
     );
-    await expect(page.getByRole('banner').getByText('Running')).toBeVisible();
+    await expect(page.getByRole('banner').getByRole('img', { name: 'Running' })).toBeVisible();
     await page.getByRole('button', { name: 'Stop' }).click();
     await expect(page.getByText('Stopped')).toBeVisible();
     await expect(page.getByRole('list', { name: 'Queued messages' })).toHaveCount(0);
