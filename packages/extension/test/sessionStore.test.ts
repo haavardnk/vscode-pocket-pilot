@@ -167,6 +167,8 @@ describe('SessionStore', () => {
             toolId: 'grep',
             message: 'grep',
             detail: null,
+            title: null,
+            grouped: true,
             awaitingConfirmation: false,
             status: 'running',
             terminal: null

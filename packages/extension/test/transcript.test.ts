@@ -1,7 +1,7 @@
 import type { HookEvent } from '@pocket-pilot/protocol';
 import { describe, expect, it } from 'vitest';
 
-import { toolStatuses } from '../src/sessions/projection';
+import { toolStatuses } from '../src/sessions/activityParts';
 import { TranscriptBuffer } from '../src/sessions/transcript';
 import { transcriptLine } from './fixtures';
 

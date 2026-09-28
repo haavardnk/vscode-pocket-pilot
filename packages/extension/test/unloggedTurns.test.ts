@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { type LogSummary, toolStatuses } from '../src/sessions/projection';
+import { toolStatuses } from '../src/sessions/activityParts';
+import type { LogSummary } from '../src/sessions/projection';
 import { TranscriptBuffer } from '../src/sessions/transcript';
 import {
   type LogMark,
@@ -94,6 +95,8 @@ describe('pending overlay', () => {
             toolId: 'grep',
             message: 'grep',
             detail: null,
+            title: null,
+            grouped: true,
             awaitingConfirmation: false,
             status: 'running',
             terminal: null

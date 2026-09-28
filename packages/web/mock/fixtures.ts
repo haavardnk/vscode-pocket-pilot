@@ -252,6 +252,8 @@ export function initialWindows(now: number): MockWindow[] {
                   toolId: 'read_file',
                   message: 'Read `App.svelte`',
                   detail: null,
+                  title: 'Updated the app shell',
+                  grouped: true,
                   awaitingConfirmation: false,
                   status: 'done',
                   terminal: null
@@ -270,6 +272,8 @@ export function initialWindows(now: number): MockWindow[] {
                   toolId: 'run_in_terminal',
                   message: 'Run `npm test`',
                   detail: 'npm test -- --run',
+                  title: null,
+                  grouped: false,
                   awaitingConfirmation: true,
                   status: 'running',
                   terminal: null

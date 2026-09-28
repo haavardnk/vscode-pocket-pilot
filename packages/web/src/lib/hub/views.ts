@@ -4,7 +4,6 @@ import type {
   PullRequest,
   PullRequestState,
   Repository,
-  ResponsePart,
   SessionDetail,
   SessionSummary,
   WindowState
@@ -168,17 +167,6 @@ export function findModel(models: Model[], modelId: string | null): Model | null
 export function modelLabel(models: Model[], modelId: string | null): string {
   if (!modelId) return 'Default model';
   return findModel(models, modelId)?.name ?? modelId.split('/').at(-1) ?? modelId;
-}
-
-export function mergeMarkdown(parts: ResponsePart[]): ResponsePart[] {
-  const merged: ResponsePart[] = [];
-  for (const part of parts) {
-    const previous = merged.at(-1);
-    if (part.kind === 'markdown' && previous?.kind === 'markdown') {
-      merged[merged.length - 1] = { kind: 'markdown', text: previous.text + part.text };
-    } else merged.push(part);
-  }
-  return merged;
 }
 
 export interface PendingTool {

@@ -11,18 +11,17 @@ import type { FSWatcher } from 'chokidar';
 
 import { watchTargets } from '../fsWatch';
 import { asArray, asNumber, asRecord, asString, type JsonRecord } from '../json';
+import { type Activity, toolStatuses } from './activityParts';
 import { LineTailer } from './lineTailer';
 import { applyLogEntry, parseLogEntry } from './mutationLog';
 import {
-  type Activity,
   editedPaths,
   lastRequestAt,
   type LogSummary,
   projectDetail,
   projectSummary,
   requestState,
-  requestText,
-  toolStatuses
+  requestText
 } from './projection';
 import { currentQueue, type QueueOverlay, type StartedTurn } from './queue';
 import { matchesRequest, TranscriptBuffer, type TranscriptTurn } from './transcript';

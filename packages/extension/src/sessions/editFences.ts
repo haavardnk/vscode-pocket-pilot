@@ -17,19 +17,24 @@ function neighbour(
   return index;
 }
 
-function unfence(parts: JsonRecord[], index: number, fence: RegExp): void {
-  const part = parts[index];
-  if (!part || part.kind !== undefined || typeof part.value !== 'string') return;
-  if ((part.value.match(FENCE_LINE)?.length ?? 0) % 2 === 0) return;
-  parts[index] = { ...part, value: part.value.replace(fence, '') };
+function unfence(part: JsonRecord, opens: boolean, closes: boolean): JsonRecord {
+  if ((!opens && !closes) || part.kind !== undefined || typeof part.value !== 'string') return part;
+  const stray = Number(opens) + Number(closes);
+  const fences = part.value.match(FENCE_LINE)?.length ?? 0;
+  if (fences < stray || (fences - stray) % 2 !== 0) return part;
+  let value = part.value;
+  if (closes) value = value.replace(CLOSING, '');
+  if (opens) value = value.replace(OPENING, '');
+  return { ...part, value };
 }
 
 export function withoutEditFences(response: JsonRecord[]): JsonRecord[] {
-  const parts = [...response];
-  parts.forEach((part, index) => {
+  const opening = new Set<number>();
+  const closing = new Set<number>();
+  response.forEach((part, index) => {
     if (part.kind !== 'codeblockUri') return;
-    unfence(parts, neighbour(parts, index, -1, BEFORE_BLOCK), OPENING);
-    unfence(parts, neighbour(parts, index, 1, AFTER_BLOCK), CLOSING);
+    opening.add(neighbour(response, index, -1, BEFORE_BLOCK));
+    closing.add(neighbour(response, index, 1, AFTER_BLOCK));
   });
-  return parts;
+  return response.map((part, index) => unfence(part, opening.has(index), closing.has(index)));
 }

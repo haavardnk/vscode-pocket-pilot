@@ -1,6 +1,7 @@
 import type { RequestView, ToolStatus } from '@pocket-pilot/protocol';
 
-import { activityParts, type LogSummary, previewText, titleText } from './projection';
+import { activityParts } from './activityParts';
+import { type LogSummary, previewText, titleText } from './projection';
 import type { TranscriptTurn } from './transcript';
 
 export interface LogMark {

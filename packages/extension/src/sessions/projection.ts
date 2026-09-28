@@ -17,24 +17,16 @@ import {
 } from '@pocket-pilot/protocol';
 
 import { asArray, asNumber, asRecord, asString, type JsonRecord, markdownText } from '../json';
+import { type Activity, withActivity } from './activityParts';
 import { withoutEditFences } from './editFences';
-import { toolCallId, type TranscriptEvent } from './transcript';
+import { basename, clip, plainMessage } from './partText';
+import { projectTool, writtenPaths } from './toolParts';
+import { toolCallId } from './transcript';
 
 const TITLE_LENGTH = 80;
 const PREVIEW_LENGTH = 160;
-const DETAIL_LENGTH = 4000;
-const LINK = /\[([^\]]*)\]\(([^)\s]+)\)/g;
 
 export type LogSummary = Omit<SessionSummary, 'pinned' | 'archived'>;
-
-type ActivityPart = Extract<ResponsePart, { kind: 'tool' | 'thinking' | 'markdown' }>;
-
-export interface Activity {
-  statuses: ReadonlyMap<string, ToolStatus>;
-  events: readonly TranscriptEvent[];
-  toolsOnly: boolean;
-  settled: boolean;
-}
 
 interface PartContext {
   state: RequestState;
@@ -42,23 +34,7 @@ interface PartContext {
   statuses: ReadonlyMap<string, ToolStatus>;
   stopId: string | null;
   callId: string | null;
-}
-
-function basename(path: string): string {
-  const trimmed = path.replace(/\/+$/, '');
-  return decodeURIComponent(trimmed.slice(trimmed.lastIndexOf('/') + 1));
-}
-
-export function plainMessage(value: unknown): string {
-  return markdownText(value)
-    .replace(LINK, (_match, label: string, target: string) => label || basename(target))
-    .replace(/\$\([\w-]+\)\s*/g, '')
-    .trim();
-}
-
-function clip(text: string, length: number): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
-  return flat.length > length ? `${flat.slice(0, length - 1)}…` : flat;
+  writers: Map<string, string>;
 }
 
 export function titleText(text: string): string {
@@ -141,31 +117,21 @@ export function projectSummary(root: unknown, id: string, modifiedAt: number): L
 }
 
 function referenceName(part: JsonRecord): string {
-  const name = asString(part.name);
-  if (name) return name;
   const reference = asRecord(part.inlineReference);
-  const path = asString(reference.path) ?? asString(asRecord(reference.uri).path) ?? '';
-  return basename(path);
+  const name = asString(part.name) ?? asString(reference.name);
+  if (name) return name;
+  const label = basename(asString(asRecord(reference.uri ?? reference).path) ?? '');
+  const range = asRecord(reference.range);
+  const start = asNumber(range.startLineNumber);
+  const end = asNumber(range.endLineNumber);
+  if (!label || start === null) return label;
+  return start === end ? `${label}:${start}` : `${label}:${start}-${end}`;
 }
 
 function thinkingText(value: unknown): string {
   return Array.isArray(value)
     ? value.filter((item) => typeof item === 'string').join('')
     : markdownText(value);
-}
-
-function toolDetail(value: unknown): string | null {
-  const data = asRecord(value);
-  if (data.kind === 'terminal') {
-    const command = asRecord(data.commandLine);
-    const text =
-      asString(command.forDisplay) ?? asString(command.toolEdited) ?? asString(command.original);
-    return text?.trim() || null;
-  }
-  if (data.kind === 'input' && data.rawInput !== undefined) {
-    return clip(JSON.stringify(data.rawInput), DETAIL_LENGTH);
-  }
-  return null;
 }
 
 function optionValue(value: unknown): OptionValue | null {
@@ -230,23 +196,20 @@ function projectPart(part: JsonRecord, context: PartContext): ResponsePart | nul
       const text = markdownText(part.kind === undefined ? part.value : part.content);
       return text ? { kind: 'markdown', text } : null;
     }
-    case 'inlineReference':
-      return { kind: 'markdown', text: `\`${referenceName(part)}\`` };
+    case 'inlineReference': {
+      const name = referenceName(part);
+      return name ? { kind: 'markdown', text: `\`${name}\`` } : null;
+    }
     case 'thinking': {
       const text = thinkingText(part.value).trim();
       return text ? { kind: 'thinking', text, title: asString(part.generatedTitle) } : null;
     }
     case 'toolInvocationSerialized':
-      return {
-        kind: 'tool',
-        callId: asString(part.toolCallId) ?? '',
-        toolId: asString(part.toolId) ?? '',
-        message: plainMessage(part.pastTenseMessage) || plainMessage(part.invocationMessage),
-        detail: toolDetail(part.toolSpecificData),
-        awaitingConfirmation: awaitingInput && part.isConfirmed == null,
-        status: context.statuses.get(asString(part.toolCallId) ?? '') ?? 'done',
-        terminal: null
-      };
+      return projectTool(
+        part,
+        awaitingInput && part.isConfirmed == null,
+        context.statuses.get(asString(part.toolCallId) ?? '')
+      );
     case 'textEditGroup':
     case 'notebookEditGroup': {
       const uri = asRecord(part.uri);
@@ -256,7 +219,7 @@ function projectPart(part: JsonRecord, context: PartContext): ResponsePart | nul
             kind: 'edit',
             path,
             stopId: context.stopId,
-            callId: context.callId,
+            callId: context.writers.get(path) ?? context.callId,
             additions: null,
             deletions: null
           }
@@ -324,13 +287,17 @@ function projectRequest(request: JsonRecord, latest: boolean, activity: Activity
     latest,
     statuses: activity.statuses,
     stopId: null,
-    callId: null
+    callId: null,
+    writers: new Map()
   };
   const parts = withoutEditFences(asArray(request.response).map(asRecord)).flatMap((part) => {
     if (part.kind === 'undoStop') context.stopId = asString(part.id);
-    if (part.kind === 'toolInvocationSerialized') {
-      const callId = asString(part.toolCallId);
-      context.callId = callId && toolCallId(callId);
+    const paths = part.kind === 'toolInvocationSerialized' ? writtenPaths(part) : null;
+    const raw = asString(part.toolCallId);
+    if (paths && raw) {
+      const callId = toolCallId(raw);
+      context.callId = callId;
+      for (const path of paths) context.writers.set(path, callId);
     }
     const projected = projectPart(part, context);
     return projected ? [projected] : [];
@@ -384,59 +351,6 @@ export function editedPaths(root: unknown): string[] {
     })
   );
   return [...new Set(paths)];
-}
-
-export function toolStatuses(events: readonly TranscriptEvent[]): Map<string, ToolStatus> {
-  const statuses = new Map<string, ToolStatus>();
-  for (const event of events) {
-    if (event.type === 'toolStart' && !statuses.has(event.callId)) {
-      statuses.set(event.callId, 'running');
-    }
-    if (event.type === 'toolEnd') statuses.set(event.callId, event.success ? 'done' : 'failed');
-  }
-  return statuses;
-}
-
-export function activityParts(
-  events: readonly TranscriptEvent[],
-  statuses: ReadonlyMap<string, ToolStatus>,
-  toolsOnly: boolean
-): ActivityPart[] {
-  const running = new Set<string>();
-  const parts: ActivityPart[] = [];
-  for (const event of events) {
-    if (event.type === 'toolStart') {
-      running.add(event.callId);
-      parts.push({
-        kind: 'tool',
-        callId: event.callId,
-        toolId: event.name,
-        message: event.name,
-        detail: event.args && clip(event.args, DETAIL_LENGTH),
-        awaitingConfirmation: false,
-        status: statuses.get(event.callId) ?? 'running',
-        terminal: null
-      });
-    } else if (event.type === 'toolEnd') {
-      running.delete(event.callId);
-    } else if (event.type === 'message' && running.size === 0 && !toolsOnly) {
-      const reasoning = event.reasoning?.trim();
-      if (reasoning) parts.push({ kind: 'thinking', text: reasoning, title: null });
-      if (event.text) parts.push({ kind: 'markdown', text: event.text });
-    }
-  }
-  return parts;
-}
-
-function withActivity(parts: ResponsePart[], activity: Activity): ResponsePart[] {
-  const tools = new Set(parts.flatMap((part) => (part.kind === 'tool' ? [part.callId] : [])));
-  const shown = parts
-    .map((part) => (part.kind === 'markdown' || part.kind === 'thinking' ? part.text : ''))
-    .join('\n');
-  const extra = activityParts(activity.events, activity.statuses, activity.toolsOnly).filter(
-    (part) => (part.kind === 'tool' ? !tools.has(part.callId) : !shown.includes(part.text.trim()))
-  );
-  return [...parts, ...extra];
 }
 
 export function projectDetail(

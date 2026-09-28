@@ -80,6 +80,8 @@ export const responsePartSchema = z.discriminatedUnion('kind', [
     toolId: z.string(),
     message: z.string(),
     detail: z.string().nullable(),
+    title: z.string().nullable(),
+    grouped: z.boolean(),
     awaitingConfirmation: z.boolean(),
     status: toolStatusSchema,
     terminal: terminalRefSchema.nullable()

@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  type Activity,
-  editedPaths,
-  plainMessage,
-  projectDetail,
-  projectSummary
-} from '../src/sessions/projection';
+import type { Activity } from '../src/sessions/activityParts';
+import { plainMessage } from '../src/sessions/partText';
+import { editedPaths, projectDetail, projectSummary } from '../src/sessions/projection';
 import { request, SESSION_ID, snapshot } from './fixtures';
 
 const quiet: Activity = { statuses: new Map(), events: [], toolsOnly: false, settled: false };
@@ -57,10 +53,34 @@ describe('projection', () => {
     expect(projectSummary(root, 'file', 0).title).toBe('Named');
   });
 
-  it('cleans tool messages', () => {
-    expect(plainMessage({ value: 'Read [](file:///repo/src/app.ts), lines 1 to 5' })).toBe(
-      'Read app.ts, lines 1 to 5'
-    );
+  it.each([
+    ['Read [](file:///repo/src/app.ts), lines 1 to 5', 'Read app.ts, lines 1 to 5'],
+    ['Read [](file:///repo/TODO.md#33-33), lines 33 to 44', 'Read TODO.md, lines 33 to 44'],
+    ['Opened [Browser](vscode-browser:/id?vscodeLinkType=browser)', 'Opened Browser']
+  ])('cleans tool message %s', (value, expected) => {
+    expect(plainMessage({ value })).toBe(expected);
+  });
+
+  it.each([
+    [{ path: '/repo/a.ts' }, 'Open `a.ts`'],
+    [
+      { name: 'devices.json', kind: 12, location: { uri: { path: '/x/y' } } },
+      'Open `devices.json`'
+    ],
+    [
+      { uri: { path: '/repo/a.ts' }, range: { startLineNumber: 3, endLineNumber: 3 } },
+      'Open `a.ts:3`'
+    ],
+    [
+      { uri: { path: '/repo/a.ts' }, range: { startLineNumber: 3, endLineNumber: 9 } },
+      'Open `a.ts:3-9`'
+    ],
+    [{}, 'Open ']
+  ])('labels inline references like VS Code %#', (inlineReference, text) => {
+    const response = [{ value: 'Open ' }, { kind: 'inlineReference', inlineReference }];
+    const root = snapshot([request('r1', 'go', 1, response)]);
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []);
+    expect(detail.requests[0]?.parts).toEqual([{ kind: 'markdown', text }]);
   });
 
   it('projects parts, queue and activity', () => {
@@ -127,21 +147,25 @@ describe('projection', () => {
         kind: 'tool',
         callId: 'c1',
         toolId: 'run_in_terminal',
-        message: 'Run tests',
+        message: 'Running `npm test`',
         detail: 'npm test',
+        title: null,
+        grouped: false,
         awaitingConfirmation: true,
         status: 'running',
         terminal: null
       },
-      { ...edit, callId: 'c1' },
+      edit,
       { kind: 'thinking', text: 'Check first', title: null },
       { kind: 'markdown', text: 'All green' },
       {
         kind: 'tool',
         callId: 'c2',
         toolId: 'grep_search',
-        message: 'grep_search',
+        message: 'Searching for text `x`',
         detail: '{"query":"x"}',
+        title: null,
+        grouped: true,
         awaitingConfirmation: false,
         status: 'running',
         terminal: null
@@ -159,6 +183,19 @@ describe('projection', () => {
     [
       [{ value: '```ts\nx\n```\n\n```\n' }, block, group, { value: '\n```\n' }],
       [{ kind: 'markdown', text: '```ts\nx\n```' }, edit]
+    ],
+    [
+      [
+        { value: '\n```\n' },
+        block,
+        group,
+        { value: '\n```\n\n```\n' },
+        { kind: 'undoStop' },
+        { ...block, uri: { path: '/repo/b.ts' } },
+        { ...group, uri: { path: '/repo/b.ts' } },
+        { value: '\n```\n' }
+      ],
+      [edit, { ...edit, path: '/repo/b.ts' }]
     ]
   ])('drops the code fences around an edit %#', (response, expected) => {
     const root = snapshot([request('r1', 'go', 1, response)]);
@@ -190,6 +227,36 @@ describe('projection', () => {
     expect(parts?.filter((part) => part.kind === 'edit')).toEqual([
       { ...edit, stopId: 'u1', callId: 'c1' },
       { ...edit, stopId: 'u2', callId: 'c2' }
+    ]);
+  });
+
+  it('anchors late edits to the tool call that wrote the file', () => {
+    const uris = (...paths: string[]) =>
+      Object.fromEntries(paths.map((path) => [`file://${path}`, { path, scheme: 'file' }]));
+    const call = (id: string, toolId: string, paths: string[]) => ({
+      kind: 'toolInvocationSerialized',
+      toolCallId: id,
+      toolId,
+      invocationMessage: { value: 'Tool', uris: uris(...paths) },
+      presentation: toolId === 'copilot_multiReplaceString' ? 'hidden' : undefined,
+      isComplete: true
+    });
+    const response = [
+      call('c1__vscode-1', 'copilot_multiReplaceString', ['/repo/a.ts', '/repo/b.ts']),
+      call('c2__vscode-2', 'copilot_readFile', ['/repo/a.ts']),
+      call('c3__vscode-3', 'copilot_createFile', ['/repo/c.ts']),
+      call('c4__vscode-4', 'run_in_terminal', []),
+      { kind: 'undoStop', id: 'u1' },
+      group,
+      { kind: 'undoStop', id: 'u2' },
+      { ...group, uri: { path: '/repo/b.ts' } }
+    ];
+    const root = snapshot([request('r1', 'go', 1, response)]);
+    const parts = projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []).requests[0]
+      ?.parts;
+    expect(parts?.filter((part) => part.kind === 'edit')).toEqual([
+      { ...edit, stopId: 'u1', callId: 'c1' },
+      { ...edit, path: '/repo/b.ts', stopId: 'u2', callId: 'c1' }
     ]);
   });
 

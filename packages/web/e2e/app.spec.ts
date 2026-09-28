@@ -535,7 +535,12 @@ test.describe('paired', () => {
   test('shows the files one message changed', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     const request = page.locator('[data-request="r1"]');
+    const steps = request.locator('summary', { hasText: 'Updated the app shell' });
+    await expect(steps).toContainText('+1 −0');
+    await expect(request.getByRole('link', { name: /App\.svelte/ })).toBeHidden();
+    await steps.click();
     await expect(request.getByRole('img', { name: 'Done' })).toBeVisible();
+    await expect(request.getByRole('link', { name: /App\.svelte/ })).toBeVisible();
     await expect(request.getByRole('img', { name: 'Running' })).toBeVisible();
     await request.getByRole('link', { name: 'Files changed (1)' }).click();
     await expect(page.getByRole('heading', { name: 'Message changes' })).toBeVisible();
@@ -552,9 +557,11 @@ test.describe('paired', () => {
   });
 
   test('opens one edit from the chat and returns to the same spot', async ({ page }) => {
-    await page.setViewportSize({ width: 412, height: 480 });
     await openSession(page, 'Build the phone app');
-    const link = page.locator('[data-request="r1"]').getByRole('link', { name: /App\.svelte/ });
+    const request = page.locator('[data-request="r1"]');
+    await request.getByText('Updated the app shell').click();
+    await page.setViewportSize({ width: 412, height: 480 });
+    const link = request.getByRole('link', { name: /App\.svelte/ });
     await expect(link).toContainText('+1 −0');
     const bottom = (): Promise<number> =>
       page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
@@ -573,6 +580,7 @@ test.describe('paired', () => {
     await expect(page.getByTestId('diff')).not.toContainText('import Composer');
     await page.getByRole('button', { name: 'Back' }).click();
     await expect(page.getByRole('heading', { name: 'Build the phone app' })).toBeVisible();
+    await expect(link).toBeVisible();
     await page.evaluate(
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     );
@@ -698,6 +706,7 @@ test.describe('paired', () => {
   test('opens the terminal a chat tool ran in', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     await page.getByRole('button', { name: 'Allow' }).click();
+    await page.getByText('Updated the app shell').click();
     await page.getByRole('link', { name: 'Open terminal' }).click();
     await expect(page.getByRole('heading', { name: 'Copilot' })).toBeVisible();
     const run = page.getByRole('region', { name: 'npm test -- --run' });

@@ -9,7 +9,6 @@ import { describe, expect, it } from 'vitest';
 import {
   agentLabel,
   ALL_REPOSITORIES,
-  mergeMarkdown,
   modelLabel,
   NO_REPOSITORY,
   pendingTool,
@@ -207,29 +206,6 @@ describe('labels', () => {
 });
 
 describe('response parts', () => {
-  it('merges adjacent markdown so split code fences render', () => {
-    const edit = {
-      kind: 'edit',
-      path: 'a.ts',
-      stopId: null,
-      callId: null,
-      additions: null,
-      deletions: null
-    } as const;
-    expect(
-      mergeMarkdown([
-        { kind: 'markdown', text: '```ts\nconst a' },
-        { kind: 'markdown', text: ' = 1;\n```' },
-        edit,
-        { kind: 'markdown', text: 'done' }
-      ])
-    ).toEqual([
-      { kind: 'markdown', text: '```ts\nconst a = 1;\n```' },
-      edit,
-      { kind: 'markdown', text: 'done' }
-    ]);
-  });
-
   it('finds the tool waiting in the latest request only', () => {
     const tool = (callId: string, awaitingConfirmation: boolean) =>
       ({
@@ -238,6 +214,8 @@ describe('response parts', () => {
         toolId: 'run',
         message: 'Run',
         detail: null,
+        title: null,
+        grouped: !awaitingConfirmation,
         awaitingConfirmation,
         status: 'running',
         terminal: null

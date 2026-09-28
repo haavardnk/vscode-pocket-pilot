@@ -189,6 +189,7 @@ export class MockHub {
       last?.parts.forEach((part) => {
         if (part.kind !== 'tool') return;
         part.awaitingConfirmation = false;
+        part.grouped = true;
         if (part.status === 'running') part.status = 'failed';
       });
       detail.status = 'idle';
@@ -201,6 +202,7 @@ export class MockHub {
       const tool = last?.parts.find((part) => part.kind === 'tool' && part.awaitingConfirmation);
       if (!last || tool?.kind !== 'tool') throw new Error('No tool is waiting');
       tool.awaitingConfirmation = false;
+      tool.grouped = true;
       tool.status = command.decision === 'accept' ? 'done' : 'failed';
       if (command.decision === 'accept') this.runTool(window, detail.id, tool);
       last.parts.push({
@@ -280,6 +282,8 @@ export class MockHub {
           toolId: 'read_file',
           message: 'Read `README.md`',
           detail: null,
+          title: null,
+          grouped: true,
           awaitingConfirmation: false,
           status: 'running',
           terminal: null
