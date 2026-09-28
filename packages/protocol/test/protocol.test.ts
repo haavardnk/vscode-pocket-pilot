@@ -71,6 +71,7 @@ const session = (requests: RequestView[], title = 'Demo'): SessionDetail => ({
   permission: 'default',
   totalRequests: requests.length,
   editedFiles: 0,
+  todos: null,
   requests,
   queued: []
 });

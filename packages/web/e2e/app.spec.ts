@@ -556,6 +556,31 @@ test.describe('paired', () => {
     await expect(page.getByRole('button', { name: /Keep all/ })).toHaveCount(0);
   });
 
+  test('shows the todo list above the composer', async ({ page }) => {
+    await openSession(page, 'Build the phone app');
+    const toggle = page.getByRole('button', { name: /^Todos \(1\/3\)/ });
+    await expect(toggle).toContainText('Composer with queue');
+    await toggle.click();
+    const list = page.getByRole('list', { name: 'Todos' });
+    await expect(list.getByRole('listitem')).toHaveText([
+      'Session list',
+      'Composer with queue',
+      'Offline banner'
+    ]);
+    await expect(list.getByRole('img', { name: 'In progress' })).toHaveCount(1);
+    await expect(toggle).toHaveText('Todos (1/3)');
+  });
+
+  test('expands a subagent with its tools and result', async ({ page }) => {
+    await openSession(page, 'Fix flaky cluster test');
+    const result = page.getByText('The follower connects before the leader listens.');
+    await expect(result).toBeHidden();
+    await page.getByText('Find the election timeout').click();
+    await expect(page.getByText('Read cluster.ts')).toBeVisible();
+    await expect(page.getByText('Claude Haiku 4.5')).toBeVisible();
+    await expect(result).toBeVisible();
+  });
+
   test('opens one edit from the chat and returns to the same spot', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     const request = page.locator('[data-request="r1"]');

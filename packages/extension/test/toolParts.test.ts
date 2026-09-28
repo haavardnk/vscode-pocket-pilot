@@ -92,4 +92,32 @@ describe('tool parts', () => {
     const part = { toolId: 'copilot_readFile', generatedTitle: 'Read project docs' };
     expect(projectTool(part, false, undefined)?.title).toBe('Read project docs');
   });
+
+  it('carries subagent details and links its tools', () => {
+    const subagent = {
+      toolId: 'runSubagent',
+      toolCallId: 's1',
+      toolSpecificData: {
+        kind: 'subagent',
+        description: 'Survey helpers',
+        agentName: 'Explore',
+        modelName: 'Claude Haiku 4.5',
+        result: 'Found two'
+      }
+    };
+    expect(projectTool(subagent, false, undefined)).toMatchObject({
+      subagent: {
+        agentName: 'Explore',
+        description: 'Survey helpers',
+        model: 'Claude Haiku 4.5',
+        result: 'Found two'
+      },
+      parentCallId: null
+    });
+    const child = { toolId: 'copilot_readFile', subAgentInvocationId: 's1' };
+    expect(projectTool(child, false, undefined)).toMatchObject({
+      subagent: null,
+      parentCallId: 's1'
+    });
+  });
 });

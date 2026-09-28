@@ -1,6 +1,7 @@
 import type { RequestState, ResponsePart } from '@pocket-pilot/protocol';
 
 export type Step = Extract<ResponsePart, { kind: 'thinking' | 'tool' | 'edit' }>;
+type ToolPart = Extract<ResponsePart, { kind: 'tool' }>;
 
 export interface StepGroup {
   kind: 'group';
@@ -11,7 +12,13 @@ export interface StepGroup {
   deletions: number | null;
 }
 
-export type ResponseItem = Exclude<ResponsePart, { kind: 'thinking' }> | StepGroup;
+export interface SubagentItem {
+  kind: 'subagent';
+  part: ToolPart;
+  steps: ToolPart[];
+}
+
+export type ResponseItem = Exclude<ResponsePart, { kind: 'thinking' }> | StepGroup | SubagentItem;
 
 const HEADER = /^\*\*([^*]+)\*\*/;
 
@@ -24,10 +31,6 @@ export function mergeMarkdown(parts: ResponsePart[]): ResponsePart[] {
     } else merged.push(part);
   }
   return merged;
-}
-
-function isStep(part: ResponsePart): part is Step {
-  return part.kind === 'thinking' || part.kind === 'edit' || (part.kind === 'tool' && part.grouped);
 }
 
 function titleOf(steps: Step[], kind: 'thinking' | 'tool'): string | undefined {
@@ -68,18 +71,35 @@ function group(steps: Step[], active: boolean): ResponseItem {
   };
 }
 
+function subagentSteps(parts: ResponsePart[]): Map<string, ToolPart[]> {
+  const children = new Map<string, ToolPart[]>(
+    parts.flatMap((part) => (part.kind === 'tool' && part.subagent ? [[part.callId, []]] : []))
+  );
+  for (const part of parts) {
+    if (part.kind === 'tool' && part.parentCallId) children.get(part.parentCallId)?.push(part);
+  }
+  return children;
+}
+
 export function responseItems(parts: ResponsePart[], state: RequestState): ResponseItem[] {
   const items: ResponseItem[] = [];
+  const children = subagentSteps(parts);
   let run: Step[] = [];
   for (const part of mergeMarkdown(parts)) {
     if (part.kind === 'markdown' && !part.text.trim()) continue;
-    if (isStep(part)) {
+    if (part.kind === 'tool' && part.parentCallId && children.has(part.parentCallId)) continue;
+    if (
+      part.kind === 'thinking' ||
+      part.kind === 'edit' ||
+      (part.kind === 'tool' && part.grouped)
+    ) {
       run.push(part);
       continue;
     }
     if (run.length > 0) items.push(group(run, false));
     run = [];
-    items.push(part);
+    const steps = part.kind === 'tool' ? children.get(part.callId) : undefined;
+    items.push(part.kind === 'tool' && steps ? { kind: 'subagent', part, steps } : part);
   }
   if (run.length > 0) items.push(group(run, state === 'pending'));
   return items;

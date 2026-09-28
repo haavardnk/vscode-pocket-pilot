@@ -246,6 +246,11 @@ export function initialWindows(now: number): MockWindow[] {
           modeId: 'agent',
           permission: 'default',
           editedFiles: 2,
+          todos: [
+            { title: 'Session list', status: 'completed' },
+            { title: 'Composer with queue', status: 'inProgress' },
+            { title: 'Offline banner', status: 'notStarted' }
+          ],
           totalRequests: 1,
           requests: [
             {
@@ -271,7 +276,9 @@ export function initialWindows(now: number): MockWindow[] {
                   grouped: true,
                   awaitingConfirmation: false,
                   status: 'done',
-                  terminal: null
+                  terminal: null,
+                  subagent: null,
+                  parentCallId: null
                 },
                 {
                   kind: 'edit',
@@ -291,7 +298,9 @@ export function initialWindows(now: number): MockWindow[] {
                   grouped: false,
                   awaitingConfirmation: true,
                   status: 'running',
-                  terminal: null
+                  terminal: null,
+                  subagent: null,
+                  parentCallId: null
                 }
               ]
             }
@@ -306,6 +315,7 @@ export function initialWindows(now: number): MockWindow[] {
           modeId: 'file:///repo/.github/agents/reviewer.agent.md',
           permission: 'default',
           editedFiles: 0,
+          todos: null,
           totalRequests: 1,
           requests: [
             {
@@ -316,6 +326,39 @@ export function initialWindows(now: number): MockWindow[] {
               state: 'complete',
               error: null,
               parts: [
+                {
+                  kind: 'tool',
+                  callId: 'sub1',
+                  toolId: 'runSubagent',
+                  message: 'Find the election timeout',
+                  detail: null,
+                  title: null,
+                  grouped: false,
+                  awaitingConfirmation: false,
+                  status: 'done',
+                  terminal: null,
+                  subagent: {
+                    agentName: 'Explore',
+                    description: 'Find the election timeout',
+                    model: 'Claude Haiku 4.5',
+                    result: 'The follower connects **before** the leader listens.'
+                  },
+                  parentCallId: null
+                },
+                {
+                  kind: 'tool',
+                  callId: 'sub1-read',
+                  toolId: 'read_file',
+                  message: 'Read `cluster.ts`',
+                  detail: null,
+                  title: null,
+                  grouped: false,
+                  awaitingConfirmation: false,
+                  status: 'done',
+                  terminal: null,
+                  subagent: null,
+                  parentCallId: 'sub1'
+                },
                 { kind: 'markdown', text: 'The follower retried before the leader was listening.' }
               ]
             }
@@ -330,6 +373,7 @@ export function initialWindows(now: number): MockWindow[] {
           modeId: 'agent',
           permission: 'autoApprove',
           editedFiles: 0,
+          todos: null,
           totalRequests: 1,
           requests: [
             {
@@ -403,6 +447,7 @@ export function initialWindows(now: number): MockWindow[] {
           modeId: 'agent',
           permission: 'default',
           editedFiles: 0,
+          todos: null,
           totalRequests: 1,
           requests: [
             {
@@ -447,6 +492,7 @@ export function initialWindows(now: number): MockWindow[] {
           modeId: 'agent',
           permission: 'default',
           editedFiles: 0,
+          todos: null,
           totalRequests: 1,
           requests: [
             {

@@ -171,7 +171,9 @@ describe('SessionStore', () => {
             grouped: true,
             awaitingConfirmation: false,
             status: 'running',
-            terminal: null
+            terminal: null,
+            subagent: null,
+            parentCallId: null
           }
         ]
       ]

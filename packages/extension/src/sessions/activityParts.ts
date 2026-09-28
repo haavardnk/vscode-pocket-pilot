@@ -60,7 +60,9 @@ function toolParts(event: ToolStart, status: ToolStatus): ActivityPart[] {
       grouped: groupedByName(event.name),
       awaitingConfirmation: false,
       status,
-      terminal: null
+      terminal: null,
+      subagent: null,
+      parentCallId: null
     }
   ];
 }

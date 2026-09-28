@@ -154,6 +154,7 @@ describe('code queries', () => {
       permission: 'default',
       totalRequests: 2,
       editedFiles: 3,
+      todos: null,
       requests: [
         view('r1', 'Change a', 1_700_000_000_000, []),
         view('r2', 'Document it', 1_700_000_060_000, [join(workspace, 'DOCS.md')])

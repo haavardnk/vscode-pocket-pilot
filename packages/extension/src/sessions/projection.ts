@@ -20,6 +20,7 @@ import { asArray, asNumber, asRecord, asString, type JsonRecord, markdownText } 
 import { type Activity, withActivity } from './activityParts';
 import { withoutEditFences } from './editFences';
 import { basename, clip, plainMessage } from './partText';
+import { sessionTodos } from './todos';
 import { projectTool, writtenPaths } from './toolParts';
 import { toolCallId } from './transcript';
 
@@ -381,6 +382,7 @@ export function projectDetail(
     permission: sessionPermission(session),
     totalRequests: requests.length + pending.length,
     editedFiles: editedPaths(session).length,
+    todos: sessionTodos(requests),
     requests: [...views, ...unlogged],
     queued: projectQueued(session)
   };

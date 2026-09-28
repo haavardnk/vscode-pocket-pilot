@@ -40,6 +40,7 @@ function detail(count: number): SessionDetail {
     permission: 'default',
     totalRequests: count,
     editedFiles: 0,
+    todos: null,
     requests: Array.from({ length: count }, (_, index) => ({
       id: `r${index}`,
       timestamp: index,

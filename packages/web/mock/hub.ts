@@ -140,6 +140,7 @@ export class MockHub {
         modeId: command.modeId ?? 'agent',
         permission: 'default',
         editedFiles: 0,
+        todos: null,
         totalRequests: 0,
         requests: [],
         queued: []
@@ -287,7 +288,9 @@ export class MockHub {
           grouped: true,
           awaitingConfirmation: false,
           status: 'running',
-          terminal: null
+          terminal: null,
+          subagent: null,
+          parentCallId: null
         }
       ]
     });

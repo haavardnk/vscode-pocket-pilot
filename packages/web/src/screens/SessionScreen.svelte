@@ -29,6 +29,7 @@
   import RequestItem from '../lib/components/RequestItem.svelte';
   import SessionActionsSheet from '../lib/components/SessionActionsSheet.svelte';
   import StatusBadge from '../lib/components/StatusBadge.svelte';
+  import TodoList from '../lib/components/TodoList.svelte';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { parseRoute, routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
@@ -58,6 +59,11 @@
   const modeId = $derived(detail?.modeId ?? summary?.modeId ?? null);
   const modelId = $derived(detail?.modelId ?? summary?.modelId ?? null);
   const tool = $derived(pendingTool(detail));
+  const todos = $derived(
+    detail?.todos && (busy || detail.todos.some((todo) => todo.status !== 'completed'))
+      ? detail.todos
+      : null
+  );
   const connected = $derived(hub.connection === 'open' && hostWindow !== undefined);
   const echoing = $derived(
     echo && detail && (detail.requests.at(-1)?.id ?? null) === echo.after ? echo.text : null
@@ -275,6 +281,9 @@
   {#if detail && hostWindow}
     <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
       <div class="flex flex-col gap-3 px-3 pt-3 pb-3">
+        {#if todos}
+          <TodoList {todos} />
+        {/if}
         {#if detail.queued.length > 0}
           <QueuedMessages queued={detail.queued} disabled={!connected} onchange={changeQueue} />
         {/if}

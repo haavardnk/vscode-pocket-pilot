@@ -71,6 +71,18 @@ export const interactionStateSchema = z.enum(['pending', 'done', 'expired']);
 
 export const toolStatusSchema = z.enum(['running', 'done', 'failed']);
 
+export const subagentSchema = z.object({
+  agentName: z.string().nullable(),
+  description: z.string(),
+  model: z.string().nullable(),
+  result: z.string().nullable()
+});
+
+export const todoItemSchema = z.object({
+  title: z.string(),
+  status: z.enum(['notStarted', 'inProgress', 'completed'])
+});
+
 export const responsePartSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('markdown'), text: z.string() }),
   z.object({ kind: z.literal('thinking'), text: z.string(), title: z.string().nullable() }),
@@ -84,7 +96,9 @@ export const responsePartSchema = z.discriminatedUnion('kind', [
     grouped: z.boolean(),
     awaitingConfirmation: z.boolean(),
     status: toolStatusSchema,
-    terminal: terminalRefSchema.nullable()
+    terminal: terminalRefSchema.nullable(),
+    subagent: subagentSchema.nullable(),
+    parentCallId: z.string().nullable()
   }),
   z.object({
     kind: z.literal('edit'),
@@ -146,6 +160,7 @@ export const sessionDetailSchema = z.object({
   permission: permissionLevelSchema,
   totalRequests: z.number(),
   editedFiles: z.number(),
+  todos: z.array(todoItemSchema).nullable(),
   requests: z.array(requestViewSchema),
   queued: z.array(queuedRequestSchema)
 });
@@ -236,6 +251,8 @@ export type QuestionAnswer = z.infer<typeof questionAnswerSchema>;
 export type QuestionAnswers = z.infer<typeof questionAnswersSchema>;
 export type InteractionState = z.infer<typeof interactionStateSchema>;
 export type ToolStatus = z.infer<typeof toolStatusSchema>;
+export type Subagent = z.infer<typeof subagentSchema>;
+export type TodoItem = z.infer<typeof todoItemSchema>;
 export type ResponsePart = z.infer<typeof responsePartSchema>;
 export type RequestView = z.infer<typeof requestViewSchema>;
 export type Delivery = z.infer<typeof deliverySchema>;

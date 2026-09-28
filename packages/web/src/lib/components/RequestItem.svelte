@@ -10,6 +10,7 @@
   import EditLink from './EditLink.svelte';
   import QuestionCard from './QuestionCard.svelte';
   import StepGroup from './StepGroup.svelte';
+  import SubagentBlock from './SubagentBlock.svelte';
   import ToolLine from './ToolLine.svelte';
 
   interface Props {
@@ -48,6 +49,8 @@
   {#each items as part, index (index)}
     {#if part.kind === 'group'}
       <StepGroup group={part} {index} {windowId} {sessionId} requestId={request.id} />
+    {:else if part.kind === 'subagent'}
+      <SubagentBlock item={part} {windowId} {sessionId} />
     {:else if part.kind === 'markdown'}
       <div class="markdown" {@attach markdown(part.text)}></div>
     {:else if part.kind === 'tool'}

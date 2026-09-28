@@ -218,7 +218,9 @@ describe('response parts', () => {
         grouped: !awaitingConfirmation,
         awaitingConfirmation,
         status: 'running',
-        terminal: null
+        terminal: null,
+        subagent: null,
+        parentCallId: null
       }) as const;
     const request = (parts: SessionDetail['requests'][number]['parts']) => ({
       id: 'r',
@@ -237,6 +239,7 @@ describe('response parts', () => {
       modeId: null,
       permission: 'default',
       editedFiles: 0,
+      todos: null,
       totalRequests: requests.length,
       requests,
       queued: []

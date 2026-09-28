@@ -16,7 +16,9 @@ const tool = (title: string | null = null, grouped = true) =>
     grouped,
     awaitingConfirmation: !grouped,
     status: 'done',
-    terminal: null
+    terminal: null,
+    subagent: null,
+    parentCallId: null
   }) as const;
 const edit = (additions: number | null, deletions: number | null) =>
   ({ kind: 'edit', path: 'a.ts', stopId: null, callId: null, additions, deletions }) as const;
@@ -85,5 +87,20 @@ describe('response steps', () => {
       additions: null,
       deletions: null
     });
+  });
+
+  it('nests tools under their subagent and keeps orphans inline', () => {
+    const subagent = {
+      ...tool(null, false),
+      callId: 's1',
+      subagent: { agentName: 'Explore', description: 'Survey', model: null, result: null }
+    };
+    const child = { ...tool(null, false), callId: 'c1', parentCallId: 's1' };
+    const orphan = { ...tool(null, false), callId: 'c2', parentCallId: 'gone' };
+    expect(responseItems([subagent, text('a'), child, orphan], 'complete')).toEqual([
+      { kind: 'subagent', part: subagent, steps: [child] },
+      text('a'),
+      orphan
+    ]);
   });
 });

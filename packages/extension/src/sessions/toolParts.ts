@@ -1,4 +1,4 @@
-import type { ResponsePart, ToolStatus } from '@pocket-pilot/protocol';
+import type { ResponsePart, Subagent, ToolStatus } from '@pocket-pilot/protocol';
 
 import { asArray, asRecord, asString, type JsonRecord } from '../json';
 import { clip, DETAIL_LENGTH, plainMessage } from './partText';
@@ -110,6 +110,16 @@ function isGrouped(part: JsonRecord, toolId: string, awaitingConfirmation: boole
   );
 }
 
+function subagentOf(data: JsonRecord): Subagent | null {
+  if (data.kind !== 'subagent') return null;
+  return {
+    agentName: asString(data.agentName),
+    description: asString(data.description) ?? '',
+    model: asString(data.modelName),
+    result: asString(data.result)
+  };
+}
+
 function outcomeOf(part: JsonRecord): Outcome {
   const type = asRecord(part.isConfirmed).type;
   if (type === SKIPPED) return 'skipped';
@@ -144,6 +154,8 @@ export function projectTool(
     grouped: isGrouped(part, toolId, awaitingConfirmation),
     awaitingConfirmation,
     status,
-    terminal: null
+    terminal: null,
+    subagent: subagentOf(data),
+    parentCallId: asString(part.subAgentInvocationId)
   };
 }

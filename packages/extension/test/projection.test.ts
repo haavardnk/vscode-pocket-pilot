@@ -153,7 +153,9 @@ describe('projection', () => {
         grouped: false,
         awaitingConfirmation: true,
         status: 'running',
-        terminal: null
+        terminal: null,
+        subagent: null,
+        parentCallId: null
       },
       edit,
       { kind: 'thinking', text: 'Check first', title: null },
@@ -168,7 +170,9 @@ describe('projection', () => {
         grouped: true,
         awaitingConfirmation: false,
         status: 'running',
-        terminal: null
+        terminal: null,
+        subagent: null,
+        parentCallId: null
       }
     ]);
     expect(detail.permission).toBe('default');
