@@ -27,6 +27,7 @@ import { type CodeFolder, codeFolder } from './code/folders';
 import { LanguageIndex } from './code/languageIndex';
 import { SessionChanges } from './code/sessionChanges';
 import { Controller } from './control/controller';
+import { GitStatusSource } from './git/gitStatus';
 import { folderRepository } from './git/repository';
 import { ModelSettingsFile } from './models/modelSettings';
 import { ModelSource } from './models/modelSource';
@@ -77,11 +78,14 @@ export class WindowAgent implements vscode.Disposable {
   private readonly editChanges: EditChanges;
   private readonly mirror: LiveMirror;
   private readonly terminals: TerminalService;
+  private readonly git: GitStatusSource;
   private readonly paths: ChatPaths;
   private readonly detailQueues = new Map<string, Promise<void>>();
   private watches = new Map<string, number>();
   private repositories: Repository[] = [];
   private folders: CodeFolder[] = [];
+  private folderRepositories = new Map<string, string>();
+  private gitKey = '';
   private agents: Agent[] = [];
   private models: Model[] = [];
   private readonly versions = { agents: 0, models: 0, repositories: 0 };
@@ -157,9 +161,12 @@ export class WindowAgent implements vscode.Disposable {
       settings
     });
     this.terminals = new TerminalService(() => this.folders, report);
+    this.git = new GitStatusSource(report);
     this.subscriptions.push(
       languages,
       this.terminals,
+      this.git,
+      this.git.onDidChange(() => this.publishGit()),
       this.terminals.onDidChange(() => this.schedulePublish()),
       this.terminals.onDidUpdate((update) => this.terminalChanged.fire(update)),
       this.terminals.onDidLink((sessionId) => {
@@ -196,7 +203,8 @@ export class WindowAgent implements vscode.Disposable {
       this.refreshAgents(),
       this.refreshModels(),
       this.refreshRepositories(),
-      this.refreshMirror()
+      this.refreshMirror(),
+      this.git.start()
     ]);
   }
 
@@ -205,7 +213,12 @@ export class WindowAgent implements vscode.Disposable {
       windowId: this.windowId,
       name: vscode.workspace.name ?? 'Empty window',
       repositories: this.repositories,
-      folders: this.folders.map(({ id, name }) => ({ id, name })),
+      folders: this.folders.map(({ id, name, root }) => ({
+        id,
+        name,
+        repositoryKey: this.folderRepositories.get(id) ?? null,
+        git: this.git.statusFor(root)
+      })),
       sessions: this.store
         .summaries()
         .map((summary) => ({ ...summary, ...this.flags.flags(summary.id) })),
@@ -291,6 +304,13 @@ export class WindowAgent implements vscode.Disposable {
     }, PUBLISH_DELAY_MS);
   }
 
+  private publishGit(): void {
+    const key = JSON.stringify(this.folders.map((folder) => this.git.statusFor(folder.root)));
+    if (key === this.gitKey) return;
+    this.gitKey = key;
+    this.schedulePublish();
+  }
+
   private async refreshAgents(): Promise<void> {
     const version = ++this.versions.agents;
     const agents = await this.agentSource.list();
@@ -322,12 +342,13 @@ export class WindowAgent implements vscode.Disposable {
     );
     this.folders = folders.map((folder) => codeFolder(folder.name, folder.uri.fsPath));
     this.schedulePublish();
-    const repositories = await Promise.all(
-      folders.map((folder) => folderRepository(folder.uri.fsPath))
+    const resolved = await Promise.all(
+      this.folders.map(async ({ id, root }) => ({ id, repository: await folderRepository(root) }))
     );
     if (version !== this.versions.repositories) return;
+    this.folderRepositories = new Map(resolved.map(({ id, repository }) => [id, repository.key]));
     this.repositories = [
-      ...new Map(repositories.map((repository) => [repository.key, repository])).values()
+      ...new Map(resolved.map(({ repository }) => [repository.key, repository])).values()
     ];
     this.schedulePublish();
   }

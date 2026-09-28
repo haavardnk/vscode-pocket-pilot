@@ -27,7 +27,19 @@ const window: WindowState = {
   windowId: 'w1',
   name: 'demo',
   repositories: [{ key: 'acme/demo', label: 'acme/demo', github: { owner: 'acme', name: 'demo' } }],
-  folders: [{ id: 'f1', name: 'demo' }],
+  folders: [
+    {
+      id: 'f1',
+      name: 'demo',
+      repositoryKey: 'acme/demo',
+      git: {
+        branch: 'main',
+        commit: 'abc1234',
+        upstream: { remote: 'origin', branch: 'main', ahead: 1, behind: 0 },
+        changed: 2
+      }
+    }
+  ],
   sessions: [
     {
       id: 's1',

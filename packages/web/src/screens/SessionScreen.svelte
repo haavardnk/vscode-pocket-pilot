@@ -30,6 +30,7 @@
   import SessionActionsSheet from '../lib/components/SessionActionsSheet.svelte';
   import StatusBadge from '../lib/components/StatusBadge.svelte';
   import TodoList from '../lib/components/TodoList.svelte';
+  import { windowRef } from '../lib/git';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { getPane } from '../lib/pane';
   import { inChat, parseRoute, routeHash } from '../lib/routing';
@@ -56,6 +57,7 @@
 
   const hostWindow = $derived(hub.windows.find((candidate) => candidate.windowId === windowId));
   const summary = $derived(hostWindow?.sessions.find((candidate) => candidate.id === sessionId));
+  const branch = $derived(hostWindow && windowRef(hostWindow));
   const detail = $derived(hub.detail);
   const status = $derived(detail?.status ?? summary?.status ?? 'idle');
   const busy = $derived(status === 'running' || status === 'needsInput');
@@ -209,7 +211,7 @@
           <div class="flex min-w-0 items-center gap-1.5">
             <StatusBadge {status} />
             {#if hostWindow}<p class="truncate text-xs text-base-content/60">
-                {hostWindow.name}
+                {branch ? `${hostWindow.name} · ${branch}` : hostWindow.name}
               </p>{/if}
           </div>
         {/if}

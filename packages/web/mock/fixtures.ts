@@ -233,7 +233,19 @@ export function initialWindows(now: number): MockWindow[] {
         ],
         agents: AGENTS,
         models: models(),
-        folders: [{ id: 'f1', name: 'vscode-pocket-pilot' }],
+        folders: [
+          {
+            id: 'f1',
+            name: 'vscode-pocket-pilot',
+            repositoryKey: 'github.com/haavardnk/vscode-pocket-pilot',
+            git: {
+              branch: 'feat/web',
+              commit: '4f2c9e1a7b3d5f60812c4e9a0b1d2c3e4f5a6b7c',
+              upstream: { remote: 'origin', branch: 'feat/web', ahead: 2, behind: 1 },
+              changed: 3
+            }
+          }
+        ],
         canOrganize: true
       },
       [
@@ -479,7 +491,19 @@ export function initialWindows(now: number): MockWindow[] {
         ],
         agents: AGENTS,
         models: models(),
-        folders: [{ id: 'f2', name: 'immich-edit' }],
+        folders: [
+          {
+            id: 'f2',
+            name: 'immich-edit',
+            repositoryKey: 'github.com/haavardnk/immich-edit',
+            git: {
+              branch: null,
+              commit: '9c1e5d7f3a2b4c6d8e0f1a2b3c4d5e6f7a8b9c0d',
+              upstream: null,
+              changed: 0
+            }
+          }
+        ],
         canOrganize: true
       },
       [

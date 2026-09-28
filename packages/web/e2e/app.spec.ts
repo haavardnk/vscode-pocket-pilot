@@ -157,6 +157,21 @@ test.describe('paired', () => {
     await expect(page.getByRole('link', { name: /Build the phone app/ })).toBeVisible();
   });
 
+  test('shows the branch and sync status of each folder', async ({ page }) => {
+    await page.getByRole('button', { name: 'Code' }).click();
+    await expect(
+      page.getByRole('link', { name: 'vscode-pocket-pilot', exact: true })
+    ).toHaveAccessibleDescription('feat/web ↑2 ↓1 · 3 changed');
+    await expect(
+      page.getByRole('link', { name: 'immich-edit', exact: true })
+    ).toHaveAccessibleDescription('9c1e5d7');
+    await page.getByRole('button', { name: 'Chats' }).click();
+    await openSession(page, 'Build the phone app');
+    await expect(
+      page.getByRole('banner').getByText('vscode-pocket-pilot · feat/web')
+    ).toBeVisible();
+  });
+
   test('approves a waiting tool', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     await expect(page.getByText('Allow tool?')).toBeVisible();

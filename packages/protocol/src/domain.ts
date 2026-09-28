@@ -8,9 +8,25 @@ export const repositorySchema = z.object({
   github: z.object({ owner: z.string(), name: z.string() }).nullable()
 });
 
+export const gitUpstreamSchema = z.object({
+  remote: z.string(),
+  branch: z.string(),
+  ahead: z.number().int(),
+  behind: z.number().int()
+});
+
+export const gitStatusSchema = z.object({
+  branch: z.string().nullable(),
+  commit: z.string().nullable(),
+  upstream: gitUpstreamSchema.nullable(),
+  changed: z.number().int()
+});
+
 export const workspaceFolderSchema = z.object({
   id: z.string(),
-  name: z.string()
+  name: z.string(),
+  repositoryKey: z.string().nullable(),
+  git: gitStatusSchema.nullable()
 });
 
 export const sessionStatusSchema = z.enum(['idle', 'running', 'needsInput', 'failed']);
@@ -212,6 +228,8 @@ export const windowStateSchema = z.object({
 });
 
 export type Repository = z.infer<typeof repositorySchema>;
+export type GitUpstream = z.infer<typeof gitUpstreamSchema>;
+export type GitStatus = z.infer<typeof gitStatusSchema>;
 export type WorkspaceFolder = z.infer<typeof workspaceFolderSchema>;
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;

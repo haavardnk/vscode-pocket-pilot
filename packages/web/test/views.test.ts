@@ -123,8 +123,8 @@ describe('terminalTargets', () => {
       {
         ...window('w1', [], []),
         folders: [
-          { id: 'f1', name: 'app' },
-          { id: 'f2', name: 'lib' }
+          { id: 'f1', name: 'app', repositoryKey: null, git: null },
+          { id: 'f2', name: 'lib', repositoryKey: null, git: null }
         ]
       },
       window('w2', [], [])

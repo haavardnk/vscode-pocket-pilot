@@ -6,6 +6,7 @@
   import { routeHash } from '../../routing';
   import { hub } from '../../stores/hub.svelte';
   import Loading from '../Loading.svelte';
+  import GitSummary from './GitSummary.svelte';
 
   const windows = $derived(windowsForRepository(hub.windows, hub.groups, hub.repository));
   const showWindow = $derived(hub.repository === ALL_REPOSITORIES || windows.length > 1);
@@ -31,6 +32,8 @@
             <li>
               <a
                 class="list-row items-center active:bg-base-200"
+                aria-label={folder.name}
+                aria-describedby={folder.git ? `git-${window.windowId}-${folder.id}` : undefined}
                 href={routeHash({
                   name: 'folder',
                   windowId: window.windowId,
@@ -40,7 +43,12 @@
                 })}
               >
                 <FolderGit class="size-5 text-primary" />
-                <span class="min-w-0 truncate font-medium list-col-grow">{folder.name}</span>
+                <span class="flex min-w-0 flex-col list-col-grow">
+                  <span class="truncate font-medium">{folder.name}</span>
+                  {#if folder.git}
+                    <GitSummary git={folder.git} id={`git-${window.windowId}-${folder.id}`} />
+                  {/if}
+                </span>
                 <ChevronRight class="size-4 text-base-content/40" />
               </a>
             </li>
