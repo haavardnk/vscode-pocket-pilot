@@ -16,7 +16,7 @@ export const terminalSummarySchema = z.object({
   sessionId: z.string().nullable(),
   command: z.string().nullable(),
   lastExitCode: z.number().nullable(),
-  shellIntegration: z.boolean(),
+  owned: z.boolean(),
   exited: z.boolean()
 });
 
@@ -52,10 +52,18 @@ export const terminalExecutionSchema = z.object({
   lines: z.array(terminalLineSchema)
 });
 
+export const terminalStreamSchema = z.object({
+  dropped: z.number().int().min(0),
+  lines: z.array(terminalLineSchema),
+  tail: z.array(terminalLineSchema),
+  alternate: z.boolean()
+});
+
 export const terminalDetailSchema = z.object({
   id: z.string(),
   dropped: z.number().int().min(0),
-  executions: z.array(terminalExecutionSchema)
+  executions: z.array(terminalExecutionSchema),
+  stream: terminalStreamSchema.nullable()
 });
 
 export const executionPatchSchema = z.object({
@@ -63,9 +71,17 @@ export const executionPatchSchema = z.object({
   append: z.array(terminalLineSchema)
 });
 
+export const streamPatchSchema = z.object({
+  dropped: z.number().int().min(0),
+  append: z.array(terminalLineSchema),
+  tail: z.array(terminalLineSchema),
+  alternate: z.boolean()
+});
+
 export const terminalPatchSchema = z.object({
   dropped: z.number().int().min(0),
-  executions: z.array(executionPatchSchema)
+  executions: z.array(executionPatchSchema),
+  stream: streamPatchSchema.nullable()
 });
 
 export const terminalRefSchema = z.object({
@@ -78,8 +94,10 @@ export type TerminalColor = z.infer<typeof terminalColorSchema>;
 export type TerminalSegment = z.infer<typeof terminalSegmentSchema>;
 export type TerminalLine = z.infer<typeof terminalLineSchema>;
 export type TerminalExecution = z.infer<typeof terminalExecutionSchema>;
+export type TerminalStream = z.infer<typeof terminalStreamSchema>;
 export type TerminalDetail = z.infer<typeof terminalDetailSchema>;
 export type ExecutionPatch = z.infer<typeof executionPatchSchema>;
+export type StreamPatch = z.infer<typeof streamPatchSchema>;
 export type TerminalPatch = z.infer<typeof terminalPatchSchema>;
 export type TerminalRef = z.infer<typeof terminalRefSchema>;
 
@@ -96,4 +114,13 @@ export function applyTerminalPatch(detail: TerminalDetail, patch: TerminalPatch)
     execution.lines.push(...append);
     Object.assign(execution, fields);
   }
+  if (!patch.stream) return;
+  const { append, ...fields } = patch.stream;
+  if (!detail.stream) {
+    detail.stream = { ...fields, lines: append };
+    return;
+  }
+  detail.stream.lines.splice(0, fields.dropped - detail.stream.dropped);
+  detail.stream.lines.push(...append);
+  Object.assign(detail.stream, fields);
 }

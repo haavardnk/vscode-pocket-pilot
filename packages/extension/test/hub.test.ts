@@ -173,7 +173,7 @@ describe('Hub', () => {
     hub.connect(second);
     hub.watchTerminal(first, { windowId: 'w1', terminalId: 't1' });
     expect(window.terminalWatches.at(-1)).toEqual(['t1']);
-    hub.terminalUpdate('w1', 't1', { id: 't1', dropped: 0, executions: [] });
+    hub.terminalUpdate('w1', 't1', { id: 't1', dropped: 0, executions: [], stream: null });
     const execution = {
       id: 'e1',
       command: 'ls',
@@ -188,7 +188,7 @@ describe('Hub', () => {
       tail: [],
       append: [[{ text: 'a.ts', fg: null, bg: null, flags: 0 }]]
     };
-    hub.terminalPatch('w1', 't1', { dropped: 0, executions: [execution] });
+    hub.terminalPatch('w1', 't1', { dropped: 0, executions: [execution], stream: null });
     hub.watchTerminal(second, { windowId: 'w1', terminalId: 't1' });
     hub.watchTerminal(first, { windowId: 'gone', terminalId: 't1' });
     const terminalMessages = (phone: { messages: ServerMessage[] }): ServerMessage[] =>

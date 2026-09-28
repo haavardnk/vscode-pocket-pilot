@@ -110,18 +110,13 @@ function withoutTrailingBlanks(lines: TerminalLine[]): TerminalLine[] {
   return lines.slice(0, end);
 }
 
-export class ExecutionScreen {
+export class TerminalScreen {
   readonly lines: TerminalLine[] = [];
   dropped = 0;
   tail: TerminalLine[] = [];
   alternate = false;
 
-  private readonly terminal = new Terminal({
-    cols: COLS,
-    rows: ROWS,
-    scrollback: SCROLLBACK,
-    allowProposedApi: true
-  });
+  private readonly terminal: Terminal;
   private readonly cell: IBufferCell;
   private harvested = 0;
   private anchor: IMarker | undefined;
@@ -129,12 +124,23 @@ export class ExecutionScreen {
   private readonly pending = new Set<() => void>();
   private finished = false;
   private disposed = false;
-  constructor(private readonly maxLines: number) {
+  constructor(
+    private readonly maxLines: number,
+    cols = COLS,
+    rows = ROWS
+  ) {
+    this.terminal = new Terminal({ cols, rows, scrollback: SCROLLBACK, allowProposedApi: true });
     this.cell = this.terminal.buffer.normal.getNullCell();
   }
 
   get total(): number {
     return this.dropped + this.lines.length;
+  }
+
+  resize(cols: number, rows: number): void {
+    if (this.finished) return;
+    this.terminal.resize(cols, rows);
+    this.capture();
   }
 
   write(data: string): Promise<void> {

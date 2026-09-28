@@ -698,9 +698,20 @@ test.describe('paired', () => {
       .getByRole('button', { name: /vscode-pocket-pilot/ })
       .click();
     await expect(page.getByRole('heading', { name: 'zsh' })).toBeVisible();
-    await expect(page.getByText('No command output yet.')).toBeVisible();
+    const output = page.getByRole('log', { name: 'Terminal output' });
+    await expect(output).toHaveText('~/Git/vscode-pocket-pilot $');
+    await page.getByRole('textbox', { name: 'Terminal input' }).fill('echo hi');
+    await page.getByRole('button', { name: 'Run' }).click();
+    await expect(output.getByText('hi', { exact: true })).toBeVisible();
+    await expect(page.getByText('Output appears once shell integration')).toHaveCount(0);
     await page.getByRole('button', { name: 'Back' }).click();
     await expect(page.getByRole('link', { name: /^zsh/ })).toBeVisible();
+  });
+
+  test('explains a terminal without shell integration', async ({ page }) => {
+    await openTerminal(page, 'bash');
+    await expect(page.getByText('Output appears once shell integration')).toBeVisible();
+    await expect(page.getByText('No command output yet.')).toBeVisible();
   });
 
   test('opens the terminal a chat tool ran in', async ({ page }) => {

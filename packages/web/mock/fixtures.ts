@@ -129,12 +129,23 @@ export function newTerminal(
       sessionId: null,
       command: null,
       lastExitCode: null,
-      shellIntegration: true,
+      owned: false,
       exited: false,
       ...fields
     },
-    detail: { id, dropped: 0, executions: [] }
+    detail: { id, dropped: 0, executions: [], stream: null }
   };
+}
+
+export function ownedTerminal(id: string, cwd: string | null): MockTerminal {
+  const terminal = newTerminal(id, cwd, { owned: true });
+  terminal.detail.stream = {
+    dropped: 0,
+    lines: [],
+    tail: [line(`${cwd ?? '~'} $`)],
+    alternate: false
+  };
+  return terminal;
 }
 
 function terminals(now: number): MockTerminal[] {
@@ -179,7 +190,11 @@ function terminals(now: number): MockTerminal[] {
     agent: true,
     sessionId: 's1'
   });
-  return [user, agent];
+  const plain = newTerminal('t-plain', '~/Git/vscode-pocket-pilot', {
+    name: 'bash',
+    shell: 'bash'
+  });
+  return [user, agent, plain];
 }
 
 function buildWindow(

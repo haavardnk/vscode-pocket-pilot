@@ -269,8 +269,11 @@ describe('cluster', () => {
       JSON.stringify({ type: 'watchTerminal', windowId: 'second', terminalId: 't1' })
     );
     await waitFor(() => second.terminalWatches.length === 1);
-    second.emitTerminal({ terminalId: 't1', detail: { id: 't1', dropped: 0, executions: [] } });
-    second.emitTerminal({ terminalId: 't1', patch: { dropped: 1, executions: [] } });
+    second.emitTerminal({
+      terminalId: 't1',
+      detail: { id: 't1', dropped: 0, executions: [], stream: null }
+    });
+    second.emitTerminal({ terminalId: 't1', patch: { dropped: 1, executions: [], stream: null } });
     await waitFor(() => client.messages.some((message) => message.type === 'terminalPatch'));
     expect(
       client.messages.filter(
@@ -281,13 +284,13 @@ describe('cluster', () => {
         type: 'terminal',
         windowId: 'second',
         terminalId: 't1',
-        detail: { id: 't1', dropped: 0, executions: [] }
+        detail: { id: 't1', dropped: 0, executions: [], stream: null }
       },
       {
         type: 'terminalPatch',
         windowId: 'second',
         terminalId: 't1',
-        patch: { dropped: 1, executions: [] }
+        patch: { dropped: 1, executions: [], stream: null }
       }
     ]);
     client.socket.send(JSON.stringify({ type: 'unwatchTerminal' }));

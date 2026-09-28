@@ -1,20 +1,19 @@
 <script lang="ts">
   import ArrowUp from '@lucide/svelte/icons/arrow-up';
-  import CircleCheck from '@lucide/svelte/icons/circle-check';
   import MessagesSquare from '@lucide/svelte/icons/messages-square';
   import Trash from '@lucide/svelte/icons/trash';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
-  import type { TerminalLine } from '@pocket-pilot/protocol';
   import { untrack } from 'svelte';
 
   import Loading from '../lib/components/Loading.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
+  import TerminalExecutions from '../lib/components/terminal/TerminalExecutions.svelte';
+  import TerminalStream from '../lib/components/terminal/TerminalStream.svelte';
   import { routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
-  import { segmentStyle } from '../lib/terminal/ansi';
 
   interface Props {
     windowId: string;
@@ -50,13 +49,18 @@
   const ready = $derived(hub.connection === 'open' && summary !== undefined && !summary.exited);
   const tail = $derived.by(() => {
     const last = detail?.executions.at(-1);
+    const stream = detail?.stream;
     return [
       detail?.executions.length,
       last?.id,
       last?.lines.length,
       last?.tail.length,
       last?.tail.at(-1)?.length,
-      last?.endedAt
+      last?.endedAt,
+      stream?.dropped,
+      stream?.lines.length,
+      stream?.tail.length,
+      stream?.tail.at(-1)?.reduce((length, segment) => length + segment.text.length, 0)
     ].join();
   });
 
@@ -113,18 +117,6 @@
   }
 </script>
 
-{#snippet output(lines: TerminalLine[], alternate: boolean)}
-  {#each lines as line, index (index)}
-    <div
-      class={['min-h-[1lh]', alternate ? 'w-max whitespace-pre' : 'break-all whitespace-pre-wrap']}
-    >
-      {#each line as segment, part (part)}<span style={segmentStyle(segment) || undefined}
-          >{segment.text}</span
-        >{/each}
-    </div>
-  {/each}
-{/snippet}
-
 <div class="flex flex-1 flex-col">
   <ScreenHeader
     title={summary?.name ?? 'Terminal'}
@@ -165,7 +157,7 @@
     {:else if !detail}
       <Loading />
     {:else}
-      {#if summary && !summary.shellIntegration}
+      {#if summary && !summary.owned && detail.executions.length === 0}
         <div role="status" class="alert alert-soft text-sm alert-info">
           Output appears once shell integration is active in this terminal. Input still works.
         </div>
@@ -175,55 +167,11 @@
           The shell in this terminal has exited.
         </div>
       {/if}
-      {#if detail.dropped > 0}
-        <p class="text-center text-xs text-base-content/50">
-          {detail.dropped} earlier {detail.dropped === 1 ? 'command' : 'commands'} trimmed
-        </p>
+      {#if detail.stream}
+        <TerminalStream stream={detail.stream} />
+      {:else}
+        <TerminalExecutions {detail} />
       {/if}
-      {#if detail.executions.length === 0}
-        <p class="p-10 text-center text-base-content/60">No command output yet.</p>
-      {/if}
-      {#each detail.executions as execution (execution.id)}
-        <section
-          id={`execution-${execution.id}`}
-          class="flex scroll-mt-20 flex-col gap-1"
-          aria-label={execution.command}
-        >
-          <div class="flex items-start gap-2">
-            <p class="min-w-0 flex-1 font-mono text-sm font-semibold break-all">
-              <span class="text-base-content/50">$</span>
-              {execution.command}
-            </p>
-            {#if execution.endedAt === null}
-              <span
-                class="loading mt-0.5 loading-xs shrink-0 loading-spinner"
-                role="img"
-                aria-label="Running"
-              ></span>
-            {:else if execution.exitCode === 0}
-              <span class="mt-0.5 shrink-0 text-success" role="img" aria-label="Succeeded">
-                <CircleCheck class="size-4" />
-              </span>
-            {:else if execution.exitCode !== null}
-              <span class="badge shrink-0 badge-soft badge-sm badge-error">
-                Exit {execution.exitCode}
-              </span>
-            {/if}
-          </div>
-          {#if execution.dropped > 0}
-            <p class="text-xs text-base-content/50">
-              {execution.dropped} earlier {execution.dropped === 1 ? 'line' : 'lines'} trimmed
-            </p>
-          {/if}
-          <div
-            class={['font-mono text-xs leading-snug', execution.alternate && 'overflow-x-auto']}
-            role="log"
-          >
-            {@render output(execution.lines, execution.alternate)}
-            {@render output(execution.tail, execution.alternate)}
-          </div>
-        </section>
-      {/each}
     {/if}
   </main>
 

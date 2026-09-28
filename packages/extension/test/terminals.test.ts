@@ -7,7 +7,9 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { ChatLinks, sameCommand } from '../src/terminals/chatLinks';
-import { ExecutionScreen } from '../src/terminals/screen';
+import type { Pty, PtyOptions } from '../src/terminals/nodePty';
+import { PtySession } from '../src/terminals/ptySession';
+import { TerminalScreen } from '../src/terminals/screen';
 import { TerminalLog } from '../src/terminals/terminalLog';
 
 const text = (lines: TerminalLine[]): string[] =>
@@ -21,14 +23,14 @@ const numbered = (count: number): string =>
     .map((label) => `${label}\r\n`)
     .join('');
 
-async function finished(data: string, maxLines = 5000): Promise<ExecutionScreen> {
-  const screen = new ExecutionScreen(maxLines);
+async function finished(data: string, maxLines = 5000): Promise<TerminalScreen> {
+  const screen = new TerminalScreen(maxLines);
   await screen.write(data);
   await screen.finish();
   return screen;
 }
 
-describe('ExecutionScreen', () => {
+describe('TerminalScreen', () => {
   it('keeps colours and styles as segments', async () => {
     const screen = await finished('\x1b[1;31mred\x1b[0m \x1b[4;38;2;1;2;3mrgb\x1b[0m\r\n');
     expect(screen.lines).toEqual([
@@ -50,10 +52,20 @@ describe('ExecutionScreen', () => {
   });
 
   it('harvests rows that scroll past the viewport while running', async () => {
-    const screen = new ExecutionScreen(5000);
+    const screen = new TerminalScreen(5000);
     await screen.write(numbered(100));
     expect(screen.lines.length).toBeGreaterThan(0);
     expect(text([...screen.lines, ...screen.tail])).toEqual(labels(100));
+    screen.dispose();
+  });
+
+  it('harvests rows a smaller viewport pushes out', async () => {
+    const screen = new TerminalScreen(5000, 80, 6);
+    await screen.write(numbered(4));
+    expect(screen.lines).toEqual([]);
+    screen.resize(40, 2);
+    expect(screen.lines.length).toBeGreaterThan(0);
+    expect(text([...screen.lines, ...screen.tail])).toEqual(labels(4));
     screen.dispose();
   });
 
@@ -69,7 +81,7 @@ describe('ExecutionScreen', () => {
   });
 
   it('shows the alternate screen as the tail', async () => {
-    const screen = new ExecutionScreen(5000);
+    const screen = new TerminalScreen(5000);
     await screen.write('before\r\n\x1b[?1049h\x1b[Htop\r\n');
     expect(screen.alternate).toBe(true);
     expect(text(screen.tail)).toEqual(['top']);
@@ -82,7 +94,7 @@ describe('ExecutionScreen', () => {
   });
 
   it('ignores writes after it is disposed', async () => {
-    const screen = new ExecutionScreen(5000);
+    const screen = new TerminalScreen(5000);
     const pending = screen.write(numbered(2000));
     screen.dispose();
     await pending;
@@ -111,6 +123,7 @@ describe('TerminalLog', () => {
     const patch = log.patch();
     if (patch) applyTerminalPatch(detail, patch);
     expect(detail).toEqual(log.detail('t1'));
+    expect(detail.stream).toBeNull();
     expect(log.running?.id).toBe('e2');
     expect(log.lastExitCode).toBe(0);
     log.dispose();
@@ -129,6 +142,96 @@ describe('TerminalLog', () => {
     expect(detail.executions.map((execution) => execution.id).at(0)).toBe('e2');
     expect(detail).toEqual(log.detail('t1'));
     log.dispose();
+  });
+
+  it('streams the whole screen of an owned terminal', async () => {
+    const log = new TerminalLog(() => undefined, true);
+    await log.writeStream('$ ');
+    const detail = log.detail('t1');
+    expect(text(detail.stream?.tail ?? [])).toEqual(['$']);
+    await log.writeStream(`ls\r\n${numbered(60)}$ `);
+    const first = log.patch();
+    if (first) applyTerminalPatch(detail, first);
+    expect(log.patch()).toBeNull();
+    log.resizeStream(40, 10);
+    const resized = log.patch();
+    if (resized) applyTerminalPatch(detail, resized);
+    expect(detail).toEqual(log.detail('t1'));
+    expect(text([...(detail.stream?.lines ?? []), ...(detail.stream?.tail ?? [])])).toEqual([
+      '$ ls',
+      ...labels(60),
+      '$'
+    ]);
+    log.dispose();
+  });
+});
+
+describe('PtySession', () => {
+  function fake() {
+    const calls: unknown[][] = [];
+    const listeners: { data?: (data: string) => void; exit?: (code: number) => void } = {};
+    const pty: Pty = {
+      onData: (listener) => {
+        listeners.data = listener;
+        return { dispose: () => delete listeners.data };
+      },
+      onExit: (listener) => {
+        listeners.exit = (exitCode) => listener({ exitCode });
+        return { dispose: () => delete listeners.exit };
+      },
+      write: (data) => calls.push(['write', data]),
+      resize: (cols, rows) => calls.push(['resize', cols, rows]),
+      kill: () => calls.push(['kill'])
+    };
+    const events: unknown[][] = [];
+    const launch = { name: 'zsh', file: '/bin/zsh', args: ['-l'], env: { TERM: 'xterm-256color' } };
+    const session = new PtySession(
+      (file: string, args: string[], options: PtyOptions) => {
+        calls.push(['spawn', file, args, options]);
+        return pty;
+      },
+      launch,
+      '/w',
+      { data: (data) => events.push(['data', data]), exit: (code) => events.push(['exit', code]) }
+    );
+    return { session, calls, events, listeners };
+  }
+
+  it('runs the shell until it exits', () => {
+    const { session, calls, events, listeners } = fake();
+    session.start(100, 30);
+    session.start(100, 30);
+    listeners.data?.('hi');
+    session.input('ls\r');
+    session.resize(120, 40);
+    listeners.exit?.(3);
+    session.input('late');
+    session.kill();
+    expect(calls).toEqual([
+      [
+        'spawn',
+        '/bin/zsh',
+        ['-l'],
+        { name: 'xterm-256color', cols: 100, rows: 30, cwd: '/w', env: { TERM: 'xterm-256color' } }
+      ],
+      ['write', 'ls\r'],
+      ['resize', 120, 40]
+    ]);
+    expect(events).toEqual([
+      ['data', 'hi'],
+      ['exit', 3]
+    ]);
+    expect(listeners).toEqual({});
+  });
+
+  it('kills the shell once and stops listening', () => {
+    const { session, calls, events, listeners } = fake();
+    session.start(80, 24);
+    session.kill();
+    session.kill();
+    expect(calls.map((call) => call[0])).toEqual(['spawn', 'kill']);
+    expect(listeners).toEqual({});
+    expect(events).toEqual([]);
   });
 });
 

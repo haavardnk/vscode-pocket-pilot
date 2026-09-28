@@ -111,7 +111,8 @@ const update = (
 const terminal = (): TerminalDetail => ({
   id: 't1',
   dropped: 0,
-  executions: [execution('e1', ['a', 'b']), execution('e2', ['c'])]
+  executions: [execution('e1', ['a', 'b']), execution('e2', ['c'])],
+  stream: null
 });
 
 describe('protocol', () => {
@@ -234,22 +235,22 @@ describe('protocol', () => {
   it.each<[string, Parameters<typeof applyTerminalPatch>[1], TerminalExecution[]]>([
     [
       'appended output',
-      { dropped: 0, executions: [update('e2', ['d'], { tail: [line('%')] })] },
+      { dropped: 0, executions: [update('e2', ['d'], { tail: [line('%')] })], stream: null },
       [execution('e1', ['a', 'b']), execution('e2', ['c', 'd'], { tail: [line('%')] })]
     ],
     [
       'dropped lines',
-      { dropped: 0, executions: [update('e1', ['x'], { dropped: 2 })] },
+      { dropped: 0, executions: [update('e1', ['x'], { dropped: 2 })], stream: null },
       [execution('e1', ['x'], { dropped: 2 }), execution('e2', ['c'])]
     ],
     [
       'lines dropped past the old end',
-      { dropped: 0, executions: [update('e2', ['z'], { dropped: 4 })] },
+      { dropped: 0, executions: [update('e2', ['z'], { dropped: 4 })], stream: null },
       [execution('e1', ['a', 'b']), execution('e2', ['z'], { dropped: 4 })]
     ],
     [
       'new execution with dropped history',
-      { dropped: 1, executions: [update('e3', ['e'], { exitCode: 0 })] },
+      { dropped: 1, executions: [update('e3', ['e'], { exitCode: 0 })], stream: null },
       [execution('e2', ['c']), execution('e3', ['e'], { exitCode: 0 })]
     ]
   ])('patches terminal %s', (_, patch, executions) => {
@@ -257,5 +258,25 @@ describe('protocol', () => {
     applyTerminalPatch(current, patch);
     expect(current.executions).toEqual(executions);
     expect(current.dropped).toBe(patch.dropped);
+  });
+
+  it('patches a terminal stream', () => {
+    const current = terminal();
+    const stream = (dropped: number, append: string[], tail: string[]) => ({
+      dropped,
+      append: append.map(line),
+      tail: tail.map(line),
+      alternate: false
+    });
+    applyTerminalPatch(current, { dropped: 0, executions: [], stream: stream(0, ['a'], ['$']) });
+    applyTerminalPatch(current, { dropped: 0, executions: [], stream: null });
+    applyTerminalPatch(current, { dropped: 0, executions: [], stream: stream(2, ['c'], ['%']) });
+    expect(current.stream).toEqual({
+      dropped: 2,
+      lines: [line('c')],
+      tail: [line('%')],
+      alternate: false
+    });
+    expect(current.executions).toEqual(terminal().executions);
   });
 });

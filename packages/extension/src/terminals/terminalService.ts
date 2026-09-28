@@ -10,6 +10,9 @@ import type { CodeFolder } from '../code/folders';
 import { errorMessage } from '../errors';
 import { asRecord, asString, parseJson } from '../json';
 import { type ChatLink, ChatLinks } from './chatLinks';
+import { loadNodePty, type SpawnPty } from './nodePty';
+import { OwnedTerminal } from './ownedTerminal';
+import { type ShellLaunch, shellLaunch } from './shellLaunch';
 import { TerminalLog } from './terminalLog';
 
 const FLUSH_MS = 100;
@@ -20,10 +23,16 @@ export type TerminalCommand = Extract<
   { kind: 'terminalInput' | 'killTerminal' | 'createTerminal' }
 >;
 
+interface Owned {
+  cwd: string | null;
+  shell: string;
+}
+
 interface TerminalRecord {
   id: string;
   terminal: vscode.Terminal;
   log: TerminalLog;
+  owned: Owned | null;
   sessionId: string | null;
   flushTimer: NodeJS.Timeout | undefined;
 }
@@ -67,6 +76,7 @@ export class TerminalService implements vscode.Disposable {
   private readonly linked = new vscode.EventEmitter<string>();
   private readonly subscriptions: vscode.Disposable[];
   private watched = new Set<string>();
+  private spawn: SpawnPty | null | undefined;
 
   readonly onDidChange = this.changed.event;
   readonly onDidUpdate = this.updated.event;
@@ -93,16 +103,16 @@ export class TerminalService implements vscode.Disposable {
   }
 
   summaries(): TerminalSummary[] {
-    return [...this.records.values()].map(({ id, terminal, log, sessionId }) => ({
+    return [...this.records.values()].map(({ id, terminal, log, owned, sessionId }) => ({
       id,
       name: terminal.name,
-      cwd: displayPath(terminal.shellIntegration?.cwd ?? creationCwd(terminal)),
-      shell: terminal.state.shell ?? null,
+      cwd: owned ? owned.cwd : displayPath(terminal.shellIntegration?.cwd ?? creationCwd(terminal)),
+      shell: owned?.shell ?? terminal.state.shell ?? null,
       agent: isAgent(terminal),
       sessionId,
       command: log.running?.command ?? null,
       lastExitCode: log.lastExitCode,
-      shellIntegration: terminal.shellIntegration !== undefined,
+      owned: owned !== null,
       exited: terminal.exitStatus !== undefined
     }));
   }
@@ -190,18 +200,58 @@ export class TerminalService implements vscode.Disposable {
     const folder =
       folderId === null ? folders[0] : folders.find((candidate) => candidate.id === folderId);
     if (folderId !== null && !folder) throw new Error('Folder is no longer open');
-    this.add(vscode.window.createTerminal({ cwd: folder?.root }), terminalId);
+    const spawn = this.ptySpawn();
+    const launch = spawn && this.defaultShell();
+    if (!spawn || !launch) {
+      this.add(vscode.window.createTerminal({ cwd: folder?.root }), terminalId);
+      return;
+    }
+    const pty = new OwnedTerminal(spawn, launch, folder?.root, {
+      data: (data) => void this.find(terminalId)?.log.writeStream(data),
+      resize: (cols, rows) => this.find(terminalId)?.log.resizeStream(cols, rows),
+      failed: (message) => this.report(message)
+    });
+    this.add(vscode.window.createTerminal({ name: launch.name, pty }), terminalId, {
+      cwd: displayPath(folder?.root),
+      shell: launch.name
+    });
   }
 
-  private add(terminal: vscode.Terminal, id: string = randomUUID()): TerminalRecord {
+  private ptySpawn(): SpawnPty | null {
+    if (vscode.env.remoteName !== undefined) return null;
+    if (this.spawn !== undefined) return this.spawn;
+    try {
+      this.spawn = loadNodePty(vscode.env.appRoot);
+    } catch (error) {
+      this.spawn = null;
+      this.report(`Phone terminals fall back to VS Code terminals: ${errorMessage(error)}`);
+    }
+    return this.spawn;
+  }
+
+  private defaultShell(): ShellLaunch | null {
+    try {
+      return shellLaunch();
+    } catch (error) {
+      this.report(`Phone terminals fall back to VS Code terminals: ${errorMessage(error)}`);
+      return null;
+    }
+  }
+
+  private add(
+    terminal: vscode.Terminal,
+    id: string = randomUUID(),
+    owned: Owned | null = null
+  ): TerminalRecord {
     const existing = this.records.get(terminal);
     if (existing) return existing;
     const record: TerminalRecord = {
       id,
       terminal,
+      owned,
       sessionId: null,
       flushTimer: undefined,
-      log: new TerminalLog(() => this.schedule(record))
+      log: new TerminalLog(() => this.schedule(record), owned !== null)
     };
     this.records.set(terminal, record);
     this.changed.fire();

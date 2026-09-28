@@ -7,6 +7,7 @@ import {
   queuePlan,
   type ServerMessage,
   type SessionDetail,
+  type TerminalDetail,
   type TerminalExecution,
   type TerminalLine,
   type TerminalSummary,
@@ -20,7 +21,7 @@ import {
   initialWindows,
   line,
   type MockWindow,
-  newTerminal,
+  ownedTerminal,
   refreshSummary
 } from './fixtures.ts';
 
@@ -320,7 +321,7 @@ export class MockHub {
           ? folders[0]
           : folders.find((candidate) => candidate.id === command.folderId);
       if (command.folderId !== null && !folder) throw new Error('Folder is no longer open');
-      const { summary, detail } = newTerminal(
+      const { summary, detail } = ownedTerminal(
         command.terminalId,
         folder ? `~/Git/${folder.name}` : null
       );
@@ -346,6 +347,10 @@ export class MockHub {
       }
       return;
     }
+    if (detail.stream) {
+      this.typeInStream(window, detail, command.text, command.execute);
+      return;
+    }
     const running = detail.executions.find((execution) => execution.endedAt === null);
     if (!command.execute) {
       if (command.text === '\x03' && running)
@@ -361,6 +366,40 @@ export class MockHub {
     this.later(() =>
       this.endExecution(window, summary, execution, 0, [line(`Ran ${command.text}`)])
     );
+  }
+
+  private typeInStream(
+    window: MockWindow,
+    detail: TerminalDetail,
+    text: string,
+    execute: boolean
+  ): void {
+    const stream = detail.stream;
+    const prompt = stream?.tail[0]?.[0]?.text;
+    if (!stream || !prompt) return;
+    const append =
+      text === '\x03'
+        ? [line(`${prompt} ^C`)]
+        : execute
+          ? [
+              line(`${prompt} ${text}`),
+              line(text.startsWith('echo ') ? text.slice(5) : `Ran ${text}`)
+            ]
+          : [];
+    stream.lines.push(...append);
+    const patch = {
+      dropped: detail.dropped,
+      executions: [],
+      stream: { dropped: stream.dropped, append, tail: stream.tail, alternate: stream.alternate }
+    };
+    for (const client of this.watchers(window, detail.id)) {
+      client.send({
+        type: 'terminalPatch',
+        windowId: window.state.windowId,
+        terminalId: detail.id,
+        patch
+      });
+    }
   }
 
   private runTool(
@@ -430,7 +469,7 @@ export class MockHub {
     if (!detail) return;
     const { lines, ...fields } = execution;
     lines.push(...append);
-    const patch = { dropped: detail.dropped, executions: [{ ...fields, append }] };
+    const patch = { dropped: detail.dropped, executions: [{ ...fields, append }], stream: null };
     for (const client of this.watchers(window, terminalId)) {
       client.send({ type: 'terminalPatch', windowId: window.state.windowId, terminalId, patch });
     }

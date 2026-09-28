@@ -1,14 +1,17 @@
 import type {
   ExecutionPatch,
+  StreamPatch,
   TerminalDetail,
   TerminalExecution,
   TerminalPatch
 } from '@pocket-pilot/protocol';
 
-import { ExecutionScreen } from './screen';
+import { TerminalScreen } from './screen';
 
 const MAX_EXECUTIONS = 50;
 const MAX_LINES = 5000;
+const STREAM_COLS = 80;
+const STREAM_ROWS = 24;
 
 export interface ExecutionStart {
   id: string;
@@ -22,7 +25,7 @@ interface ExecutionRecord extends ExecutionStart {
   exitCode: number | null;
   sessionId: string | null;
   callId: string | null;
-  screen: ExecutionScreen;
+  screen: TerminalScreen;
 }
 
 interface Sent {
@@ -42,13 +45,24 @@ function fields(record: ExecutionRecord): ExecutionFields {
   };
 }
 
+function streamFields(screen: TerminalScreen): string {
+  return JSON.stringify([screen.dropped, screen.tail, screen.alternate]);
+}
+
 export class TerminalLog {
   private readonly records: ExecutionRecord[] = [];
+  private readonly stream: TerminalScreen | null;
   private dropped = 0;
   private sent: Map<string, Sent> | null = null;
   private sentDropped = 0;
+  private sentStream: Sent | null = null;
 
-  constructor(private readonly changed: () => void) {}
+  constructor(
+    private readonly changed: () => void,
+    streamed = false
+  ) {
+    this.stream = streamed ? new TerminalScreen(MAX_LINES, STREAM_COLS, STREAM_ROWS) : null;
+  }
 
   get running(): ExecutionRecord | undefined {
     return this.records.findLast((record) => record.endedAt === null);
@@ -73,9 +87,21 @@ export class TerminalLog {
       exitCode: null,
       sessionId: null,
       callId: null,
-      screen: new ExecutionScreen(MAX_LINES)
+      screen: new TerminalScreen(MAX_LINES)
     });
     this.enforceBudget();
+    this.changed();
+  }
+
+  async writeStream(data: string): Promise<void> {
+    if (!this.stream) return;
+    await this.stream.write(data);
+    this.changed();
+  }
+
+  resizeStream(cols: number, rows: number): void {
+    if (!this.stream) return;
+    this.stream.resize(cols, rows);
     this.changed();
   }
 
@@ -119,13 +145,21 @@ export class TerminalLog {
       ])
     );
     this.sentDropped = this.dropped;
+    const { stream } = this;
+    this.sentStream = stream && { total: stream.total, fields: streamFields(stream) };
     return {
       id: terminalId,
       dropped: this.dropped,
       executions: this.records.map((record) => ({
         ...fields(record),
         lines: record.screen.lines.slice()
-      }))
+      })),
+      stream: stream && {
+        dropped: stream.dropped,
+        lines: stream.lines.slice(),
+        tail: stream.tail,
+        alternate: stream.alternate
+      }
     };
   }
 
@@ -147,17 +181,31 @@ export class TerminalLog {
     for (const id of sent.keys()) {
       if (!this.find(id)) sent.delete(id);
     }
-    if (executions.length === 0 && this.sentDropped === this.dropped) return null;
+    const stream = this.streamPatch();
+    if (executions.length === 0 && this.sentDropped === this.dropped && !stream) return null;
     this.sentDropped = this.dropped;
-    return { dropped: this.dropped, executions };
+    return { dropped: this.dropped, executions, stream };
   }
 
   stopStreaming(): void {
     this.sent = null;
+    this.sentStream = null;
   }
 
   dispose(): void {
     for (const record of this.records) record.screen.dispose();
+    this.stream?.dispose();
+  }
+
+  private streamPatch(): StreamPatch | null {
+    const { stream, sentStream } = this;
+    if (!stream || !sentStream) return null;
+    const from = Math.max(sentStream.total, stream.dropped);
+    const append = stream.lines.slice(from - stream.dropped);
+    const key = streamFields(stream);
+    if (append.length === 0 && sentStream.fields === key) return null;
+    this.sentStream = { total: stream.total, fields: key };
+    return { dropped: stream.dropped, append, tail: stream.tail, alternate: stream.alternate };
   }
 
   private enforceBudget(): void {
