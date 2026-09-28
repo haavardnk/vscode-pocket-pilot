@@ -9,6 +9,7 @@
   import { markdown } from '../markdown';
   import { routeHash } from '../routing';
   import EditLink from './EditLink.svelte';
+  import PromptAlert from './PromptAlert.svelte';
   import QuestionCard from './QuestionCard.svelte';
   import StepGroup from './StepGroup.svelte';
   import SubagentBlock from './SubagentBlock.svelte';
@@ -65,20 +66,12 @@
     {:else if part.kind === 'questions'}
       <QuestionCard {part} {disabled} {onanswer} />
     {:else if part.kind === 'confirmation'}
-      <div
-        role={part.state === 'pending' ? 'alert' : undefined}
-        class={[
-          'alert flex flex-col items-stretch gap-2 alert-soft text-sm',
-          part.state === 'pending' ? 'alert-warning' : 'alert-info'
-        ]}
+      <PromptAlert
+        icon={CircleHelp}
+        title={part.title}
+        message={part.message}
+        pending={part.state === 'pending'}
       >
-        <p class="flex items-center gap-2 font-medium">
-          <CircleHelp class="size-4 shrink-0" />{part.title}
-        </p>
-        {#if part.message}<div
-            class="markdown"
-            {@attach markdown(part.message, repository.github)}
-          ></div>{/if}
         {#if part.state === 'pending'}
           <div class="flex gap-2">
             {#each part.buttons as button, index (button)}
@@ -92,22 +85,14 @@
             {/each}
           </div>
         {/if}
-      </div>
+      </PromptAlert>
     {:else}
-      <div
-        role={part.state === 'pending' ? 'alert' : undefined}
-        class={[
-          'alert flex flex-col items-stretch gap-2 alert-soft text-sm',
-          part.state === 'pending' ? 'alert-warning' : 'alert-info'
-        ]}
+      <PromptAlert
+        icon={ShieldAlert}
+        title={part.title}
+        message={part.message}
+        pending={part.state === 'pending'}
       >
-        <p class="flex items-center gap-2 font-medium">
-          <ShieldAlert class="size-4 shrink-0" />{part.title}
-        </p>
-        {#if part.message}<div
-            class="markdown"
-            {@attach markdown(part.message, repository.github)}
-          ></div>{/if}
         {#if part.state === 'pending'}
           <button
             class="btn btn-primary btn-sm"
@@ -125,7 +110,7 @@
                 : 'No longer waiting'}
           </p>
         {/if}
-      </div>
+      </PromptAlert>
     {/if}
   {/each}
 
