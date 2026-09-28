@@ -6,6 +6,7 @@
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
   import RepositoryPicker from '../lib/components/RepositoryPicker.svelte';
   import SessionList from '../lib/components/SessionList.svelte';
+  import KillAllTerminals from '../lib/components/terminal/KillAllTerminals.svelte';
   import NewTerminalSheet from '../lib/components/terminal/NewTerminalSheet.svelte';
   import TerminalList from '../lib/components/terminal/TerminalList.svelte';
   import type { Tab } from '../lib/routing';
@@ -32,6 +33,9 @@
         <h1 class="text-lg font-semibold">Settings</h1>
       {:else}
         <RepositoryPicker />
+        {#if tab === 'terminals'}
+          <KillAllTerminals />
+        {/if}
       {/if}
     </div>
     <ConnectionBanner />

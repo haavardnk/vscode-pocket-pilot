@@ -42,7 +42,7 @@ async function openFolder(page: Page): Promise<void> {
 }
 
 async function openTerminal(page: Page, name: string): Promise<void> {
-  await page.getByRole('button', { name: 'Terminals' }).click();
+  await page.getByRole('button', { name: 'Terminals', exact: true }).click();
   await page.getByRole('link', { name: new RegExp(`^${name}`) }).click();
   await expect(page.getByRole('heading', { name })).toBeVisible();
 }
@@ -859,7 +859,7 @@ test.describe('paired', () => {
   });
 
   test('lists terminals and shows their coloured output', async ({ page }, testInfo) => {
-    await page.getByRole('button', { name: 'Terminals' }).click();
+    await page.getByRole('button', { name: 'Terminals', exact: true }).click();
     await expect(page.getByRole('link', { name: /^Copilot.*Build the phone app/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /^zsh.*Exit 1/ })).toBeVisible();
     await expect(
@@ -923,6 +923,20 @@ test.describe('paired', () => {
     await expect(page.getByText('Output appears once shell integration')).toHaveCount(0);
     await page.getByRole('button', { name: 'Back' }).click();
     await expect(page.getByRole('link', { name: /^zsh/ })).toBeVisible();
+  });
+
+  test('kills all terminals', async ({ page }) => {
+    await page.getByRole('button', { name: 'Terminals', exact: true }).click();
+    await page.getByRole('button', { name: 'Kill all terminals' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Kill all terminals' });
+    await expect(dialog).toContainText('Kill all 3 terminals?');
+    await dialog.getByRole('button', { name: 'Kill all', exact: true }).click();
+    await expect(
+      page
+        .getByRole('region', { name: 'vscode-pocket-pilot' })
+        .getByText('No terminals are open in this window.')
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Kill all terminals' })).toHaveCount(0);
   });
 
   test('explains a terminal without shell integration', async ({ page }) => {

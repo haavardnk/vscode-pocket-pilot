@@ -28,7 +28,7 @@ const INTERRUPTED = 130;
 
 type TerminalCommand = Extract<
   Command,
-  { kind: 'terminalInput' | 'killTerminal' | 'createTerminal' }
+  { kind: 'terminalInput' | 'killTerminal' | 'killTerminals' | 'createTerminal' }
 >;
 
 export interface TerminalWatch {
@@ -116,6 +116,7 @@ export class MockHub {
     if (
       command.kind === 'terminalInput' ||
       command.kind === 'killTerminal' ||
+      command.kind === 'killTerminals' ||
       command.kind === 'createTerminal'
     ) {
       this.runTerminal(window, command);
@@ -324,21 +325,20 @@ export class MockHub {
       this.broadcast({ type: 'window', window: window.state });
       return;
     }
+    if (command.kind === 'killTerminals') {
+      const ids = window.state.terminals.map((terminal) => terminal.id);
+      window.state.terminals = [];
+      this.broadcast({ type: 'window', window: window.state });
+      for (const id of ids) this.closeTerminal(window, id);
+      return;
+    }
     const summary = window.state.terminals.find((terminal) => terminal.id === command.terminalId);
     const detail = window.terminals.get(command.terminalId);
     if (!summary || !detail) throw new Error('Terminal is no longer open');
     if (command.kind === 'killTerminal') {
       window.state.terminals = window.state.terminals.filter((terminal) => terminal !== summary);
-      window.terminals.delete(detail.id);
       this.broadcast({ type: 'window', window: window.state });
-      for (const client of this.watchers(window, detail.id)) {
-        client.send({
-          type: 'terminal',
-          windowId: window.state.windowId,
-          terminalId: detail.id,
-          detail: null
-        });
-      }
+      this.closeTerminal(window, detail.id);
       return;
     }
     if (detail.stream) {
@@ -360,6 +360,13 @@ export class MockHub {
     this.later(() =>
       this.endExecution(window, summary, execution, 0, [line(`Ran ${command.text}`)])
     );
+  }
+
+  private closeTerminal(window: MockWindow, terminalId: string): void {
+    window.terminals.delete(terminalId);
+    for (const client of this.watchers(window, terminalId)) {
+      client.send({ type: 'terminal', windowId: window.state.windowId, terminalId, detail: null });
+    }
   }
 
   private typeInStream(

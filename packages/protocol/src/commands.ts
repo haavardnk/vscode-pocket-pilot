@@ -86,6 +86,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
     execute: z.boolean()
   }),
   z.object({ kind: z.literal('killTerminal'), ...terminalTarget }),
+  z.object({ kind: z.literal('killTerminals'), windowId: z.string() }),
   z.object({
     kind: z.literal('createTerminal'),
     windowId: z.string(),

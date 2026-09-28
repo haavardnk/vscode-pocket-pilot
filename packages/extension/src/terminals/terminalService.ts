@@ -20,7 +20,7 @@ const TERMINAL_TOOL = 'run_in_terminal';
 
 export type TerminalCommand = Extract<
   Command,
-  { kind: 'terminalInput' | 'killTerminal' | 'createTerminal' }
+  { kind: 'terminalInput' | 'killTerminal' | 'killTerminals' | 'createTerminal' }
 >;
 
 interface Owned {
@@ -41,6 +41,7 @@ export function isTerminalCommand(command: Command): command is TerminalCommand 
   return (
     command.kind === 'terminalInput' ||
     command.kind === 'killTerminal' ||
+    command.kind === 'killTerminals' ||
     command.kind === 'createTerminal'
   );
 }
@@ -136,6 +137,10 @@ export class TerminalService implements vscode.Disposable {
   run(command: TerminalCommand): void {
     if (command.kind === 'createTerminal') {
       this.create(command.terminalId, command.folderId);
+      return;
+    }
+    if (command.kind === 'killTerminals') {
+      for (const record of this.records.values()) record.terminal.dispose();
       return;
     }
     const record = this.find(command.terminalId);
