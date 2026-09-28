@@ -4,6 +4,7 @@
   import SquareTerminal from '@lucide/svelte/icons/square-terminal';
   import type { ResponsePart } from '@pocket-pilot/protocol';
 
+  import { getChatRepository } from '../chatRepository';
   import { markdown } from '../markdown';
   import { routeHash } from '../routing';
 
@@ -13,6 +14,8 @@
   }
 
   const { part, windowId }: Props = $props();
+
+  const repository = getChatRepository();
 </script>
 
 {#snippet line()}
@@ -28,7 +31,10 @@
       <CircleCheck class="size-4" />
     </span>
   {/if}
-  <div class="markdown min-w-0 flex-1" {@attach markdown(part.message || part.toolId)}></div>
+  <div
+    class="markdown min-w-0 flex-1"
+    {@attach markdown(part.message || part.toolId, repository.github)}
+  ></div>
   {#if part.awaitingConfirmation}<span class="badge shrink-0 badge-sm badge-warning">Waiting</span
     >{/if}
 {/snippet}

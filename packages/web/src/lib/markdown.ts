@@ -2,6 +2,8 @@ import DOMPurify from 'dompurify';
 import { Marked } from 'marked';
 import type { Attachment } from 'svelte/attachments';
 
+import { type GitHubRepository, linkifyGitHub } from './github';
+
 const marked = new Marked({ gfm: true, async: false });
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
@@ -16,8 +18,9 @@ export function renderMarkdown(text: string): string {
   });
 }
 
-export function markdown(text: string): Attachment<HTMLElement> {
+export function markdown(text: string, github: GitHubRepository | null): Attachment<HTMLElement> {
   return (node) => {
     node.innerHTML = renderMarkdown(text);
+    if (github) linkifyGitHub(node, github);
   };
 }

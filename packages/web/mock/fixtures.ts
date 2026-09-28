@@ -370,7 +370,10 @@ export function initialWindows(now: number): MockWindow[] {
                   subagent: null,
                   parentCallId: 'sub1'
                 },
-                { kind: 'markdown', text: 'The follower retried before the leader was listening.' }
+                {
+                  kind: 'markdown',
+                  text: 'The follower retried before the leader was listening. Regressed in 3b7d0a2, fixed in `4f2c9e1`, see #12.'
+                }
               ]
             }
           ],

@@ -172,6 +172,38 @@ test.describe('paired', () => {
     ).toBeVisible();
   });
 
+  test('links chats and folders to GitHub', async ({ page }) => {
+    const base = 'https://github.com/haavardnk/vscode-pocket-pilot';
+    await openSession(page, 'Fix flaky cluster test');
+    const main = page.getByRole('main');
+    await expect(main.getByRole('link', { name: '#12' })).toHaveAttribute(
+      'href',
+      `${base}/issues/12`
+    );
+    await expect(main.getByRole('link', { name: '3b7d0a2' })).toHaveAttribute(
+      'href',
+      `${base}/commit/3b7d0a2`
+    );
+    await expect(main.getByRole('link', { name: '4f2c9e1' })).toHaveAttribute(
+      'href',
+      `${base}/commit/4f2c9e1`
+    );
+    await page.getByRole('button', { name: 'Chats' }).click();
+    await openFolder(page);
+    await page.getByRole('button', { name: 'Open on GitHub' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Open on GitHub' });
+    await expect(sheet.getByRole('link', { name: /^Repository/ })).toHaveAttribute('href', base);
+    await expect(sheet.getByRole('link', { name: /^Branch/ })).toHaveAttribute(
+      'href',
+      `${base}/tree/feat/web`
+    );
+    await expect(sheet.getByRole('link', { name: /^Pull requests/ })).toHaveAttribute(
+      'href',
+      `${base}/pulls?q=is%3Apr%20head%3Afeat%2Fweb`
+    );
+    await expect(sheet.getByRole('link', { name: /^Commit/ })).toHaveCount(0);
+  });
+
   test('approves a waiting tool', async ({ page }) => {
     await openSession(page, 'Build the phone app');
     await expect(page.getByText('Allow tool?')).toBeVisible();

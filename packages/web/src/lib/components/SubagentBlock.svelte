@@ -9,6 +9,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import CircleX from '@lucide/svelte/icons/circle-x';
 
+  import { getChatRepository } from '../chatRepository';
   import type { SubagentItem } from '../hub/steps';
   import { markdown } from '../markdown';
   import ToolLine from './ToolLine.svelte';
@@ -20,6 +21,8 @@
   }
 
   const { item, windowId, sessionId }: Props = $props();
+
+  const repository = getChatRepository();
 
   const subagent = $derived(item.part.subagent);
   const key = $derived(`${windowId}/${sessionId}/${item.part.callId}`);
@@ -57,7 +60,10 @@
         <ToolLine part={step} {windowId} />
       {/each}
       {#if subagent.result}
-        <div class="markdown text-base-content/80" {@attach markdown(subagent.result)}></div>
+        <div
+          class="markdown text-base-content/80"
+          {@attach markdown(subagent.result, repository.github)}
+        ></div>
       {:else if item.steps.length === 0 && item.part.status !== 'running'}
         <p class="text-base-content/50">No details</p>
       {/if}

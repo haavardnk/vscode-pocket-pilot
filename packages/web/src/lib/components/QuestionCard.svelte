@@ -7,6 +7,7 @@
     ResponsePart
   } from '@pocket-pilot/protocol';
 
+  import { getChatRepository } from '../chatRepository';
   import { answerSummary, collectAnswers, type Draft, initialDraft } from '../hub/questions';
   import { markdown } from '../markdown';
 
@@ -17,6 +18,8 @@
   }
 
   const { part, disabled, onanswer }: Props = $props();
+
+  const repository = getChatRepository();
 
   let edits = $state<Record<string, Draft>>({});
   let sending = $state(false);
@@ -67,7 +70,10 @@
           {question.title}{#if question.required && pending}<span class="text-error">*</span>{/if}
         </legend>
         {#if question.message}
-          <div class="markdown text-base-content/70" {@attach markdown(question.message)}></div>
+          <div
+            class="markdown text-base-content/70"
+            {@attach markdown(question.message, repository.github)}
+          ></div>
         {/if}
         {#if !pending}
           {#if part.answers}<p>{answerSummary(question, part.answers[question.id])}</p>{/if}

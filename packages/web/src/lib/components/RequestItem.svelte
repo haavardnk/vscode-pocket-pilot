@@ -4,6 +4,7 @@
   import ShieldAlert from '@lucide/svelte/icons/shield-alert';
   import type { QuestionAnswers, RequestView } from '@pocket-pilot/protocol';
 
+  import { getChatRepository } from '../chatRepository';
   import { responseItems } from '../hub/steps';
   import { markdown } from '../markdown';
   import { routeHash } from '../routing';
@@ -24,6 +25,8 @@
   }
 
   const { request, windowId, sessionId, disabled, onanswer, onconfirm, onelicit }: Props = $props();
+
+  const repository = getChatRepository();
 
   let acting = $state(false);
 
@@ -52,7 +55,7 @@
     {:else if part.kind === 'subagent'}
       <SubagentBlock item={part} {windowId} {sessionId} />
     {:else if part.kind === 'markdown'}
-      <div class="markdown" {@attach markdown(part.text)}></div>
+      <div class="markdown" {@attach markdown(part.text, repository.github)}></div>
     {:else if part.kind === 'tool'}
       <ToolLine {part} {windowId} />
     {:else if part.kind === 'edit'}
@@ -72,7 +75,10 @@
         <p class="flex items-center gap-2 font-medium">
           <CircleHelp class="size-4 shrink-0" />{part.title}
         </p>
-        {#if part.message}<div class="markdown" {@attach markdown(part.message)}></div>{/if}
+        {#if part.message}<div
+            class="markdown"
+            {@attach markdown(part.message, repository.github)}
+          ></div>{/if}
         {#if part.state === 'pending'}
           <div class="flex gap-2">
             {#each part.buttons as button, index (button)}
@@ -98,7 +104,10 @@
         <p class="flex items-center gap-2 font-medium">
           <ShieldAlert class="size-4 shrink-0" />{part.title}
         </p>
-        {#if part.message}<div class="markdown" {@attach markdown(part.message)}></div>{/if}
+        {#if part.message}<div
+            class="markdown"
+            {@attach markdown(part.message, repository.github)}
+          ></div>{/if}
         {#if part.state === 'pending'}
           <button
             class="btn btn-primary btn-sm"

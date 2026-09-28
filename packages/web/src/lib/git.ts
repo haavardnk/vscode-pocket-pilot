@@ -9,11 +9,11 @@ export function refLabel(git: GitStatus): string | null {
 }
 
 export function windowRef(window: WindowState): string | null {
-  const labels = new Set(
+  const [only, ...rest] = new Set(
     window.folders.flatMap((folder) => {
       const label = folder.git && refLabel(folder.git);
       return label ? [label] : [];
     })
   );
-  return labels.size === 1 ? ([...labels][0] ?? null) : null;
+  return only && rest.length === 0 ? only : null;
 }

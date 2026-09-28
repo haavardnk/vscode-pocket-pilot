@@ -1,7 +1,10 @@
 <script lang="ts">
+  import SquareArrowOutUpRight from '@lucide/svelte/icons/square-arrow-out-up-right';
+
   import { parentPath } from '../lib/code/paths';
   import FileTree from '../lib/components/code/FileTree.svelte';
   import GitChangeList from '../lib/components/code/GitChangeList.svelte';
+  import GitHubSheet from '../lib/components/code/GitHubSheet.svelte';
   import QueryView from '../lib/components/QueryView.svelte';
   import RefreshButton from '../lib/components/RefreshButton.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
@@ -21,6 +24,11 @@
   const hostWindow = $derived(hub.windows.find((candidate) => candidate.windowId === windowId));
   const folder = $derived(hostWindow?.folders.find((candidate) => candidate.id === folderId));
   const windowName = $derived(hostWindow?.name === folder?.name ? null : hostWindow?.name);
+  const github = $derived(
+    hostWindow?.repositories.find((repository) => repository.key === folder?.repositoryKey)
+      ?.github ?? null
+  );
+  let linking = $state(false);
   const back = $derived<Route>(
     tab === 'files' && path
       ? { name: 'folder', windowId, folderId, tab, path: parentPath(path) }
@@ -42,6 +50,15 @@
 <div class="flex flex-1 flex-col">
   <ScreenHeader title={folder?.name ?? 'Folder'} subtitle={path || windowName} {back}>
     {#snippet actions()}
+      {#if github}
+        <button
+          class="btn btn-square btn-ghost"
+          aria-label="Open on GitHub"
+          onclick={() => (linking = true)}
+        >
+          <SquareArrowOutUpRight class="size-5" />
+        </button>
+      {/if}
       <RefreshButton loading={active.loading} onrefresh={() => void active.refresh()} />
     {/snippet}
     <div role="tablist" class="tabs tabs-border px-2">
@@ -81,3 +98,12 @@
     {/if}
   </main>
 </div>
+
+{#if github}
+  <GitHubSheet
+    open={linking}
+    {github}
+    git={folder?.git ?? null}
+    onclose={() => (linking = false)}
+  />
+{/if}
