@@ -21,6 +21,7 @@ const EXIT_POLL_MS = 100;
 export interface KeeperFiles {
   record: string;
   log: string;
+  link: string;
   cloudflaredPid: string;
 }
 
@@ -35,6 +36,7 @@ export function keeperFiles(storage: string): KeeperFiles {
   return {
     record: join(storage, 'tunnel-keeper.json'),
     log: join(storage, 'tunnel-keeper.log'),
+    link: join(storage, 'tunnel-link.json'),
     cloudflaredPid: join(storage, 'cloudflared.pid')
   };
 }

@@ -15,7 +15,7 @@ const tunnelStatusSchema = z.discriminatedUnion('state', [
 ]);
 export type TunnelStatus = z.infer<typeof tunnelStatusSchema>;
 
-async function readTunnelStatus(file: string): Promise<TunnelStatus | null> {
+export async function readTunnelStatus(file: string): Promise<TunnelStatus | null> {
   const text = await readOptional(file);
   if (text === null) return null;
   const result = tunnelStatusSchema.safeParse(parseJson(text));

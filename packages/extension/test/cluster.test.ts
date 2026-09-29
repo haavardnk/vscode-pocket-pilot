@@ -262,6 +262,7 @@ describe('cluster', () => {
     await waitFor(() => leader.role.kind === 'leader');
     follower.start();
     await waitFor(() => follower.role.kind === 'follower');
+    await until(async () => (await tunnelUrl()) !== null);
 
     expect(
       (await post('/api/pair', { code: '000000', deviceName: 'Phone' }, 'https://evil.test')).status
@@ -442,6 +443,7 @@ describe('cluster', () => {
     await client.closed;
     await waitFor(() => follower.role.kind === 'leader');
     expect(second.watches).toEqual([]);
+    await until(async () => (await tunnelUrl()) !== null);
 
     const again = phone(paired.cookie);
     await waitFor(() => again.messages.some((message) => message.type === 'snapshot'));

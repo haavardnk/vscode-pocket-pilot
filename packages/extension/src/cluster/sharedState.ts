@@ -23,8 +23,12 @@ export function sharedFiles(storage: string): SharedFiles {
   };
 }
 
+export function clusterSecretFile(storage: string): string {
+  return join(storage, 'cluster-secret');
+}
+
 export function clusterSecret(storage: string): Promise<string> {
-  return createOnce(join(storage, 'cluster-secret'), () => randomBytes(32).toString('base64url'));
+  return createOnce(clusterSecretFile(storage), () => randomBytes(32).toString('base64url'));
 }
 
 export function hookSecret(storage: string): Promise<string> {

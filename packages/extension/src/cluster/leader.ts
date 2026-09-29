@@ -89,6 +89,7 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
   const tunnel = await startTunnel({
     ...options.tunnel,
     origin: server.tunnel,
+    secret,
     leaderPort: options.port,
     keeperScript: options.keeperScript,
     version: options.version,

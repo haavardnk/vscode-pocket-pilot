@@ -1,17 +1,24 @@
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import type { Server as HttpServer } from 'node:http';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { LOOPBACK } from '../cluster/sharedState';
+import { clusterSecretFile } from '../cluster/sharedState';
 import { errorMessage } from '../errors';
 import { LineTailer } from '../sessions/lineTailer';
 import { installCloudflared } from './install';
 import { keeperFiles, keeperRunning, spawnKeeper, stopKeeper } from './keeperClient';
 import { type KeeperIdentity, processAlive, readKeeperRecord, sameKeeper } from './keeperRecord';
 import type { NamedTunnel } from './named';
+import { type OriginLink, serveLink } from './originLink';
 import { cloudflaredRelease } from './release';
-import { clearTunnelStatus, type TunnelStatus, writeTunnelStatus } from './status';
+import {
+  clearTunnelStatus,
+  readTunnelStatus,
+  type TunnelStatus,
+  writeTunnelStatus
+} from './status';
 
 const MONITOR_MS = 2_000;
 const MIN_RETRY_MS = 2_000;
@@ -26,6 +33,7 @@ export interface TunnelSettings {
 
 export interface TunnelOptions extends TunnelSettings {
   origin: HttpServer;
+  secret: string;
   leaderPort: number;
   keeperScript: string;
   version: string;
@@ -38,22 +46,6 @@ export interface Tunnel {
   close(keepTunnel: boolean): Promise<void>;
 }
 
-function listen(server: HttpServer, port: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const fail = (error: NodeJS.ErrnoException): void =>
-      reject(
-        error.code === 'EADDRINUSE'
-          ? new Error(`Port ${port} for the tunnel is used by another program`)
-          : error
-      );
-    server.once('error', fail);
-    server.listen({ host: LOOPBACK, port }, () => {
-      server.off('error', fail);
-      resolve();
-    });
-  });
-}
-
 async function resolveBinary(options: TunnelOptions, signal: AbortSignal): Promise<string> {
   if (options.cloudflaredPath) return options.cloudflaredPath;
   const release = cloudflaredRelease(process.platform, process.arch);
@@ -64,25 +56,29 @@ async function resolveBinary(options: TunnelOptions, signal: AbortSignal): Promi
   return installCloudflared(join(options.storage, 'cloudflared'), release, signal, options.report);
 }
 
-function keeperIdentity(options: TunnelOptions): KeeperIdentity {
+function sha256(data: string | Buffer): string {
+  return createHash('sha256').update(data).digest('hex');
+}
+
+async function keeperIdentity(options: TunnelOptions): Promise<KeeperIdentity> {
   return {
     script: options.keeperScript,
+    scriptHash: sha256(await readFile(options.keeperScript)),
     version: options.version,
     port: options.leaderPort,
     cloudflaredPath: options.cloudflaredPath,
     hostname: options.named?.hostname ?? null,
-    tokenHash: options.named ? createHash('sha256').update(options.named.token).digest('hex') : null
+    tokenHash: options.named ? sha256(options.named.token) : null
   };
 }
 
 export async function startTunnel(options: TunnelOptions): Promise<Tunnel> {
   const { report } = options;
   const quick = !options.named;
-  const port = options.leaderPort + 1;
   const files = keeperFiles(options.storage);
-  const identity = keeperIdentity(options);
   const log = new LineTailer(files.log);
   const abort = new AbortController();
+  let identity: KeeperIdentity | null = null;
   let writing = Promise.resolve();
   let keeper: number | null = null;
   let keeperSince = 0;
@@ -106,6 +102,7 @@ export async function startTunnel(options: TunnelOptions): Promise<Tunnel> {
   };
 
   const ensure = async (): Promise<void> => {
+    identity ??= await keeperIdentity(options);
     const record = await readKeeperRecord(files.record);
     if (keeper !== null && record?.pid === keeper && processAlive(keeper)) {
       if (Date.now() - keeperSince >= STABLE_MS) failures = 0;
@@ -119,7 +116,8 @@ export async function startTunnel(options: TunnelOptions): Promise<Tunnel> {
     }
     if (keeper !== null) {
       keeper = null;
-      fail('The tunnel keeper stopped unexpectedly');
+      const last = await readTunnelStatus(options.statusFile);
+      fail(last?.state === 'error' ? last.message : 'The tunnel keeper stopped unexpectedly');
     }
     if (Date.now() < retryAt) return;
     await stopKeeper(files, report);
@@ -130,9 +128,11 @@ export async function startTunnel(options: TunnelOptions): Promise<Tunnel> {
       identity,
       config: {
         binary,
-        origin: `http://${LOOPBACK}:${port}`,
+        originPort: options.leaderPort + 1,
         leaderPort: options.leaderPort,
         hostname: identity.hostname,
+        linkFile: files.link,
+        secretFile: clusterSecretFile(options.storage),
         recordFile: files.record,
         statusFile: options.statusFile,
         pidFile: files.cloudflaredPid
@@ -153,8 +153,8 @@ export async function startTunnel(options: TunnelOptions): Promise<Tunnel> {
     for (const line of read?.lines ?? []) report(line.replace(LOG_TIMESTAMP, ''));
   };
 
-  const listening = listen(options.origin, port);
-  const running = listening.then(
+  const linking = serveLink(options.origin, options.secret, files.link);
+  const running = linking.then(
     async () => {
       while (!abort.signal.aborted) {
         await tick();
@@ -166,14 +166,13 @@ export async function startTunnel(options: TunnelOptions): Promise<Tunnel> {
       publish({ state: 'error', quick, message: errorMessage(error) });
     }
   );
-  await listening.catch(() => undefined);
+  const link: OriginLink | null = await linking.catch(() => null);
 
   return {
     close: async (keepTunnel) => {
       abort.abort();
       await running;
-      options.origin.close();
-      options.origin.closeAllConnections();
+      await link?.close();
       await writing;
       if (keepTunnel && keeper !== null) return;
       await stopKeeper(files, report);

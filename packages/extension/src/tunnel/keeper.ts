@@ -3,7 +3,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { LOOPBACK } from '../cluster/sharedState';
 import { errorMessage } from '../errors';
+import { readOptional } from '../storage/sharedFile';
 import { runCloudflared } from './cloudflared';
+import { type KeeperOrigin, listenOrigin } from './keeperOrigin';
 import { clearKeeperRecord, readKeeperRecord } from './keeperRecord';
 import type { NamedTunnel } from './named';
 import { reapStale } from './stalePid';
@@ -20,9 +22,11 @@ export const KEEPER_TIMING: KeeperTiming = { recordMs: 1_000, probeMs: 2_000, gr
 export interface KeeperOptions {
   pid: number;
   binary: string;
-  origin: string;
+  originPort: number;
   leaderPort: number;
   named: NamedTunnel | null;
+  linkFile: string;
+  secretFile: string;
   recordFile: string;
   statusFile: string;
   pidFile: string;
@@ -78,9 +82,19 @@ export async function runKeeper(options: KeeperOptions): Promise<void> {
         report(`Could not save the tunnel status: ${errorMessage(error)}`)
       );
   };
+  let origin: KeeperOrigin;
+  try {
+    const secret = await readOptional(options.secretFile);
+    if (secret === null) throw new Error('The cluster secret is missing');
+    origin = await listenOrigin(options.originPort, options.linkFile, secret);
+  } catch (error) {
+    publish({ state: 'error', quick: options.named === null, message: errorMessage(error) });
+    await writing;
+    return;
+  }
   const cloudflared = runCloudflared({
     binary: options.binary,
-    origin: options.origin,
+    origin: `http://${LOOPBACK}:${options.originPort}`,
     named: options.named,
     pidFile: options.pidFile,
     onStatus: publish,
@@ -91,6 +105,7 @@ export async function runKeeper(options: KeeperOptions): Promise<void> {
   } finally {
     ending ??= 'stopped';
     await cloudflared.close();
+    await origin.close();
     await writing;
   }
   if (ending === 'replaced') return;

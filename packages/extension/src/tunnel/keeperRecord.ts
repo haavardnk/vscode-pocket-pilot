@@ -9,9 +9,11 @@ export const KEEPER_CONFIG = 'POCKET_PILOT_KEEPER';
 
 export const keeperConfigSchema = z.object({
   binary: z.string().min(1),
-  origin: z.string().min(1),
+  originPort: z.number().int(),
   leaderPort: z.number().int(),
   hostname: z.string().nullable(),
+  linkFile: z.string().min(1),
+  secretFile: z.string().min(1),
   recordFile: z.string().min(1),
   statusFile: z.string().min(1),
   pidFile: z.string().min(1)
@@ -21,6 +23,7 @@ export type KeeperConfig = z.infer<typeof keeperConfigSchema>;
 const keeperRecordSchema = z.object({
   pid: z.number().int().positive(),
   script: z.string(),
+  scriptHash: z.string(),
   version: z.string(),
   port: z.number().int(),
   cloudflaredPath: z.string(),
@@ -48,6 +51,7 @@ export function clearKeeperRecord(file: string): Promise<void> {
 export function sameKeeper(record: KeeperRecord, identity: KeeperIdentity): boolean {
   return (
     record.script === identity.script &&
+    record.scriptHash === identity.scriptHash &&
     record.version === identity.version &&
     record.port === identity.port &&
     record.cloudflaredPath === identity.cloudflaredPath &&
