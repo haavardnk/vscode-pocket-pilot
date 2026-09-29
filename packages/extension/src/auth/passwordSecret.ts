@@ -5,7 +5,7 @@ import { hashPassword, verifyPassword } from '../server/password';
 
 const SECRET_KEY = 'pocketPilot.password';
 const CONTEXT_KEY = 'pocketPilot.hasPassword';
-const MIN_LENGTH = 8;
+const MIN_LENGTH = 12;
 
 export class PasswordSecret implements PasswordCheck, vscode.Disposable {
   private readonly subscription: vscode.Disposable;

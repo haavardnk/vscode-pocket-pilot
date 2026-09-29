@@ -21,6 +21,7 @@ import { errorMessage } from '../errors';
 import { parseHook } from '../hooks/hookEvent';
 import { HOOK_HEADER } from '../hooks/hookFile';
 import type { DeviceStore } from './devices';
+import { LoginLimit } from './loginLimit';
 import type { PairingStore } from './pairing';
 import type { PhoneRegistry } from './phones';
 import { acceptPhone } from './phoneSocket';
@@ -71,6 +72,7 @@ declare module 'fastify' {
 
 export async function startServer(options: ServerOptions): Promise<RunningServer> {
   const { hub, devices, pairing, phones, password, report } = options;
+  const logins = new LoginLimit(report);
   const app = Fastify({
     logger: false,
     bodyLimit: 64 * 1024,
@@ -171,8 +173,13 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       if (!body.success) return reply.code(400).send({ error: 'Enter the password' });
       if (!(await password.enabled()))
         return reply.code(404).send({ error: 'Password sign-in is off' });
-      if (!(await password.verify(body.data.password)))
-        return reply.code(401).send({ error: 'Wrong password' });
+      const outcome = await logins.attempt(() => password.verify(body.data.password));
+      if (outcome === 'blocked') {
+        return reply
+          .code(429)
+          .send({ error: 'Too many wrong passwords. Pair this device with a code instead.' });
+      }
+      if (outcome === 'wrong') return reply.code(401).send({ error: 'Wrong password' });
       return signIn(request, reply, body.data.deviceName);
     }
   );
