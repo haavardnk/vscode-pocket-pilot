@@ -76,7 +76,7 @@ test('answers a confirmation', async ({ page }) => {
   await expect(page.getByText('Continue to iterate?')).toBeVisible();
   await page.getByRole('button', { name: 'Pause' }).click();
   await expect(page.getByText('Done: Pause: "Continue to iterate?"')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toHaveCount(0);
 });
 
 test('changes the approval level after a warning', async ({ page }) => {

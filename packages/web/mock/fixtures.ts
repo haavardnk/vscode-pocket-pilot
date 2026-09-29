@@ -358,6 +358,9 @@ export function initialWindows(now: number): MockWindow[] {
               agentName: null,
               state: 'pending',
               error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: ['/repo/packages/web/src/App.svelte'],
               parts: [
                 { kind: 'thinking', text: 'Plan the screens first.', title: 'Planning' },
                 {
@@ -424,6 +427,9 @@ export function initialWindows(now: number): MockWindow[] {
               agentName: 'Reviewer',
               state: 'complete',
               error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: [],
               parts: [
                 {
                   kind: 'tool',
@@ -486,6 +492,9 @@ export function initialWindows(now: number): MockWindow[] {
               agentName: null,
               state: 'needsInput',
               error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: [],
               parts: [
                 { kind: 'markdown', text: 'A few choices before I start.' },
                 {
@@ -561,6 +570,9 @@ export function initialWindows(now: number): MockWindow[] {
               agentName: 'Plan',
               state: 'complete',
               error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: [],
               parts: [
                 {
                   kind: 'markdown',
@@ -590,6 +602,9 @@ export function initialWindows(now: number): MockWindow[] {
               agentName: null,
               state: 'complete',
               error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: [],
               parts: [{ kind: 'markdown', text: 'Bumped Svelte and Vite.' }]
             }
           ],
@@ -649,6 +664,9 @@ export function initialWindows(now: number): MockWindow[] {
               agentName: null,
               state: 'complete',
               error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: [],
               parts: [
                 { kind: 'markdown', text: 'Demosaic is now 2x faster.' },
                 {
@@ -659,6 +677,79 @@ export function initialWindows(now: number): MockWindow[] {
                   state: 'pending'
                 }
               ]
+            }
+          ],
+          queued: []
+        },
+        {
+          id: 's7',
+          title: 'Split the exporter',
+          status: 'idle',
+          modelId: 'copilot/claude-opus',
+          modeId: 'agent',
+          permission: 'default',
+          editedFiles: 2,
+          todos: null,
+          totalRequests: 3,
+          requests: [
+            {
+              id: 'r7a',
+              timestamp: now - 70 * MINUTE,
+              message: 'Extract the JPEG encoder.',
+              modelId: 'copilot/claude-opus',
+              agentName: null,
+              state: 'complete',
+              error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: ['/Users/me/Git/immich-edit/src/export/jpeg.rs'],
+              parts: [
+                {
+                  kind: 'edit',
+                  path: '/Users/me/Git/immich-edit/src/export/jpeg.rs',
+                  stopId: 'u7a',
+                  callId: 'c7a',
+                  additions: 40,
+                  deletions: 2
+                },
+                { kind: 'markdown', text: 'Moved the JPEG encoder into its own module.' }
+              ]
+            },
+            {
+              id: 'r7b',
+              timestamp: now - 68 * MINUTE,
+              message: 'Add a PNG encoder next to it.',
+              modelId: 'copilot/gpt-5',
+              agentName: null,
+              state: 'complete',
+              error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: ['/Users/me/Git/immich-edit/src/export/png.rs'],
+              parts: [
+                {
+                  kind: 'edit',
+                  path: '/Users/me/Git/immich-edit/src/export/png.rs',
+                  stopId: 'u7b',
+                  callId: 'c7b',
+                  additions: 35,
+                  deletions: 0
+                },
+                { kind: 'markdown', text: 'Added a PNG encoder.' }
+              ]
+            },
+            {
+              id: 'r7c',
+              timestamp: now - 66 * MINUTE,
+              message: 'Summarise the export modules.',
+              modelId: 'copilot/claude-opus',
+              agentName: null,
+              state: 'complete',
+              error: null,
+              editable: true,
+              disabled: false,
+              editedPaths: [],
+              parts: [{ kind: 'markdown', text: 'There are two encoders now.' }]
             }
           ],
           queued: []

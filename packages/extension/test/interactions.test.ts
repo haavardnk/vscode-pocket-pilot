@@ -52,6 +52,9 @@ const detail = (parts: ResponsePart[]): SessionDetail => ({
       agentName: null,
       state: 'needsInput',
       error: null,
+      editable: true,
+      disabled: false,
+      editedPaths: [],
       parts
     }
   ],

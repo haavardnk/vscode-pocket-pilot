@@ -49,6 +49,9 @@ export function pendingTurns(
     agentName: null,
     state: turn === last && !settled ? 'pending' : 'complete',
     error: null,
+    editable: false,
+    disabled: false,
+    editedPaths: [],
     parts: activityParts(turn.events, statuses, false)
   }));
 }

@@ -68,6 +68,12 @@ export const commandSchema = z.discriminatedUnion('kind', [
     level: permissionLevelSchema
   }),
   z.object({
+    kind: z.literal('restoreCheckpoint'),
+    ...sessionTarget,
+    requestId: z.string().min(1)
+  }),
+  z.object({ kind: z.literal('redoCheckpoint'), ...sessionTarget }),
+  z.object({
     kind: z.literal('editDecision'),
     ...sessionTarget,
     decision: z.enum(['keep', 'undo']),

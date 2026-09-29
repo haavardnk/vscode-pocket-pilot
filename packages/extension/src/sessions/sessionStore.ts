@@ -61,6 +61,14 @@ function expectedOr<T>(expected: Expected<T> | null, logged: T): T {
   return expected && Date.now() - expected.at < INPUT_OVERLAY_MS ? expected.value : logged;
 }
 
+function withoutRemoved(root: unknown, removed: Expected<string> | null): unknown {
+  const requestId = expectedOr<string | null>(removed, null);
+  if (requestId === null) return root;
+  const requests = requestsOf(root);
+  const index = requests.findIndex((request) => asString(request.requestId) === requestId);
+  return index < 0 ? root : { ...asRecord(root), requests: requests.slice(0, index) };
+}
+
 export class SessionStore {
   private readonly entries = new Map<string, SessionEntry>();
   private readonly hot: string[] = [];
@@ -115,7 +123,7 @@ export class SessionStore {
     if (!summary) return null;
     const activity = this.activity(entry);
     const detail = projectDetail(
-      rootOf(entry),
+      withoutRemoved(rootOf(entry), entry.removed),
       summary,
       limit,
       activity,
@@ -157,6 +165,13 @@ export class SessionStore {
     const entry = this.entries.get(sessionId);
     if (!entry) return;
     entry.mode = { value: modeId, at: Date.now() };
+    this.emit(sessionId);
+  }
+
+  expectRemoved(sessionId: string, requestId: string): void {
+    const entry = this.entries.get(sessionId);
+    if (!entry) return;
+    entry.removed = { value: requestId, at: Date.now() };
     this.emit(sessionId);
   }
 
@@ -368,6 +383,7 @@ export class SessionStore {
     if (entry.exported && modified >= entry.exported.at) entry.exported = null;
     if (entry.permission && modified >= entry.permission.at) entry.permission = null;
     if (entry.mode && modified >= entry.mode.at) entry.mode = null;
+    if (entry.removed && modified >= entry.removed.at) entry.removed = null;
     syncUnlogged(entry);
   }
 

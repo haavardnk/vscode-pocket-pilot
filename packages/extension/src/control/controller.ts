@@ -16,11 +16,8 @@ import * as vscode from 'vscode';
 import type { ModelSettingsFile } from '../models/modelSettings';
 import { withQueued } from '../sessions/queue';
 import type { SessionFlags } from '../sessions/sessionFlags';
-import {
-  LOCAL_SESSION_AUTHORITY,
-  LOCAL_SESSION_SCHEME,
-  localSessionPath
-} from '../sessions/sessionUri';
+import { focusChat, selectModel, sessionResource, submitChat } from './chatSession';
+import type { CheckpointCommands } from './checkpointCommands';
 import {
   answersError,
   confirmationPrompt,
@@ -41,16 +38,9 @@ export interface ControllerSources {
   expectQueue: (sessionId: string, items: QueuedRequest[]) => void;
   expectPermission: (sessionId: string, level: PermissionLevel) => void;
   expectMode: (sessionId: string, modeId: string) => void;
+  checkpoints: CheckpointCommands;
   canOrganize: boolean;
   settings: ModelSettingsFile;
-}
-
-function sessionResource(sessionId: string): vscode.Uri {
-  return vscode.Uri.from({
-    scheme: LOCAL_SESSION_SCHEME,
-    authority: LOCAL_SESSION_AUTHORITY,
-    path: localSessionPath(sessionId)
-  });
 }
 
 interface HandoffResult {
@@ -65,10 +55,12 @@ export class Controller {
     switch (command.kind) {
       case 'send': {
         const before = command.delivery ? await this.sources.detail(command.sessionId) : null;
-        await this.focus(command.sessionId);
-        await vscode.commands.executeCommand('workbench.action.chat.submit', {
-          inputValue: command.text,
-          ...(command.delivery ? { acceptInputOptions: { queue: command.delivery } } : {})
+        await this.sources.checkpoints.submitting(command.sessionId, async () => {
+          await focusChat(command.sessionId);
+          await vscode.commands.executeCommand('workbench.action.chat.submit', {
+            inputValue: command.text,
+            ...(command.delivery ? { acceptInputOptions: { queue: command.delivery } } : {})
+          });
         });
         if (command.delivery && (before?.status === 'running' || before?.status === 'needsInput')) {
           this.sources.expectQueue(
@@ -87,7 +79,7 @@ export class Controller {
         await this.setQueue(command);
         return;
       case 'stop':
-        await this.focus(command.sessionId);
+        await focusChat(command.sessionId);
         await vscode.commands.executeCommand('workbench.action.chat.cancel');
         return;
       case 'setMode':
@@ -102,10 +94,16 @@ export class Controller {
         await this.handoff(command);
         return;
       case 'setModel':
-        await this.selectModel(await this.requireModel(command.modelId));
+        await selectModel(await this.requireModel(command.modelId));
+        return;
+      case 'restoreCheckpoint':
+        await this.sources.checkpoints.restore(command.sessionId, command.requestId);
+        return;
+      case 'redoCheckpoint':
+        await this.sources.checkpoints.redo(command.sessionId);
         return;
       case 'toolDecision':
-        await this.focus(command.sessionId);
+        await focusChat(command.sessionId);
         await vscode.commands.executeCommand(
           command.decision === 'accept'
             ? 'workbench.action.chat.acceptTool'
@@ -132,17 +130,18 @@ export class Controller {
           await this.sources.detail(command.sessionId),
           command.button
         );
-        await this.submit(command.sessionId, prompt);
+        await submitChat(command.sessionId, prompt);
         return;
       }
       case 'acceptElicitation':
         requirePendingElicitation(await this.sources.detail(command.sessionId));
-        await this.focus(command.sessionId);
+        await focusChat(command.sessionId);
         await vscode.commands.executeCommand('workbench.action.chat.acceptElicitation');
         return;
       case 'setPermission':
-        await this.submit(command.sessionId, PERMISSION_COMMANDS[command.level]);
-        this.sources.expectPermission(command.sessionId, command.level);
+        await this.sources.checkpoints.submitting(command.sessionId, () =>
+          this.setPermission(command.sessionId, command.level)
+        );
         return;
       case 'setPinned':
         this.requireOrganize();
@@ -168,7 +167,7 @@ export class Controller {
             modeId: command.modeId
           });
         }
-        if (model) await this.selectModel(model);
+        if (model) await selectModel(model);
         await vscode.commands.executeCommand('workbench.action.chat.submit', {
           inputValue: command.text
         });
@@ -188,10 +187,6 @@ export class Controller {
         return;
       }
     }
-  }
-
-  private async focus(sessionId: string): Promise<void> {
-    await vscode.commands.executeCommand('vscode.open', sessionResource(sessionId));
   }
 
   private requireOrganize(): void {
@@ -225,7 +220,7 @@ export class Controller {
     if (command.path !== null && !files.includes(command.path)) {
       throw new Error('File is not part of this chat');
     }
-    await this.focus(command.sessionId);
+    await focusChat(command.sessionId);
     if (command.path === null && command.decision === 'keep') {
       await vscode.commands.executeCommand('chatEditing.acceptAllFiles');
       return;
@@ -243,21 +238,19 @@ export class Controller {
       .find((agent) => agent.id === command.agentId)
       ?.handoffs.find((item) => item.id === command.handoffId);
     if (!handoff) throw new Error('This handoff is no longer offered');
-    if (command.autopilot) {
-      await this.submit(command.sessionId, PERMISSION_COMMANDS.autopilot);
-      this.sources.expectPermission(command.sessionId, 'autopilot');
-    } else {
-      await this.focus(command.sessionId);
-    }
-    const result = await vscode.commands.executeCommand<HandoffResult | undefined>(
-      'workbench.action.chat.executeHandoff',
-      {
-        id: handoff.id,
-        sessionResource: sessionResource(command.sessionId).toString(),
-        sourceCustomAgent: command.agentId
-      }
-    );
-    if (!result?.success) throw new Error(result?.error ?? 'VS Code could not run the handoff');
+    await this.sources.checkpoints.submitting(command.sessionId, async () => {
+      if (command.autopilot) await this.setPermission(command.sessionId, 'autopilot');
+      else await focusChat(command.sessionId);
+      const result = await vscode.commands.executeCommand<HandoffResult | undefined>(
+        'workbench.action.chat.executeHandoff',
+        {
+          id: handoff.id,
+          sessionResource: sessionResource(command.sessionId).toString(),
+          sourceCustomAgent: command.agentId
+        }
+      );
+      if (!result?.success) throw new Error(result?.error ?? 'VS Code could not run the handoff');
+    });
     const target =
       agents.find((agent) => agent.id === handoff.agent) ??
       agents.find((agent) => agent.name === handoff.agent);
@@ -281,7 +274,7 @@ export class Controller {
       );
       return;
     }
-    await this.focus(command.sessionId);
+    await focusChat(command.sessionId);
     await vscode.commands.executeCommand('workbench.action.chat.removeAllPendingRequests');
     for (const item of command.queue) {
       await vscode.commands.executeCommand('workbench.action.chat.submit', {
@@ -300,9 +293,9 @@ export class Controller {
     );
   }
 
-  private async submit(sessionId: string, text: string): Promise<void> {
-    await this.focus(sessionId);
-    await vscode.commands.executeCommand('workbench.action.chat.submit', { inputValue: text });
+  private async setPermission(sessionId: string, level: PermissionLevel): Promise<void> {
+    await submitChat(sessionId, PERMISSION_COMMANDS[level]);
+    this.sources.expectPermission(sessionId, level);
   }
 
   private async requireAgent(modeId: string): Promise<void> {
@@ -314,13 +307,5 @@ export class Controller {
     const model = (await this.sources.models()).find((candidate) => candidate.id === modelId);
     if (!model) throw new Error('Unknown model');
     return model;
-  }
-
-  private async selectModel(model: Model): Promise<void> {
-    await vscode.commands.executeCommand('workbench.action.chat.changeModel', {
-      vendor: model.vendor,
-      id: model.id.slice(model.vendor.length + 1),
-      family: model.family
-    });
   }
 }

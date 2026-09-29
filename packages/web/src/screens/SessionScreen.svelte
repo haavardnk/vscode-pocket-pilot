@@ -16,15 +16,18 @@
     ModelConfigOption,
     PermissionLevel,
     QuestionAnswers,
-    QueueEntry
+    QueueEntry,
+    RequestView
   } from '@pocket-pilot/protocol';
   import { tick, untrack } from 'svelte';
 
   import { setChatRepository } from '../lib/chatRepository';
+  import CheckpointBar from '../lib/components/CheckpointBar.svelte';
   import Composer from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
   import HandoffBar from '../lib/components/HandoffBar.svelte';
   import Loading from '../lib/components/Loading.svelte';
+  import MessageActionsSheet from '../lib/components/MessageActionsSheet.svelte';
   import ModelSheet from '../lib/components/ModelSheet.svelte';
   import ModeSheet from '../lib/components/ModeSheet.svelte';
   import PermissionSheet from '../lib/components/PermissionSheet.svelte';
@@ -35,6 +38,7 @@
   import TodoList from '../lib/components/TodoList.svelte';
   import { windowRef } from '../lib/git';
   import { windowGitHub } from '../lib/github';
+  import { restoreImpact } from '../lib/hub/checkpoints';
   import { handoffSource } from '../lib/hub/handoffs';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { getPane } from '../lib/pane';
@@ -63,6 +67,7 @@
   let stopping = $state(false);
   let handingOff = $state(false);
   let echo = $state<{ text: string; after: string | null } | null>(null);
+  let acting = $state<RequestView | null>(null);
   let root = $state<HTMLElement>();
   let composer = $state<ReturnType<typeof Composer>>();
   let followBottom = true;
@@ -90,9 +95,15 @@
   const handoffAgent = $derived(
     detail && hostWindow && !echoing ? handoffSource(hostWindow.agents, detail, modeId) : null
   );
+  const actionTarget = $derived.by(() => {
+    const index = indexOf(acting);
+    if (!acting || !detail || index < 0) return null;
+    return { request: acting, impact: restoreImpact(detail.requests, index) };
+  });
 
   $effect(() => {
     echo = null;
+    acting = null;
     const key = `${windowId}/${sessionId}`;
     const restored =
       saved?.key === key && untrack(() => hub.detail?.id) === sessionId ? saved.top : null;
@@ -160,6 +171,15 @@
 
   function changeQueue(expected: string[], queue: QueueEntry[]): Promise<boolean> {
     return run(() => hub.command({ kind: 'setQueue', windowId, sessionId, expected, queue }));
+  }
+
+  function indexOf(request: RequestView | null): number {
+    if (!request || !detail) return -1;
+    return detail.requests.findIndex((candidate) => candidate.id === request.id);
+  }
+
+  function restored(request: RequestView): void {
+    if (!composer?.current().trim()) composer?.fill(request.message, false);
   }
 
   async function handoff(agent: Agent, item: Handoff, autopilot: boolean): Promise<void> {
@@ -303,12 +323,16 @@
       {#if detail.requests.length === 0 && !echoing}
         <p class="p-10 text-center text-base-content/60">No messages yet.</p>
       {/if}
-      {#each detail.requests as request (request.id)}
+      {#each detail.requests as request, index (request.id)}
+        {#if request.disabled && !detail.requests[index - 1]?.disabled}
+          <CheckpointBar {windowId} {sessionId} disabled={!connected} />
+        {/if}
         <RequestItem
           {request}
           {windowId}
           {sessionId}
           disabled={!connected}
+          onmessage={() => (acting = request)}
           onanswer={answer}
           onconfirm={confirm}
           onelicit={elicit}
@@ -412,6 +436,14 @@
       current={detail.permission}
       onselect={selectPermission}
       onclose={() => (sheet = null)}
+    />
+    <MessageActionsSheet
+      target={actionTarget}
+      {windowId}
+      {sessionId}
+      disabled={!connected}
+      onrestored={restored}
+      onclose={() => (acting = null)}
     />
   {/if}
   <SessionActionsSheet

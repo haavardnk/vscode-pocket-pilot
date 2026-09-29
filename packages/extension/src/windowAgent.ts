@@ -26,13 +26,16 @@ import { type Blob, MAX_FILE_BYTES, readBlob } from './code/files';
 import { type CodeFolder, codeFolder } from './code/folders';
 import { LanguageIndex } from './code/languageIndex';
 import { SessionChanges } from './code/sessionChanges';
+import { CheckpointCommands } from './control/checkpointCommands';
 import { Controller } from './control/controller';
+import { RemovalPrompt } from './control/removalPrompt';
 import { BranchService, isBranchCommand } from './git/branchService';
 import { GitStatusSource } from './git/gitStatus';
 import { folderRepository } from './git/repository';
 import { ModelSettingsFile } from './models/modelSettings';
 import { ModelSource } from './models/modelSource';
 import { type ChatPaths, chatPaths } from './paths';
+import { Checkpoints } from './sessions/checkpoints';
 import { EditingSessions } from './sessions/editingState';
 import { FlagStore } from './sessions/flagStore';
 import { LiveEdits } from './sessions/liveEdits';
@@ -83,6 +86,8 @@ export class WindowAgent implements vscode.Disposable {
   private readonly code: CodeService;
   private readonly edits: LiveEdits;
   private readonly editChanges: EditChanges;
+  private readonly checkpoints: Checkpoints;
+  private readonly removalPrompt: RemovalPrompt;
   private readonly mirror: LiveMirror;
   private readonly terminals: TerminalService;
   private readonly git: GitStatusSource;
@@ -141,6 +146,8 @@ export class WindowAgent implements vscode.Disposable {
     const languages = new LanguageIndex();
     const editing = new EditingSessions(this.paths.editingSessions);
     this.editChanges = new EditChanges(editing, this.edits);
+    this.checkpoints = new Checkpoints(this.paths.editingSessions, editing, report);
+    this.removalPrompt = new RemovalPrompt(context.globalState);
     const sessionChanges = new SessionChanges({
       folders: () => this.folders,
       language: (path) => languages.resolve(path),
@@ -166,6 +173,16 @@ export class WindowAgent implements vscode.Disposable {
       expectQueue: (sessionId, items) => this.store.expectQueue(sessionId, items),
       expectPermission: (sessionId, level) => this.store.expectPermission(sessionId, level),
       expectMode: (sessionId, modeId) => this.store.expectMode(sessionId, modeId),
+      checkpoints: new CheckpointCommands({
+        requests: async (sessionId) => {
+          const detail = await this.store.detail(sessionId, Infinity);
+          return detail ? (await this.checkpoints.decorate(detail)).requests : [];
+        },
+        disabled: (sessionId) => this.checkpoints.disabled(sessionId),
+        expectRestored: (sessionId, requestIds) => this.checkpoints.expect(sessionId, requestIds),
+        expectRemoved: (sessionId, requestId) => this.store.expectRemoved(sessionId, requestId),
+        prompt: this.removalPrompt
+      }),
       canOrganize: this.paths.stateDatabase !== null,
       settings
     });
@@ -187,6 +204,7 @@ export class WindowAgent implements vscode.Disposable {
       { dispose: () => this.store.dispose() },
       { dispose: () => this.flags.dispose() },
       { dispose: () => this.mirror.dispose() },
+      { dispose: () => this.checkpoints.dispose() },
       { dispose: () => clearTimeout(this.publishTimer) },
       this.modelSource.onDidChange(() => void this.refreshModels()),
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
@@ -202,14 +220,21 @@ export class WindowAgent implements vscode.Disposable {
     );
     this.agentSource.onDidChange(() => void this.refreshAgents());
     this.store.onDidChange((sessionId) => this.onSessionChange(sessionId));
+    this.checkpoints.onDidChange((sessionId) => {
+      if (this.watches.has(sessionId)) this.pushDetail(sessionId);
+    });
     this.flags.onDidChange(() => this.schedulePublish());
   }
 
   async start(): Promise<void> {
     this.agentSource.setFolders(agentFolders(this.paths));
+    this.checkpoints.start();
     await Promise.all([
       this.store.start(),
       this.flags.start(),
+      this.removalPrompt
+        .recover()
+        .catch((error: unknown) => this.report(`Cannot restore chat setting: ${String(error)}`)),
       this.refreshAgents(),
       this.refreshModels(),
       this.refreshRepositories(),
@@ -306,7 +331,10 @@ export class WindowAgent implements vscode.Disposable {
         if (limit === undefined) return;
         const detail = await this.store.detail(sessionId, limit);
         const decorated =
-          detail && (await this.editChanges.decorate(this.terminals.decorate(detail)));
+          detail &&
+          (await this.editChanges.decorate(
+            await this.checkpoints.decorate(this.terminals.decorate(detail))
+          ));
         if (!this.watches.has(sessionId)) return;
         this.sessionChanged.fire({ sessionId, detail: decorated });
       })

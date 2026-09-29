@@ -304,14 +304,18 @@ function projectRequest(request: JsonRecord, latest: boolean, activity: Activity
     return projected ? [projected] : [];
   });
   const error = asRecord(asRecord(request.result).errorDetails);
+  const id = asString(request.requestId) ?? '';
   return {
-    id: asString(request.requestId) ?? '',
+    id,
     timestamp: asNumber(request.timestamp) ?? 0,
     message: requestText(request),
     modelId: asString(request.modelId),
     agentName: asString(asRecord(asRecord(request.modeInfo).modeInstructions).name),
     state,
     error: state === 'failed' ? (asString(error.message) ?? 'Request failed') : null,
+    editable: id !== '',
+    disabled: false,
+    editedPaths: [],
     parts: mergeParts(parts)
   };
 }

@@ -91,6 +91,9 @@ const turn = (id: string, parts: ResponsePart[]): RequestView => ({
   agentName: null,
   state: 'pending',
   error: null,
+  editable: true,
+  disabled: false,
+  editedPaths: [],
   parts
 });
 
@@ -157,6 +160,14 @@ describe('protocol', () => {
         type: 'command',
         requestId: 'r1',
         command: { kind: 'send', windowId: 'w1', sessionId: 's1', text: 'go', delivery: 'steering' }
+      }
+    ],
+    [
+      clientMessageSchema,
+      {
+        type: 'command',
+        requestId: 'r3',
+        command: { kind: 'restoreCheckpoint', windowId: 'w1', sessionId: 's1', requestId: 'q1' }
       }
     ],
     [

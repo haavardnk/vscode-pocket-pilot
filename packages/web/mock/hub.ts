@@ -16,6 +16,7 @@ import {
 } from '@pocket-pilot/protocol';
 
 import { MockBranches } from './branches.ts';
+import { dropDisabled, redoCheckpoint, restoreCheckpoint } from './checkpoints.ts';
 import { MockCode } from './code.ts';
 import {
   copilotUsage,
@@ -201,9 +202,11 @@ export class MockHub {
       return;
     }
     if (command.kind === 'send') {
-      if (detail.status === 'idle' || detail.status === 'failed')
+      if (detail.status === 'idle' || detail.status === 'failed') {
+        dropDisabled(detail);
+        this.changed(window, detail.id);
         this.later(() => this.ask(window, detail.id, command.text));
-      else {
+      } else {
         detail.queued.push({
           id: this.id('queued'),
           delivery: command.delivery ?? 'queued',
@@ -314,7 +317,20 @@ export class MockHub {
       if (handoff.send) this.later(() => this.ask(window, detail.id, handoff.prompt));
       return;
     }
-    if (command.kind === 'setPermission') detail.permission = command.level;
+    if (command.kind === 'restoreCheckpoint') {
+      restoreCheckpoint(detail, command.requestId);
+      this.changed(window, detail.id);
+      return;
+    }
+    if (command.kind === 'redoCheckpoint') {
+      redoCheckpoint(detail);
+      this.changed(window, detail.id);
+      return;
+    }
+    if (command.kind === 'setPermission') {
+      dropDisabled(detail);
+      detail.permission = command.level;
+    }
     if (command.kind === 'setMode') detail.modeId = command.modeId;
     if (command.kind === 'setModel') detail.modelId = command.modelId;
     this.changed(window, detail.id);
@@ -333,6 +349,9 @@ export class MockHub {
           ?.name ?? null,
       state: 'pending',
       error: null,
+      editable: true,
+      disabled: false,
+      editedPaths: [],
       parts: [
         {
           kind: 'tool',

@@ -20,12 +20,22 @@
     windowId: string;
     sessionId: string;
     disabled: boolean;
+    onmessage: () => void;
     onanswer: (resolveId: string, answers: QuestionAnswers | null) => Promise<boolean>;
     onconfirm: (button: string) => Promise<boolean>;
     onelicit: () => Promise<boolean>;
   }
 
-  const { request, windowId, sessionId, disabled, onanswer, onconfirm, onelicit }: Props = $props();
+  const {
+    request,
+    windowId,
+    sessionId,
+    disabled,
+    onmessage,
+    onanswer,
+    onconfirm,
+    onelicit
+  }: Props = $props();
 
   const repository = getChatRepository();
 
@@ -43,10 +53,21 @@
   }
 </script>
 
-<article class="flex flex-col gap-3" data-request={request.id}>
+<article
+  class={['flex flex-col gap-3', request.disabled && 'opacity-50']}
+  data-request={request.id}
+>
   {#if request.message}
     <div class="chat-end chat">
-      <div class="chat-bubble chat-bubble-primary whitespace-pre-wrap">{request.message}</div>
+      {#if request.editable && !request.disabled}
+        <button
+          class="chat-bubble cursor-pointer chat-bubble-primary text-left whitespace-pre-wrap"
+          aria-haspopup="dialog"
+          onclick={onmessage}>{request.message}</button
+        >
+      {:else}
+        <div class="chat-bubble chat-bubble-primary whitespace-pre-wrap">{request.message}</div>
+      {/if}
     </div>
   {/if}
 

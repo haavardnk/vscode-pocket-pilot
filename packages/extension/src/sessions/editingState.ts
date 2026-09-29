@@ -88,6 +88,10 @@ export class EditingSessions {
     return entry.timeline;
   }
 
+  async savedAt(sessionId: string): Promise<number | null> {
+    return (await this.load(sessionId))?.mtime ?? null;
+  }
+
   async blob(sessionId: string, hash: string): Promise<Blob> {
     if (this.root === null || !hashSchema.safeParse(hash).success) return 'missing';
     const file = join(this.root, sessionId, 'contents', hash);

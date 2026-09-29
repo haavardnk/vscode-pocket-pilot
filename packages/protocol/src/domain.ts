@@ -156,6 +156,9 @@ export const requestViewSchema = z.object({
   agentName: z.string().nullable(),
   state: requestStateSchema,
   error: z.string().nullable(),
+  editable: z.boolean(),
+  disabled: z.boolean(),
+  editedPaths: z.array(z.string()),
   parts: z.array(responsePartSchema)
 });
 

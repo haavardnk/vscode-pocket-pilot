@@ -124,6 +124,9 @@ describe('code queries', () => {
     agentName: null,
     state: 'complete',
     error: null,
+    editable: true,
+    disabled: false,
+    editedPaths: [],
     parts: paths.map((path) => ({
       kind: 'edit',
       path,

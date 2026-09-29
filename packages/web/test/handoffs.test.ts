@@ -45,6 +45,9 @@ const detail = (state: RequestState | null, agentName: string | null): SessionDe
           agentName,
           state,
           error: null,
+          editable: true,
+          disabled: false,
+          editedPaths: [],
           parts: []
         }
       ]

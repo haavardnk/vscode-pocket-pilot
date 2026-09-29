@@ -69,6 +69,28 @@ describe('SessionStore', () => {
     expect(await current()).toBe(change.logged);
   });
 
+  it('hides removed requests until the log is written', async () => {
+    const log = join(sessions, `${SESSION_ID}.jsonl`);
+    await appendFile(log, logLines({ kind: 2, k: ['requests'], v: [request('r2', 'Ship it', 1)] }));
+    await store.start();
+    const messages = async (): Promise<string[] | undefined> =>
+      (await store.detail(SESSION_ID, 10))?.requests.map((item) => item.message);
+
+    store.expectRemoved(SESSION_ID, 'missing');
+    expect(await messages()).toEqual(['Build it', 'Ship it']);
+    store.expectRemoved(SESSION_ID, 'r2');
+    expect(await messages()).toEqual(['Build it']);
+
+    const logged = new Promise<void>((resolve) => {
+      store.onDidChange((sessionId) => {
+        if (sessionId === SESSION_ID) resolve();
+      });
+    });
+    await appendFile(log, logLines({ kind: 1, k: ['customTitle'], v: 'Release' }));
+    await logged;
+    expect(await messages()).toEqual(['Build it', 'Ship it']);
+  });
+
   it('lists non-empty sessions and follows appended mutations', async () => {
     await store.start();
     expect(store.summaries().map((summary) => [summary.title, summary.status])).toEqual([

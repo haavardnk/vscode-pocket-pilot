@@ -42,9 +42,13 @@
 
   const ready = $derived(text.trim().length > 0 && !disabled && !sending);
 
-  export function fill(value: string): void {
+  export function fill(value: string, focus = true): void {
     text = value;
-    input?.focus();
+    if (focus) input?.focus();
+  }
+
+  export function current(): string {
+    return text;
   }
 
   async function submit(): Promise<void> {

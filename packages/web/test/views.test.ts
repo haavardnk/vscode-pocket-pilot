@@ -233,6 +233,9 @@ describe('response parts', () => {
       agentName: null,
       state: 'pending' as const,
       error: null,
+      editable: true,
+      disabled: false,
+      editedPaths: [],
       parts
     });
     const detail = (requests: SessionDetail['requests']): SessionDetail => ({

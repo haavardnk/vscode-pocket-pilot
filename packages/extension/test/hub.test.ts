@@ -42,6 +42,9 @@ function detail(count: number): SessionDetail {
       agentName: null,
       state: 'complete' as const,
       error: null,
+      editable: true,
+      disabled: false,
+      editedPaths: [],
       parts: []
     })),
     queued: []

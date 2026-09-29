@@ -35,6 +35,7 @@ const checkpointSchema = z.object({
 const stateSchema = z.object({
   timeline: z.object({
     checkpoints: z.array(z.unknown()).optional(),
+    currentEpoch: z.number().optional(),
     operations: z.array(z.unknown()),
     fileBaselines: z.array(z.tuple([z.string(), z.unknown()]))
   })
@@ -61,6 +62,7 @@ export interface Timeline {
   baselines: Map<string, string>;
   checkpoints: Checkpoint[];
   operations: TimelineOperation[];
+  currentEpoch: number | null;
 }
 
 export interface RequestEdit {
@@ -78,9 +80,11 @@ function baselineKey(requestId: string, path: string): string {
 
 export function parseTimeline(raw: unknown): Timeline {
   const parsed = stateSchema.safeParse(raw);
-  if (!parsed.success) return { baselines: new Map(), checkpoints: [], operations: [] };
-  const { checkpoints, operations, fileBaselines } = parsed.data.timeline;
+  if (!parsed.success)
+    return { baselines: new Map(), checkpoints: [], operations: [], currentEpoch: null };
+  const { checkpoints, currentEpoch, operations, fileBaselines } = parsed.data.timeline;
   return {
+    currentEpoch: currentEpoch ?? null,
     checkpoints: (checkpoints ?? [])
       .flatMap((value) => {
         const checkpoint = checkpointSchema.safeParse(value);
