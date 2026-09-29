@@ -124,15 +124,17 @@ export class SessionStore {
     const summary = summaryOf(entry);
     if (!summary) return null;
     const activity = this.activity(entry);
+    const modelId = expectedOr(entry.model, summary.modelId);
     const detail = projectDetail(
       withoutRemoved(rootOf(entry), entry.removed),
       summary,
       limit,
       activity,
-      pendingTurns(entry.unlogged, summary.modelId, activity.statuses, activity.settled)
+      pendingTurns(entry.unlogged, modelId, activity.statuses, activity.settled)
     );
     return {
       ...detail,
+      modelId,
       modeId: expectedOr(entry.mode, detail.modeId),
       permission: expectedOr(entry.permission, detail.permission),
       queued: currentQueue(
@@ -167,6 +169,13 @@ export class SessionStore {
     const entry = this.entries.get(sessionId);
     if (!entry) return;
     entry.mode = { value: modeId, at: Date.now() };
+    this.emit(sessionId);
+  }
+
+  expectModel(sessionId: string, modelId: string): void {
+    const entry = this.entries.get(sessionId);
+    if (!entry) return;
+    entry.model = { value: modelId, at: Date.now() };
     this.emit(sessionId);
   }
 
@@ -397,6 +406,7 @@ export class SessionStore {
     if (entry.exported && modified >= entry.exported.at) entry.exported = null;
     if (entry.permission && modified >= entry.permission.at) entry.permission = null;
     if (entry.mode && modified >= entry.mode.at) entry.mode = null;
+    if (entry.model && modified >= entry.model.at) entry.model = null;
     if (entry.removed && modified >= entry.removed.at) entry.removed = null;
     syncUnlogged(entry);
   }

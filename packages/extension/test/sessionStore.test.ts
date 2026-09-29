@@ -50,6 +50,18 @@ describe('SessionStore', () => {
       phone: 'agent',
       mutation: { kind: 1, k: ['inputState', 'mode'], v: { id: 'ask', kind: 'agent' } },
       logged: 'ask'
+    },
+    {
+      name: 'model',
+      expect: (): void => store.expectModel(SESSION_ID, 'copilot/claude-opus-4.5'),
+      read: (detail: SessionDetail | null) => detail?.modelId,
+      phone: 'copilot/claude-opus-4.5',
+      mutation: {
+        kind: 1,
+        k: ['inputState', 'selectedModel'],
+        v: { identifier: 'copilot/gpt-5-mini' }
+      },
+      logged: 'copilot/gpt-5-mini'
     }
   ])('holds a phone $name change until the log is written', async (change) => {
     await store.start();

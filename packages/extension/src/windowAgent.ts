@@ -176,6 +176,7 @@ export class WindowAgent implements vscode.Disposable {
       expectQueue: (sessionId, items) => this.store.expectQueue(sessionId, items),
       expectPermission: (sessionId, level) => this.store.expectPermission(sessionId, level),
       expectMode: (sessionId, modeId) => this.store.expectMode(sessionId, modeId),
+      expectModel: (sessionId, modelId) => this.store.expectModel(sessionId, modelId),
       checkpoints: new CheckpointCommands({
         requests: async (sessionId) => {
           const detail = await this.store.detail(sessionId, Infinity);

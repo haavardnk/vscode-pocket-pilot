@@ -39,6 +39,7 @@ export interface ControllerSources {
   expectQueue: (sessionId: string, items: QueuedRequest[]) => void;
   expectPermission: (sessionId: string, level: PermissionLevel) => void;
   expectMode: (sessionId: string, modeId: string) => void;
+  expectModel: (sessionId: string, modelId: string) => void;
   checkpoints: CheckpointCommands;
   images: ChatImages;
   canOrganize: boolean;
@@ -90,6 +91,7 @@ export class Controller {
         return;
       case 'setModel':
         await selectModel(await this.requireModel(command.modelId));
+        this.sources.expectModel(command.sessionId, command.modelId);
         return;
       case 'editRequest':
         await this.editRequest(command);
@@ -304,7 +306,10 @@ export class Controller {
       if (command.modeId && command.modeId !== detail.modeId) {
         await this.setMode(command.sessionId, command.modeId);
       }
-      if (model) await selectModel(model);
+      if (model) {
+        await selectModel(model);
+        this.sources.expectModel(command.sessionId, model.id);
+      }
       if (command.permission !== detail.permission) {
         await this.setPermission(command.sessionId, command.permission);
       }

@@ -35,6 +35,7 @@ export interface SessionEntry {
   queue: QueueOverlay | null;
   permission: Expected<PermissionLevel> | null;
   mode: Expected<string> | null;
+  model: Expected<string> | null;
   removed: Expected<string> | null;
 }
 
@@ -56,6 +57,7 @@ export function newEntry(id: string, logPath: string): SessionEntry {
     queue: null,
     permission: null,
     mode: null,
+    model: null,
     removed: null
   };
 }
