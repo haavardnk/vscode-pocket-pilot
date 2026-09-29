@@ -11,6 +11,7 @@ import { DeviceStore } from '../server/devices';
 import { PairingStore } from '../server/pairing';
 import { PhoneRegistry } from '../server/phones';
 import { startTunnel, type TunnelSettings } from '../tunnel/tunnel';
+import { UsageFeed, type UsageReader } from '../usage/usageFeed';
 import { Hub } from './hub';
 import { attachLocalWindow } from './localLink';
 import type { LocalWindow } from './localWindow';
@@ -25,6 +26,7 @@ export interface LeaderOptions {
   version: string;
   webRoot: string;
   password: PasswordCheck;
+  usage: UsageReader;
   expireDays: () => number;
   report: (message: string) => void;
 }
@@ -53,7 +55,11 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
   });
 
   const hub: Hub = new Hub(options.version, {
-    windowsChanged: () => alerts.observe(hub.windowStates())
+    windowsChanged: () => {
+      const windows = hub.windowStates();
+      alerts.observe(windows);
+      usage.observe(windows);
+    }
   });
 
   const server = await startServer({
@@ -69,9 +75,16 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
     push,
     password: options.password,
     expireDays: options.expireDays,
+    phoneVisible: () => usage.phoneVisible(),
     report
   });
 
+  const usage = new UsageFeed({
+    reader: options.usage,
+    publish: (value) => hub.setUsage(value),
+    hasClients: () => hub.clientCount > 0,
+    report
+  });
   const local = attachLocalWindow(hub, options.window);
   const tunnel = await startTunnel({
     ...options.tunnel,
@@ -96,6 +109,7 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
     close: async (keepTunnel = false) => {
       local.dispose();
       alerts.dispose();
+      usage.dispose();
       await watcher.close();
       await tunnel.close(keepTunnel);
       await server.close();

@@ -10,6 +10,7 @@
   import type { AuthInfo, Connection, Device } from '@pocket-pilot/protocol';
 
   import { logout } from '../lib/api/auth';
+  import CopilotUsageGroup from '../lib/components/CopilotUsageGroup.svelte';
   import NotificationSettings from '../lib/components/NotificationSettings.svelte';
   import SettingsGroup from '../lib/components/SettingsGroup.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
@@ -79,6 +80,8 @@
   </SettingsGroup>
 
   <NotificationSettings {connection} />
+
+  <CopilotUsageGroup />
 
   <SettingsGroup title="Connection">
     {#snippet caption()}

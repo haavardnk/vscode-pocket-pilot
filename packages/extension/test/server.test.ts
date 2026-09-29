@@ -86,6 +86,7 @@ async function start(namedTunnel = false): Promise<Fixture> {
     }),
     password: { enabled: async () => false, verify: async () => false },
     expireDays: () => 30,
+    phoneVisible: () => undefined,
     report: () => undefined
   });
   await new Promise<void>((resolve) => server.tunnel.listen(0, '127.0.0.1', resolve));

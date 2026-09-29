@@ -1,4 +1,5 @@
 import {
+  type CopilotUsage,
   type Model,
   type OpenTarget,
   SEGMENT_BOLD,
@@ -252,6 +253,22 @@ export function openedWindow(windowId: string, opened: OpenTarget): MockWindow {
     [],
     Date.now()
   );
+}
+
+export function copilotUsage(now: number): CopilotUsage {
+  const date = new Date(now);
+  return {
+    state: 'ready',
+    plan: 'Pro+',
+    meters: [
+      { kind: 'premium', usedPercent: 42, used: 630, total: 1500, unlimited: false },
+      { kind: 'chat', usedPercent: 0, used: null, total: null, unlimited: true },
+      { kind: 'completions', usedPercent: 0, used: null, total: null, unlimited: true }
+    ],
+    overage: { permitted: true, count: 0 },
+    resetAt: Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1),
+    checkedAt: now - 3 * MINUTE
+  };
 }
 
 export function initialWindows(now: number): MockWindow[] {

@@ -9,4 +9,5 @@ export * from './push.ts';
 export * from './query.ts';
 export * from './queue.ts';
 export * from './terminal.ts';
+export * from './usage.ts';
 export * from './windows.ts';

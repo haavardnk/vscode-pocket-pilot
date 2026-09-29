@@ -1,6 +1,7 @@
 import {
   applyTerminalPatch,
   type Command,
+  type CopilotUsage,
   diffDetail,
   type HookEvent,
   type Query,
@@ -63,6 +64,7 @@ export class Hub {
   private readonly sent = new Map<HubClient, SessionDetail | null>();
   private readonly terminalWatches = new Map<HubClient, TerminalWatch>();
   private readonly incompatible = new Map<object, string>();
+  private usage: CopilotUsage | null = null;
 
   constructor(
     private readonly version: string,
@@ -117,6 +119,11 @@ export class Hub {
     this.broadcast({ type: 'incompatibleWindows', names: [...this.incompatible.values()] });
   }
 
+  setUsage(usage: CopilotUsage): void {
+    this.usage = usage;
+    this.broadcast({ type: 'usage', usage });
+  }
+
   sessionUpdate(windowId: string, sessionId: string, detail: SessionDetail | null): void {
     const entry = this.windows.get(windowId);
     if (!entry) return;
@@ -151,7 +158,8 @@ export class Hub {
       type: 'snapshot',
       version: this.version,
       windows: this.windowStates(),
-      incompatibleWindows: [...this.incompatible.values()]
+      incompatibleWindows: [...this.incompatible.values()],
+      usage: this.usage
     });
   }
 

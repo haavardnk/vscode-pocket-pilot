@@ -146,9 +146,28 @@ describe('protocol', () => {
         type: 'snapshot',
         version: '0.1.0',
         windows: [window],
-        incompatibleWindows: ['old']
+        incompatibleWindows: ['old'],
+        usage: null
       }
     ],
+    [
+      serverMessageSchema,
+      {
+        type: 'usage',
+        usage: {
+          state: 'ready',
+          plan: 'Pro+',
+          meters: [
+            { kind: 'premium', usedPercent: 42, used: 630, total: 1500, unlimited: false },
+            { kind: 'chat', usedPercent: 0, used: null, total: null, unlimited: true }
+          ],
+          overage: { permitted: true, count: 0 },
+          resetAt: 1_759_276_800_000,
+          checkedAt: 1_758_000_000_000
+        }
+      }
+    ],
+    [serverMessageSchema, { type: 'usage', usage: { state: 'needsAccess' } }],
     [followerMessageSchema, { type: 'register', secret: 'x', window }],
     [
       clientMessageSchema,

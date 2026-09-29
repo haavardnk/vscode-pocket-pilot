@@ -1,5 +1,6 @@
 import {
   type Command,
+  type CopilotUsage,
   diffDetail,
   type Query,
   type QueryResult,
@@ -17,6 +18,7 @@ import {
 import { MockBranches } from './branches.ts';
 import { MockCode } from './code.ts';
 import {
+  copilotUsage,
   GREEN,
   initialWindows,
   line,
@@ -54,6 +56,7 @@ function folderOf(window: MockWindow, folderId: string): WorkspaceFolder {
 
 export class MockHub {
   private windows: MockWindow[] = [];
+  private usage: CopilotUsage | null = null;
   private readonly clients = new Set<MockClient>();
   private readonly sent = new Map<MockClient, SessionDetail>();
   private readonly code = new MockCode();
@@ -75,6 +78,7 @@ export class MockHub {
     this.nextId = 1;
     const now = Date.now();
     this.windows = initialWindows(now);
+    this.usage = copilotUsage(now);
     this.code.reset();
     this.branches.reset();
     this.sent.clear();
@@ -88,6 +92,11 @@ export class MockHub {
   connect(client: MockClient): void {
     this.clients.add(client);
     client.send(this.snapshot());
+  }
+
+  setUsage(usage: CopilotUsage): void {
+    this.usage = usage;
+    this.broadcast({ type: 'usage', usage });
   }
 
   disconnect(client: MockClient): void {
@@ -596,7 +605,8 @@ export class MockHub {
       type: 'snapshot',
       version: '0.0.0-mock',
       windows,
-      incompatibleWindows: []
+      incompatibleWindows: [],
+      usage: this.usage
     };
   }
 }

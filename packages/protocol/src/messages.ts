@@ -5,6 +5,7 @@ import { sessionDetailSchema, windowStateSchema } from './domain.ts';
 import { sessionPatchSchema } from './patch.ts';
 import { queryResultSchema, querySchema } from './query.ts';
 import { terminalDetailSchema, terminalPatchSchema } from './terminal.ts';
+import { copilotUsageSchema } from './usage.ts';
 
 const hookTarget = { sessionId: z.string(), at: z.number() };
 
@@ -56,11 +57,13 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('snapshot'),
     version: z.string(),
     windows: z.array(windowStateSchema),
-    incompatibleWindows: z.array(z.string())
+    incompatibleWindows: z.array(z.string()),
+    usage: copilotUsageSchema.nullable()
   }),
   z.object({ type: z.literal('window'), window: windowStateSchema }),
   z.object({ type: z.literal('windowRemoved'), windowId: z.string() }),
   z.object({ type: z.literal('incompatibleWindows'), names: z.array(z.string()) }),
+  z.object({ type: z.literal('usage'), usage: copilotUsageSchema }),
   z.object({
     type: z.literal('session'),
     windowId: z.string(),

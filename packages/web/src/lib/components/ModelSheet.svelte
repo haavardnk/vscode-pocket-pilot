@@ -3,6 +3,8 @@
   import type { ConfigValue, Model, ModelConfigOption } from '@pocket-pilot/protocol';
 
   import { findModel } from '../hub/views';
+  import { hub } from '../stores/hub.svelte';
+  import { METER_LABELS, percentLabel, premiumMeter, progressClass, resetLabel } from '../usage';
   import Sheet from './Sheet.svelte';
 
   interface Props {
@@ -17,6 +19,8 @@
   const { open, models, current, onselect, onconfig, onclose }: Props = $props();
 
   const selected = $derived(findModel(models, current));
+  const premium = $derived(premiumMeter(hub.usage));
+  const resetAt = $derived(hub.usage?.state === 'ready' ? hub.usage.resetAt : null);
 
   function selectValue(option: ModelConfigOption): string {
     return String(option.value ?? option.defaultValue ?? '');
@@ -29,6 +33,22 @@
 </script>
 
 <Sheet {open} title="Model" {onclose}>
+  {#if premium}
+    <div class="mb-3 flex flex-col gap-1.5">
+      <div class="flex items-baseline justify-between gap-3 text-sm">
+        <span>{METER_LABELS.premium}</span>
+        <span class="text-base-content/70">
+          {percentLabel(premium)}{resetAt === null ? '' : ` · ${resetLabel(resetAt, Date.now())}`}
+        </span>
+      </div>
+      <progress
+        class={progressClass(premium)}
+        value={premium.usedPercent}
+        max="100"
+        aria-label={METER_LABELS.premium}
+      ></progress>
+    </div>
+  {/if}
   {#if selected && selected.options.length > 0}
     <div class="mb-3 flex flex-col gap-2">
       {#each selected.options as option (option.key)}

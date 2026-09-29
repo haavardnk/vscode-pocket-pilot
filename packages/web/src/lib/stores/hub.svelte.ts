@@ -2,6 +2,7 @@ import {
   applyPatch,
   applyTerminalPatch,
   type Command,
+  type CopilotUsage,
   type Query,
   type QueryResultFor,
   type ServerMessage,
@@ -36,6 +37,7 @@ class HubStore {
   windows = $state<WindowState[]>([]);
   mismatch = $state(false);
   incompatibleWindows = $state<string[]>([]);
+  usage = $state<CopilotUsage | null>(null);
   detail = $state<SessionDetail | null>(null);
   detailMissing = $state(false);
   limit = $state(PAGE_SIZE);
@@ -82,6 +84,7 @@ class HubStore {
     this.windows = [];
     this.mismatch = false;
     this.incompatibleWindows = [];
+    this.usage = null;
     this.detail = null;
     this.subscription = null;
     this.terminal = null;
@@ -161,12 +164,17 @@ class HubStore {
       this.version = message.version;
       this.windows = message.windows;
       this.incompatibleWindows = message.incompatibleWindows;
+      this.usage = message.usage;
       this.loaded = true;
       this.mismatch = false;
       return;
     }
     if (message.type === 'incompatibleWindows') {
       this.incompatibleWindows = message.names;
+      return;
+    }
+    if (message.type === 'usage') {
+      this.usage = message.usage;
       return;
     }
     if (message.type === 'window') {

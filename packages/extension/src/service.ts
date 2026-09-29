@@ -14,6 +14,7 @@ import { hookFileContent, hookFilePath, installHooks, removeHooks } from './hook
 import { readSettings, type Settings } from './settings';
 import { type TunnelStatus, watchTunnelStatus } from './tunnel/status';
 import type { TunnelSettings } from './tunnel/tunnel';
+import { CopilotUsageReader } from './usage/copilotUsage';
 import { WindowAgent } from './windowAgent';
 
 export class PocketPilotService {
@@ -130,6 +131,7 @@ export class PocketPilotService {
           version,
           webRoot: this.context.asAbsolutePath('media/web'),
           password: this.password,
+          usage: new CopilotUsageReader(),
           expireDays: () => readSettings().expireDays,
           report
         }),

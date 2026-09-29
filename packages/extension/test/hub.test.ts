@@ -98,6 +98,22 @@ describe('Hub', () => {
     ]);
   });
 
+  it('keeps the latest Copilot usage for new phones', () => {
+    const hub = new Hub('1.0.0');
+    const early = client();
+    hub.connect(early);
+    hub.setUsage({ state: 'needsAccess' });
+    const late = client();
+    hub.connect(late);
+    expect(early.messages).toEqual([
+      expect.objectContaining({ type: 'snapshot', usage: null }),
+      { type: 'usage', usage: { state: 'needsAccess' } }
+    ]);
+    expect(late.messages).toEqual([
+      expect.objectContaining({ type: 'snapshot', usage: { state: 'needsAccess' } })
+    ]);
+  });
+
   it('watches the largest limit per session and trims details per client', () => {
     const hub = new Hub('1.0.0');
     const window = link();

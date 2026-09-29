@@ -167,6 +167,10 @@ function cluster(window: FakeWindow, roles: Role[]): Cluster<Leader> {
         version: 'test',
         webRoot: storage,
         password: { enabled: () => Promise.resolve(false), verify: () => Promise.resolve(false) },
+        usage: {
+          read: () => Promise.resolve({ state: 'needsAccess' }),
+          onDidChangeAccess: () => ({ dispose: () => undefined })
+        },
         expireDays: () => 30,
         report
       }),

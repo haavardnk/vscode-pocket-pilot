@@ -3,7 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 
-import type { ClientMessage, Device, PushEvents } from '@pocket-pilot/protocol';
+import {
+  type ClientMessage,
+  copilotUsageSchema,
+  type Device,
+  type PushEvents
+} from '@pocket-pilot/protocol';
 import { WebSocketServer } from 'ws';
 
 import { type MockClient, MockHub } from './hub.ts';
@@ -122,6 +127,12 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
     return;
   }
   if (url === '/__push') return json(response, 200, { pushes: [...pushes.values()], pushTests });
+  if (url === '/__usage' && request.method === 'POST') {
+    const usage = copilotUsageSchema.safeParse((await readBody(request)).usage);
+    if (!usage.success) return json(response, 400, { error: 'Invalid usage' });
+    hub.setUsage(usage.data);
+    return json(response, 200, {});
+  }
   if (url === '/api/auth')
     return json(response, 200, {
       device: deviceOf(request),
