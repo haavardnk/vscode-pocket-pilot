@@ -215,8 +215,13 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     scope.addHook('preValidation', async (request, reply) => {
       if (tunnel.carries(request)) return reply.code(403).send({ error: 'Local only' });
     });
-    scope.get(INTERNAL_PATH, { websocket: true }, (socket) =>
-      acceptFollower(socket, hub, options.clusterSecret, report)
+    scope.get(INTERNAL_PATH, { websocket: true }, (socket, request) =>
+      acceptFollower(
+        socket,
+        hub,
+        { secret: options.clusterSecret, port: request.socket.localPort ?? 0 },
+        report
+      )
     );
     scope.post(HOOK_PATH, { bodyLimit: MAX_PAYLOAD }, async (request, reply) => {
       const secret = request.headers[HOOK_HEADER];

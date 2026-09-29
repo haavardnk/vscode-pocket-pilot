@@ -92,8 +92,17 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
   z.object(queryResult)
 ]);
 
+export const helloSchema = z.object({ type: z.literal('hello'), nonce: z.string() });
+
+export const challengeSchema = z.object({
+  type: z.literal('challenge'),
+  nonce: z.string(),
+  proof: z.string()
+});
+
 export const followerMessageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('register'), secret: z.string(), window: windowStateSchema }),
+  helloSchema,
+  z.object({ type: z.literal('register'), proof: z.string(), window: windowStateSchema }),
   z.object({ type: z.literal('window'), window: windowStateSchema }),
   z.object({
     type: z.literal('session'),
@@ -115,6 +124,7 @@ export const followerMessageSchema = z.discriminatedUnion('type', [
 ]);
 
 export const leaderMessageSchema = z.discriminatedUnion('type', [
+  challengeSchema,
   z.object({ type: z.literal('watch'), sessions: z.array(sessionWatchSchema) }),
   z.object({ type: z.literal('watchTerminals'), terminalIds: z.array(z.string()) }),
   z.object({ type: z.literal('command'), requestId: z.string(), command: commandSchema }),
@@ -129,7 +139,7 @@ export const stableRequestSchema = z.object({ type: z.string(), requestId: z.str
 
 export const stableRegisterSchema = z.object({
   type: z.literal('register'),
-  secret: z.string(),
+  proof: z.string(),
   window: z.object({ name: z.string() })
 });
 

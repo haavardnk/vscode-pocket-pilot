@@ -16,10 +16,11 @@ import {
   type WindowState
 } from '@pocket-pilot/protocol';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 
 import { Cluster, type Role } from '../src/cluster/cluster';
 import { followLeader } from '../src/cluster/followerClient';
+import { newNonce, proof, validProof } from '../src/cluster/handshake';
 import { type Leader, startLeader } from '../src/cluster/leader';
 import type { Disposable, LocalWindow, TerminalUpdate } from '../src/cluster/localWindow';
 import { clusterSecret, hookSecret, sharedFiles } from '../src/cluster/sharedState';
@@ -402,12 +403,28 @@ describe('cluster', () => {
       error: VERSION_MISMATCH
     });
 
+    const secret = await clusterSecret(storage);
+    const forged = new WebSocket(`ws://127.0.0.1:${port}/internal`);
+    const forgedClosed = new Promise<number>((resolve) => forged.once('close', resolve));
+    await new Promise((resolve) => forged.once('open', resolve));
+    forged.send(JSON.stringify({ type: 'register', proof: secret, window: first.state() }));
+    expect(await forgedClosed).toBe(4003);
+
     const outdated = new WebSocket(`ws://127.0.0.1:${port}/internal`);
     await new Promise((resolve) => outdated.once('open', resolve));
+    const nonce = newNonce();
+    const challenge = new Promise<{ nonce: string; proof: string }>((resolve) =>
+      outdated.once('message', (data) =>
+        resolve(JSON.parse(data.toString()) as { nonce: string; proof: string })
+      )
+    );
+    outdated.send(JSON.stringify({ type: 'hello', nonce }));
+    const answer = await challenge;
+    expect(validProof(secret, 'leader', port, nonce, answer.proof)).toBe(true);
     outdated.send(
       JSON.stringify({
         type: 'register',
-        secret: await clusterSecret(storage),
+        proof: proof(secret, 'follower', port, answer.nonce),
         window: { windowId: 'old', name: 'Old window' }
       })
     );
@@ -432,6 +449,27 @@ describe('cluster', () => {
     await follower.stop();
     expect(firstRoles.at(-1)).toEqual({ kind: 'stopped' });
   }, 20_000);
+
+  it('refuses a leader that fails the cluster check', async () => {
+    const rogue = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+    await new Promise((resolve) => rogue.once('listening', resolve));
+    const received: string[] = [];
+    rogue.on('connection', (socket) =>
+      socket.on('message', (data) => {
+        received.push(data.toString());
+        socket.send(JSON.stringify({ type: 'challenge', nonce: 'n', proof: 'forged' }));
+      })
+    );
+    const roguePort = (rogue.address() as { port: number }).port;
+
+    await expect(followLeader(new FakeWindow('first'), storage, roguePort, report)).rejects.toThrow(
+      'The leader failed the cluster check'
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(received.map((text) => (JSON.parse(text) as { type: string }).type)).toEqual(['hello']);
+    expect(received.join()).not.toContain(await clusterSecret(storage));
+    await new Promise((resolve) => rogue.close(resolve));
+  });
 
   it('keeps the quick tunnel address when the leader window closes', async () => {
     const first = cluster(new FakeWindow('first'), []);

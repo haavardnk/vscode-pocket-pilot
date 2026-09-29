@@ -12,8 +12,8 @@ import {
 } from '@pocket-pilot/protocol';
 import type { WebSocket } from 'ws';
 
+import { newNonce, proof, validProof } from './handshake';
 import type { Hub, WindowLink } from './hub';
-import { sameSecret } from './sharedState';
 
 const REGISTER_TIMEOUT_MS = 5000;
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -37,21 +37,25 @@ function queryOutcome(reply: Reply): QueryResult {
   return reply.result;
 }
 
-function registeringName(text: string, secret: string): string | null {
-  const register = parseMessage(stableRegisterSchema, text);
-  return register && sameSecret(secret, register.secret) ? register.window.name : null;
+export interface FollowerCheck {
+  secret: string;
+  port: number;
 }
 
 export function acceptFollower(
   socket: WebSocket,
   hub: Hub,
-  secret: string,
+  check: FollowerCheck,
   report: (message: string) => void
 ): void {
   const pending = new Map<string, Pending>();
+  const nonce = newNonce();
+  let challenged = false;
   let windowId: string | null = null;
   let incompatible = false;
   const send = (message: LeaderMessage): void => socket.send(JSON.stringify(message));
+  const registered = (candidate: string): boolean =>
+    validProof(check.secret, 'follower', check.port, nonce, candidate);
 
   const request = <T>(
     message: (requestId: string) => LeaderMessage,
@@ -89,8 +93,21 @@ export function acceptFollower(
   );
 
   const handle = (message: FollowerMessage): void => {
+    if (message.type === 'hello') {
+      if (challenged) {
+        socket.close(4003, 'forbidden');
+        return;
+      }
+      challenged = true;
+      send({
+        type: 'challenge',
+        nonce,
+        proof: proof(check.secret, 'leader', check.port, message.nonce)
+      });
+      return;
+    }
     if (message.type === 'register') {
-      if (windowId !== null || !sameSecret(secret, message.secret)) {
+      if (windowId !== null || !challenged || !registered(message.proof)) {
         socket.close(4003, 'forbidden');
         return;
       }
@@ -135,9 +152,12 @@ export function acceptFollower(
       waiting.reject(new Error(VERSION_MISMATCH));
     }
     if (incompatible) return;
+    const register = windowId === null ? parseMessage(stableRegisterSchema, text) : null;
     const name =
       windowId === null
-        ? registeringName(text, secret)
+        ? register && challenged && registered(register.proof)
+          ? register.window.name
+          : null
         : (hub.windowStates().find((state) => state.windowId === windowId)?.name ?? windowId);
     if (name === null) return;
     incompatible = true;

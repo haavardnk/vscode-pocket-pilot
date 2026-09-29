@@ -8,6 +8,7 @@ import {
   diffDetail,
   type ExecutionPatch,
   followerMessageSchema,
+  leaderMessageSchema,
   mismatchReply,
   parseMessage,
   pushRegistrationSchema,
@@ -186,7 +187,9 @@ describe('protocol', () => {
       }
     ],
     [serverMessageSchema, { type: 'usage', usage: { state: 'needsAccess' } }],
-    [followerMessageSchema, { type: 'register', secret: 'x', window }],
+    [followerMessageSchema, { type: 'hello', nonce: 'n' }],
+    [followerMessageSchema, { type: 'register', proof: 'x', window }],
+    [leaderMessageSchema, { type: 'challenge', nonce: 'n', proof: 'x' }],
     [
       clientMessageSchema,
       {

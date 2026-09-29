@@ -1,4 +1,5 @@
 import {
+  challengeSchema,
   type FollowerMessage,
   type LeaderMessage,
   leaderMessageSchema,
@@ -10,23 +11,29 @@ import WebSocket from 'ws';
 import { errorMessage } from '../errors';
 import { INTERNAL_PATH } from '../server/tunnelTraffic';
 import type { FollowerHandle } from './cluster';
+import { newNonce, proof, validProof } from './handshake';
 import type { Disposable, LocalWindow } from './localWindow';
 import { clusterSecret, LOOPBACK } from './sharedState';
 
 interface FollowerOptions {
-  url: string;
+  port: number;
   secret: string;
 }
 
 const MAX_PAYLOAD = 16 * 1024 * 1024;
+const HANDSHAKE_TIMEOUT_MS = 5000;
 
 function connectFollower(
   window: LocalWindow,
   options: FollowerOptions,
   report: (message: string) => void
 ): { opened: Promise<void>; closed: Promise<void>; close: () => void } {
-  const socket = new WebSocket(options.url, { maxPayload: MAX_PAYLOAD });
+  const socket = new WebSocket(`ws://${LOOPBACK}:${options.port}${INTERNAL_PATH}`, {
+    maxPayload: MAX_PAYLOAD
+  });
   const subscriptions: Disposable[] = [];
+  const nonce = newNonce();
+  let verified = false;
   let warned = false;
   const send = (message: FollowerMessage): void => {
     if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
@@ -53,29 +60,51 @@ function connectFollower(
     }
   };
 
+  let accept: () => void = () => undefined;
+  let refuse: (error: Error) => void = () => undefined;
   const opened = new Promise<void>((resolve, reject) => {
-    socket.once('open', () => {
-      send({ type: 'register', secret: options.secret, window: window.state() });
-      subscriptions.push(
-        window.onDidChangeState((state) => send({ type: 'window', window: state })),
-        window.onDidChangeSession(({ sessionId, detail }) =>
-          send({ type: 'session', sessionId, detail })
-        ),
-        window.onDidChangeTerminal((update) =>
-          send(
-            'patch' in update
-              ? { type: 'terminalPatch', terminalId: update.terminalId, patch: update.patch }
-              : { type: 'terminal', terminalId: update.terminalId, detail: update.detail }
-          )
-        )
-      );
-      resolve();
-    });
+    accept = resolve;
+    refuse = reject;
     socket.once('error', reject);
   });
+  const handshakeTimer = setTimeout(
+    () => refuse(new Error('The leader did not answer the cluster check')),
+    HANDSHAKE_TIMEOUT_MS
+  );
+  socket.once('open', () => send({ type: 'hello', nonce }));
+
+  const verify = (text: string): void => {
+    const challenge = parseMessage(challengeSchema, text);
+    if (!challenge || !validProof(options.secret, 'leader', options.port, nonce, challenge.proof)) {
+      refuse(new Error('The leader failed the cluster check'));
+      return;
+    }
+    verified = true;
+    clearTimeout(handshakeTimer);
+    send({
+      type: 'register',
+      proof: proof(options.secret, 'follower', options.port, challenge.nonce),
+      window: window.state()
+    });
+    subscriptions.push(
+      window.onDidChangeState((state) => send({ type: 'window', window: state })),
+      window.onDidChangeSession(({ sessionId, detail }) =>
+        send({ type: 'session', sessionId, detail })
+      ),
+      window.onDidChangeTerminal((update) =>
+        send(
+          'patch' in update
+            ? { type: 'terminalPatch', terminalId: update.terminalId, patch: update.patch }
+            : { type: 'terminal', terminalId: update.terminalId, detail: update.detail }
+        )
+      )
+    );
+    accept();
+  };
 
   const closed = new Promise<void>((resolve) => {
     socket.once('close', () => {
+      clearTimeout(handshakeTimer);
       for (const subscription of subscriptions) subscription.dispose();
       window.setWatches([]);
       window.setTerminalWatches([]);
@@ -96,11 +125,16 @@ function connectFollower(
 
   socket.on('message', (data) => {
     const text = data.toString();
+    if (!verified) {
+      verify(text);
+      return;
+    }
     const message = parseMessage(leaderMessageSchema, text);
     if (!message) {
       unreadable(text);
       return;
     }
+    if (message.type === 'challenge') return;
     if (message.type === 'watch') window.setWatches(message.sessions);
     else if (message.type === 'watchTerminals') window.setTerminalWatches(message.terminalIds);
     else if (message.type === 'query') void query(message);
@@ -118,7 +152,7 @@ export async function followLeader(
 ): Promise<FollowerHandle> {
   const connection = connectFollower(
     window,
-    { url: `ws://${LOOPBACK}:${port}${INTERNAL_PATH}`, secret: await clusterSecret(storage) },
+    { port, secret: await clusterSecret(storage) },
     report
   );
   try {
