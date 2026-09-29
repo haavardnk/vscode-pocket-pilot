@@ -76,10 +76,9 @@ registerRoute(
   new NavigationRoute(
     async (options) => {
       const response = await fetch(options.request).catch(() => null);
-      if (response?.ok || response?.type === 'opaqueredirect') return response;
-      return shell(options);
+      return response?.ok ? response : shell(options);
     },
-    { denylist: [/^\/api\//, /^\/ws$/, /^\/internal$/] }
+    { denylist: [/^\/api\//, /^\/ws$/, /^\/internal$/, /^\/signin$/] }
   )
 );
 

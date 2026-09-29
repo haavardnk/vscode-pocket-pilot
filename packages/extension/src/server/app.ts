@@ -147,6 +147,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   app.get('/api/auth', async (request) => authInfo(request, await authenticate(request)));
 
+  app.get('/signin', async (_request, reply) => reply.redirect('/'));
+
   app.post(
     '/api/pair',
     { config: { rateLimit: AUTH_RATE_LIMIT }, preHandler: requireOrigin },

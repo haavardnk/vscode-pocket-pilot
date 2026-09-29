@@ -188,6 +188,11 @@ describe('server', () => {
     expect(response.headers.location).toBe(`${PUBLIC_ORIGIN}/api/auth?x=1`);
   });
 
+  it('sends a returning sign-in to the app', async () => {
+    const response = await send(fixture, '/signin', { tunnel: true, headers: viaTunnel() });
+    expect([response.status, response.headers.location]).toEqual([302, '/']);
+  });
+
   it('refuses cluster links through the tunnel', async () => {
     const socket = new WebSocket(`ws://127.0.0.1:${fixture.tunnelPort}/internal`, {
       headers: viaTunnel()

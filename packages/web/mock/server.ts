@@ -117,16 +117,33 @@ async function handle(request: IncomingMessage, response: ServerResponse): Promi
     for (const client of sockets.clients) client.terminate();
     return json(response, 200, {});
   }
-  if (url === '/__access/login') {
+  if (url.startsWith('/__access/login')) {
+    const back = new URL(url, ACCESS_LOGIN).searchParams.get('redirect_url') ?? '/';
     response.writeHead(200, { 'content-type': TYPES['.html'] ?? 'text/html' });
-    response.end('<!doctype html><title>Access</title><h1>Sign in with GitHub</h1>');
+    response.end(
+      `<!doctype html><title>Access</title><h1>Sign in with GitHub</h1>` +
+        `<a href="/__access/done?redirect_url=${encodeURIComponent(back)}">Continue</a>`
+    );
+    return;
+  }
+  if (url.startsWith('/__access/done')) {
+    const back = URL.parse(new URL(url, ACCESS_LOGIN).searchParams.get('redirect_url') ?? '');
+    accessGate = false;
+    response.writeHead(302, { location: back?.port === String(PORT) ? back.href : '/' }).end();
     return;
   }
   if (accessGate) {
-    response.writeHead(302, { location: ACCESS_LOGIN }).end();
+    const back = `http://${request.headers.host ?? `localhost:${PORT}`}${url}`;
+    response
+      .writeHead(302, { location: `${ACCESS_LOGIN}?redirect_url=${encodeURIComponent(back)}` })
+      .end();
     return;
   }
   if (url === '/__push') return json(response, 200, { pushes: [...pushes.values()], pushTests });
+  if (url === '/signin') {
+    response.writeHead(302, { location: '/' }).end();
+    return;
+  }
   if (url === '/__usage' && request.method === 'POST') {
     const usage = copilotUsageSchema.safeParse((await readBody(request)).usage);
     if (!usage.success) return json(response, 400, { error: 'Invalid usage' });
