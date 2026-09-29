@@ -1,7 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { basename } from 'node:path';
-import { setTimeout as delay } from 'node:timers/promises';
-import { pathToFileURL } from 'node:url';
 
 import {
   type Agent,
@@ -11,9 +8,6 @@ import {
   type PermissionLevel,
   PHONE_QUEUE_PREFIX,
   type QueuedRequest,
-  type QueueEntry,
-  queuePlan,
-  type RequestImage,
   type SessionDetail
 } from '@pocket-pilot/protocol';
 import * as vscode from 'vscode';
@@ -21,19 +15,18 @@ import * as vscode from 'vscode';
 import type { ModelSettingsFile } from '../models/modelSettings';
 import { withQueued } from '../sessions/queue';
 import type { SessionFlags } from '../sessions/sessionFlags';
-import type { ChatImages, ImageData } from './chatImages';
+import type { ChatImages } from './chatImages';
+import { ChatInputs } from './chatInput';
 import { attachImages, focusChat, selectModel, sessionResource, submitChat } from './chatSession';
 import type { CheckpointCommands } from './checkpointCommands';
 import {
   answersError,
   confirmationPrompt,
   pendingQuestions,
-  PERMISSION_COMMANDS,
   requirePendingElicitation
 } from './interactions';
-
-const AGENT_SESSION_CONTEXT = 25;
-const ARCHIVE_PROMPT_MS = 3000;
+import { queuedImages, QueueRewrite } from './queueRewrite';
+import { SessionOrganizer } from './sessionOrganizer';
 
 export interface ControllerSources {
   models: () => Promise<Model[]>;
@@ -57,31 +50,16 @@ interface HandoffResult {
   error?: string;
 }
 
-type ChatInput = Pick<SessionDetail, 'modeId' | 'modelId' | 'permission'>;
-
-interface InputChange {
-  modeId: string | null;
-  model: Model | null;
-  permission: PermissionLevel | null;
-}
-
-interface QueuedSubmit extends InputChange {
-  entry: QueueEntry;
-  images: ImageData[];
-  paths: string[];
-}
-
-function queuedImages(paths: readonly string[], images: readonly ImageData[]): RequestImage[] {
-  return paths.flatMap((path, index) => {
-    const image = images[index];
-    return image
-      ? [{ id: pathToFileURL(path).href, name: basename(path), mimeType: image.mimeType }]
-      : [];
-  });
-}
-
 export class Controller {
-  constructor(private readonly sources: ControllerSources) {}
+  private readonly inputs: ChatInputs;
+  private readonly queue: QueueRewrite;
+  private readonly organizer: SessionOrganizer;
+
+  constructor(private readonly sources: ControllerSources) {
+    this.inputs = new ChatInputs(sources);
+    this.queue = new QueueRewrite(sources, this.inputs);
+    this.organizer = new SessionOrganizer(sources.canOrganize, sources.expectFlags);
+  }
 
   async run(command: Command): Promise<void> {
     switch (command.kind) {
@@ -109,22 +87,24 @@ export class Controller {
         return;
       }
       case 'setQueue':
-        await this.setQueue(command);
+        await this.queue.apply(command);
         return;
       case 'stop':
         await focusChat(command.sessionId);
         await vscode.commands.executeCommand('workbench.action.chat.cancel');
         return;
       case 'setMode':
-        await this.requireAgent(command.modeId);
-        await this.setMode(command.sessionId, command.modeId);
+        await this.inputs.requireAgent(command.modeId);
+        await this.inputs.setMode(command.sessionId, command.modeId);
         return;
       case 'handoff':
         await this.handoff(command);
         return;
       case 'setModel':
-        await selectModel(await this.requireModel(command.modelId));
-        this.sources.expectModel(command.sessionId, command.modelId);
+        await this.inputs.setModel(
+          command.sessionId,
+          await this.inputs.requireModel(command.modelId)
+        );
         return;
       case 'editRequest':
         await this.editRequest(command);
@@ -173,27 +153,21 @@ export class Controller {
         return;
       case 'setPermission':
         await this.sources.checkpoints.submitting(command.sessionId, () =>
-          this.setPermission(command.sessionId, command.level)
+          this.inputs.setPermission(command.sessionId, command.level)
         );
         return;
       case 'setPinned':
-        this.requireOrganize();
-        await this.agentSessionCommand(
-          command.pinned ? 'agentSession.pin' : 'agentSession.unpin',
-          command.sessionId
-        );
-        this.sources.expectFlags(command.sessionId, { pinned: command.pinned });
+        await this.organizer.setPinned(command.sessionId, command.pinned);
         return;
       case 'setArchived':
-        this.requireOrganize();
-        await this.setArchived(command.sessionId, command.archived);
+        await this.organizer.setArchived(command.sessionId, command.archived);
         return;
       case 'editDecision':
         await this.decideEdits(command);
         return;
       case 'newSession': {
-        if (command.modeId) await this.requireAgent(command.modeId);
-        const model = command.modelId ? await this.requireModel(command.modelId) : null;
+        if (command.modeId) await this.inputs.requireAgent(command.modeId);
+        const model = command.modelId ? await this.inputs.requireModel(command.modelId) : null;
         const images = await this.sources.images.write(command.images);
         await vscode.commands.executeCommand('workbench.action.openChat');
         if (command.modeId) {
@@ -209,7 +183,7 @@ export class Controller {
         return;
       }
       case 'setModelConfig': {
-        const model = await this.requireModel(command.modelId);
+        const model = await this.inputs.requireModel(command.modelId);
         const option = model.options.find((candidate) => candidate.key === command.key);
         if (!option) throw new Error(`${model.name} has no ${command.key} setting`);
         if (
@@ -221,32 +195,6 @@ export class Controller {
         await this.sources.settings.update(command.modelId, command.key, command.value);
         return;
       }
-    }
-  }
-
-  private requireOrganize(): void {
-    if (!this.sources.canOrganize) {
-      throw new Error('Chats in a window without a folder cannot be pinned or archived');
-    }
-  }
-
-  private async agentSessionCommand(id: string, sessionId: string): Promise<void> {
-    const session = { resource: sessionResource(sessionId) };
-    await vscode.commands.executeCommand(id, {
-      $mid: AGENT_SESSION_CONTEXT,
-      session,
-      sessions: [session]
-    });
-  }
-
-  private async setArchived(sessionId: string, archived: boolean): Promise<void> {
-    const done = this.agentSessionCommand(
-      archived ? 'agentSession.archive' : 'agentSession.unarchive',
-      sessionId
-    ).then(() => this.sources.expectFlags(sessionId, { archived }));
-    const prompted = delay(ARCHIVE_PROMPT_MS, true, { ref: false });
-    if (await Promise.race([done.then(() => false), prompted])) {
-      throw new Error('VS Code asks what to do with the pending edits of this chat');
     }
   }
 
@@ -274,7 +222,7 @@ export class Controller {
       ?.handoffs.find((item) => item.id === command.handoffId);
     if (!handoff) throw new Error('This handoff is no longer offered');
     await this.sources.checkpoints.submitting(command.sessionId, async () => {
-      if (command.autopilot) await this.setPermission(command.sessionId, 'autopilot');
+      if (command.autopilot) await this.inputs.setPermission(command.sessionId, 'autopilot');
       else await focusChat(command.sessionId);
       const result = await vscode.commands.executeCommand<HandoffResult | undefined>(
         'workbench.action.chat.executeHandoff',
@@ -292,137 +240,20 @@ export class Controller {
     if (target) this.sources.expectMode(command.sessionId, target.id);
   }
 
-  private async setQueue(command: Extract<Command, { kind: 'setQueue' }>): Promise<void> {
-    const detail = await this.sources.detail(command.sessionId);
-    if (!detail) throw new Error('Chat not found');
-    const current = detail.queued;
-    const plan = queuePlan(current, command.expected, command.queue);
-    if (plan.kind === 'remove') {
-      for (const id of plan.ids) {
-        await vscode.commands.executeCommand('workbench.action.chat.removePendingRequest', {
-          sessionResource: sessionResource(command.sessionId),
-          pendingRequestId: id
-        });
-      }
-      this.sources.expectQueue(
-        command.sessionId,
-        current.filter((item) => !plan.ids.includes(item.id))
-      );
-      return;
-    }
-    const submits: QueuedSubmit[] = [];
-    for (const entry of command.queue) {
-      submits.push(await this.queuedSubmit(command.sessionId, entry, current));
-    }
-    await focusChat(command.sessionId);
-    await vscode.commands.executeCommand('workbench.action.chat.removeAllPendingRequests');
-    let input: ChatInput = detail;
-    const queued: QueuedRequest[] = [];
-    try {
-      for (const submit of submits) {
-        input = await this.changeInput(command.sessionId, input, submit);
-        await submitChat(command.sessionId, submit.entry.text, submit.paths, submit.entry.delivery);
-        queued.push({
-          id: PHONE_QUEUE_PREFIX + randomUUID(),
-          delivery: submit.entry.delivery,
-          text: submit.entry.text,
-          ...input,
-          images: queuedImages(submit.paths, submit.images),
-          attachments: 0
-        });
-      }
-    } finally {
-      const model = (await this.sources.models()).find((item) => item.id === detail.modelId);
-      await this.changeInput(command.sessionId, input, {
-        modeId: detail.modeId,
-        model: model ?? null,
-        permission: detail.permission
-      });
-    }
-    this.sources.expectQueue(command.sessionId, queued);
-  }
-
-  private async queuedSubmit(
-    sessionId: string,
-    entry: QueueEntry,
-    current: readonly QueuedRequest[]
-  ): Promise<QueuedSubmit> {
-    if (entry.modeId) await this.requireAgent(entry.modeId);
-    const model = entry.modelId ? await this.requireModel(entry.modelId) : null;
-    const images = entry.images ?? (await this.keptImages(sessionId, entry.id, current));
-    const paths = await this.sources.images.write(images);
-    return { entry, modeId: entry.modeId, model, permission: entry.permission, images, paths };
-  }
-
-  private async keptImages(
-    sessionId: string,
-    id: string,
-    current: readonly QueuedRequest[]
-  ): Promise<ImageData[]> {
-    const shown = current.find((item) => item.id === id)?.images ?? [];
-    const images = await Promise.all(
-      shown.map((image) => this.sources.image(sessionId, id, image.id))
-    );
-    const found = images.filter((image) => image !== null);
-    if (found.length < shown.length) throw new Error('A queued photo is no longer available');
-    return found;
-  }
-
-  private async changeInput(
-    sessionId: string,
-    from: ChatInput,
-    to: InputChange
-  ): Promise<ChatInput> {
-    const modeId = to.modeId ?? from.modeId;
-    const modelId = to.model?.id ?? from.modelId;
-    const permission = to.permission ?? from.permission;
-    if (modeId && modeId !== from.modeId) await this.setMode(sessionId, modeId);
-    if (to.model && modelId !== from.modelId) {
-      await selectModel(to.model);
-      this.sources.expectModel(sessionId, to.model.id);
-    }
-    if (permission !== from.permission) await this.setPermission(sessionId, permission);
-    return { modeId, modelId, permission };
-  }
-
   private async editRequest(command: Extract<Command, { kind: 'editRequest' }>): Promise<void> {
-    if (command.modeId) await this.requireAgent(command.modeId);
-    const model = command.modelId ? await this.requireModel(command.modelId) : null;
+    if (command.modeId) await this.inputs.requireAgent(command.modeId);
+    const model = command.modelId ? await this.inputs.requireModel(command.modelId) : null;
     const detail = await this.sources.detail(command.sessionId);
     if (!detail) throw new Error('Chat not found');
     const images = await this.sources.images.write(command.images);
     await this.sources.checkpoints.restore(command.sessionId, command.requestId, false);
     await this.sources.checkpoints.submitting(command.sessionId, async () => {
-      await this.changeInput(command.sessionId, detail, {
+      await this.inputs.change(command.sessionId, detail, {
         modeId: command.modeId,
         model,
         permission: command.permission
       });
       await submitChat(command.sessionId, command.text, images);
     });
-  }
-
-  private async setMode(sessionId: string, modeId: string): Promise<void> {
-    await vscode.commands.executeCommand('workbench.action.chat.toggleAgentMode', {
-      modeId,
-      sessionResource: sessionResource(sessionId)
-    });
-    this.sources.expectMode(sessionId, modeId);
-  }
-
-  private async setPermission(sessionId: string, level: PermissionLevel): Promise<void> {
-    await submitChat(sessionId, PERMISSION_COMMANDS[level]);
-    this.sources.expectPermission(sessionId, level);
-  }
-
-  private async requireAgent(modeId: string): Promise<void> {
-    const agents = await this.sources.agents();
-    if (!agents.some((agent) => agent.id === modeId)) throw new Error('Unknown agent');
-  }
-
-  private async requireModel(modelId: string): Promise<Model> {
-    const model = (await this.sources.models()).find((candidate) => candidate.id === modelId);
-    if (!model) throw new Error('Unknown model');
-    return model;
   }
 }
