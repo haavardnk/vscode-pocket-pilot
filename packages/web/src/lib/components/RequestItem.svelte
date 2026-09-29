@@ -8,6 +8,7 @@
   import { responseItems } from '../hub/steps';
   import { markdown } from '../markdown';
   import { routeHash } from '../routing';
+  import { chatView } from '../stores/chatView.svelte';
   import EditLink from './EditLink.svelte';
   import PromptAlert from './PromptAlert.svelte';
   import QuestionCard from './QuestionCard.svelte';
@@ -44,7 +45,7 @@
 
   let acting = $state(false);
 
-  const items = $derived(responseItems(request.parts, request.state));
+  const items = $derived(responseItems(request.parts, request.state, chatView.compact));
   const edited = $derived(
     new Set(request.parts.flatMap((part) => (part.kind === 'edit' ? [part.path] : []))).size
   );

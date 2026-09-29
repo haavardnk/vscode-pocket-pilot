@@ -81,17 +81,23 @@ function subagentSteps(parts: ResponsePart[]): Map<string, ToolPart[]> {
   return children;
 }
 
-export function responseItems(parts: ResponsePart[], state: RequestState): ResponseItem[] {
+export function responseItems(
+  parts: ResponsePart[],
+  state: RequestState,
+  compact = false
+): ResponseItem[] {
   const items: ResponseItem[] = [];
   const children = subagentSteps(parts);
+  const shown = compact
+    ? parts.filter((part) => part.kind !== 'thinking' && part.kind !== 'progress')
+    : parts;
   let run: Step[] = [];
-  for (const part of mergeMarkdown(parts)) {
+  for (const part of mergeMarkdown(shown)) {
     if (part.kind === 'markdown' && !part.text.trim()) continue;
     if (part.kind === 'tool' && part.parentCallId && children.has(part.parentCallId)) continue;
     if (
       part.kind === 'thinking' ||
-      part.kind === 'edit' ||
-      (part.kind === 'tool' && part.grouped)
+      (!compact && (part.kind === 'edit' || (part.kind === 'tool' && part.grouped)))
     ) {
       run.push(part);
       continue;

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { signIn } from './helpers';
+import { openSession, signIn } from './helpers';
 
 const BASES: Record<string, string> = {
   latte: 'rgb(239, 241, 245)',
@@ -27,6 +27,26 @@ test('persists the chosen theme', async ({ page }) => {
     '#303446'
   );
   await expect(page.getByRole('combobox', { name: 'Theme' })).toHaveValue('frappe');
+});
+
+test('shows compact chats without thinking', async ({ page }) => {
+  const main = page.getByRole('main');
+  await openSession(page, 'Build the phone app');
+  await expect(main.getByText('Planning')).toBeVisible();
+  await expect(main.getByText('Read App.svelte')).toBeHidden();
+
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('checkbox', { name: 'Compact chats' }).check();
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'Compact chats' })).toBeChecked();
+  await page.getByRole('button', { name: 'Chats' }).click();
+  await openSession(page, 'Build the phone app');
+  await expect(main.getByText('Starting with the session list.')).toBeVisible();
+  await expect(main.getByText('Planning')).toHaveCount(0);
+  await expect(main.getByText('Updated the app shell')).toHaveCount(0);
+  await expect(main.getByText('Read App.svelte')).toBeVisible();
+  await expect(main.getByRole('link', { name: /App\.svelte/ }).first()).toBeVisible();
+  await expect(main.getByText('Run npm test')).toBeVisible();
 });
 
 test('signs out this device', async ({ page }) => {

@@ -89,6 +89,25 @@ describe('response steps', () => {
     });
   });
 
+  it('drops thinking and status lines and lists every step when compact', () => {
+    const progress = { kind: 'progress', text: 'Summarizing' } as const;
+    expect(
+      responseItems(
+        [
+          thinking('a', 'Plan'),
+          text('one'),
+          thinking('b'),
+          text(' two'),
+          tool(),
+          progress,
+          edit(1, 0)
+        ],
+        'pending',
+        true
+      )
+    ).toEqual([text('one two'), tool(), edit(1, 0)]);
+  });
+
   it('nests tools under their subagent and keeps orphans inline', () => {
     const subagent = {
       ...tool(null, false),

@@ -3,6 +3,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Globe from '@lucide/svelte/icons/globe';
   import Info from '@lucide/svelte/icons/info';
+  import ListCollapse from '@lucide/svelte/icons/list-collapse';
   import LogOut from '@lucide/svelte/icons/log-out';
   import Palette from '@lucide/svelte/icons/palette';
   import Smartphone from '@lucide/svelte/icons/smartphone';
@@ -15,6 +16,7 @@
   import SettingsGroup from '../lib/components/SettingsGroup.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
   import { routeHash } from '../lib/routing';
+  import { chatView } from '../lib/stores/chatView.svelte';
   import { hub } from '../lib/stores/hub.svelte';
   import { theme, THEMES } from '../lib/stores/theme.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -60,6 +62,9 @@
   </div>
 
   <SettingsGroup title="Appearance">
+    {#snippet caption()}
+      Compact chats hide the agent's thinking and status lines and list each tool call and edit.
+    {/snippet}
     <li class="list-row items-center py-2.5">
       <Palette class="size-5 text-base-content/70" />
       <span class="list-col-grow">Theme</span>
@@ -76,6 +81,18 @@
           <option value={option.id}>{option.label}</option>
         {/each}
       </select>
+    </li>
+    <li>
+      <label class="list-row items-center py-3">
+        <ListCollapse class="size-5 text-base-content/70" />
+        <span class="list-col-grow">Compact chats</span>
+        <input
+          type="checkbox"
+          class="toggle toggle-primary"
+          checked={chatView.compact}
+          onchange={(event) => chatView.setCompact(event.currentTarget.checked)}
+        />
+      </label>
     </li>
   </SettingsGroup>
 
