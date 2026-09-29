@@ -22,6 +22,8 @@ function hashCode(code: string): Buffer {
 }
 
 export class PairingStore {
+  private checking: Promise<unknown> = Promise.resolve();
+
   constructor(private readonly file: string) {}
 
   async create(): Promise<{ code: string; expiresAt: number }> {
@@ -31,7 +33,13 @@ export class PairingStore {
     return { code, expiresAt };
   }
 
-  async consume(code: string): Promise<boolean> {
+  consume(code: string): Promise<boolean> {
+    const result = this.checking.then(() => this.check(code));
+    this.checking = result.catch(() => undefined);
+    return result;
+  }
+
+  private async check(code: string): Promise<boolean> {
     const pairing = await this.read();
     if (!pairing) return false;
     if (pairing.expiresAt <= Date.now()) {
