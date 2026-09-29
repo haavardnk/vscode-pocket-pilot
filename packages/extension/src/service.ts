@@ -10,7 +10,7 @@ import { followLeader } from './cluster/followerClient';
 import { type Leader, startLeader } from './cluster/leader';
 import { hookSecret, sharedFiles } from './cluster/sharedState';
 import { errorMessage } from './errors';
-import { hookFileContent, hookFilePath, installHooks, removeHooks } from './hooks/hookFile';
+import { hookFilePath, hookHeadersPath, installHooks, removeHooks } from './hooks/hookFile';
 import { readSettings, type Settings } from './settings';
 import { type TunnelStatus, watchTunnelStatus } from './tunnel/status';
 import type { TunnelSettings } from './tunnel/tunnel';
@@ -98,7 +98,13 @@ export class PocketPilotService {
     const { enabled, liveMirror, port } = readSettings();
     try {
       if (!enabled || liveMirror === 'off') await removeHooks(file);
-      else await installHooks(file, hookFileContent(port, await hookSecret(this.storage)));
+      else
+        await installHooks({
+          hookFile: file,
+          headersFile: hookHeadersPath(this.storage),
+          port,
+          secret: await hookSecret(this.storage)
+        });
     } catch (error) {
       this.log.warn(`Cannot update the Copilot hook file: ${errorMessage(error)}`);
     }

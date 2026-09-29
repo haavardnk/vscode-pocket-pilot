@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { type IncomingHttpHeaders, type IncomingMessage, request } from 'node:http';
 import { type AddressInfo, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { WebSocket } from 'ws';
 
 import { Hub } from '../src/cluster/hub';
-import { HOOK_HEADER, hookFileContent } from '../src/hooks/hookFile';
+import { HOOK_HEADER, installHooks } from '../src/hooks/hookFile';
 import { PushService } from '../src/push/pushService';
 import { PushStore } from '../src/push/pushStore';
 import { vapidKeys } from '../src/push/vapid';
@@ -290,7 +290,12 @@ describe('server', () => {
       window
     );
     const port = name === 'a closed port' ? await closedPort() : fixture.port;
-    const { hooks } = JSON.parse(hookFileContent(port, secret)) as {
+    const folder = join(fixture.folder, `it's ${calls} hooks`);
+    const hookFile = join(folder, 'pocket-pilot.json');
+    await installHooks({ hookFile, headersFile: join(folder, 'hook-headers'), port, secret });
+    const text = await readFile(hookFile, 'utf8');
+    expect(text).not.toContain(secret);
+    const { hooks } = JSON.parse(text) as {
       hooks: Record<string, { command: string }[]>;
     };
     const output = await new Promise<string>((resolve, reject) => {
