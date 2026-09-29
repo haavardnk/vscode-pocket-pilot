@@ -42,6 +42,12 @@ export const commandSchema = z.discriminatedUnion('kind', [
         message: 'Only one queued message can change its photos at a time'
       })
   }),
+  z.object({
+    kind: z.literal('sendQueuedNow'),
+    ...sessionTarget,
+    expected: z.array(z.string()).max(100),
+    id: z.string()
+  }),
   z.object({ kind: z.literal('stop'), ...sessionTarget }),
   z.object({ kind: z.literal('setMode'), ...sessionTarget, modeId: z.string().min(1) }),
   z.object({

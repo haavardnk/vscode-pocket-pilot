@@ -1,9 +1,10 @@
 <script module lang="ts">
-  import type { ImageUpload } from '@pocket-pilot/protocol';
+  import type { Delivery, ImageUpload } from '@pocket-pilot/protocol';
 
   export interface Draft {
     text: string;
     images: ImageUpload[];
+    delivery: Delivery;
   }
 </script>
 
@@ -16,7 +17,7 @@
   import Shield from '@lucide/svelte/icons/shield';
   import ShieldOff from '@lucide/svelte/icons/shield-off';
   import X from '@lucide/svelte/icons/x';
-  import { type Delivery, MAX_IMAGES, type PermissionLevel } from '@pocket-pilot/protocol';
+  import { MAX_IMAGES, type PermissionLevel } from '@pocket-pilot/protocol';
 
   import { PERMISSIONS } from '../hub/permissions';
   import { dataUrl, preparePhoto } from '../photos/prepare';
@@ -69,12 +70,13 @@
     generation += 1;
     text = draft.text;
     images = draft.images;
+    delivery = draft.delivery;
     preparing = 0;
     if (focus) input?.focus();
   }
 
   export function current(): Draft {
-    return { text, images: $state.snapshot(images) };
+    return { text, images: $state.snapshot(images), delivery };
   }
 
   export async function attach(loading: Promise<ImageUpload>[]): Promise<void> {

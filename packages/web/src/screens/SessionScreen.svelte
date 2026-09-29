@@ -80,7 +80,7 @@
   let root = $state<HTMLElement>();
   let composer = $state<ReturnType<typeof Composer>>();
   let queuedMessages = $state<ReturnType<typeof QueuedMessages>>();
-  let draft: Draft = { text: '', images: [] };
+  let draft: Draft = { text: '', images: [], delivery: 'queued' };
   let followBottom = true;
   let scrolled = 0;
 
@@ -189,7 +189,7 @@
     if (editing) {
       const edit = editing;
       return edit.target.kind === 'queued'
-        ? saveQueued(edit, edit.target.item, text, images)
+        ? saveQueued(edit, edit.target.item, text, images, delivery ?? edit.target.item.delivery)
         : sendEdit(edit, edit.target.request, text, images);
     }
     followBottom = true;
@@ -205,6 +205,11 @@
     return run(() => hub.command({ kind: 'setQueue', windowId, sessionId, expected, queue }));
   }
 
+  function sendNow(expected: string[], id: string): Promise<boolean> {
+    followBottom = true;
+    return run(() => hub.command({ kind: 'sendQueuedNow', windowId, sessionId, expected, id }));
+  }
+
   function indexOf(request: RequestView | null): number {
     if (!request || !detail) return -1;
     return detail.requests.findIndex((candidate) => candidate.id === request.id);
@@ -216,33 +221,39 @@
     );
   }
 
-  function fillFrom(text: string, requestId: string, images: RequestImage[], focus: boolean): void {
-    composer?.fill({ text, images: [] }, focus);
+  function fillFrom(
+    text: string,
+    requestId: string,
+    images: RequestImage[],
+    delivery: Delivery,
+    focus: boolean
+  ): void {
+    composer?.fill({ text, images: [], delivery }, focus);
     void composer?.attach(photosOf(requestId, images));
   }
 
   function startEdit(request: RequestView): void {
     if (!detail) return;
-    draft = composer?.current() ?? { text: '', images: [] };
+    draft = composer?.current() ?? { text: '', images: [], delivery: 'queued' };
     editing = {
       target: { kind: 'request', request },
       modeId,
       modelId: request.modelId ?? modelId,
       permission: detail.permission
     };
-    fillFrom(request.message, request.id, request.images, true);
+    fillFrom(request.message, request.id, request.images, draft.delivery, true);
   }
 
   function editQueued(item: QueuedRequest): void {
     if (!detail) return;
-    draft = composer?.current() ?? { text: '', images: [] };
+    draft = composer?.current() ?? { text: '', images: [], delivery: 'queued' };
     editing = {
       target: { kind: 'queued', item: $state.snapshot(item) },
       modeId: item.modeId ?? modeId,
       modelId: item.modelId ?? modelId,
       permission: item.permission ?? detail.permission
     };
-    fillFrom(item.text, item.id, item.images, true);
+    fillFrom(item.text, item.id, item.images, item.delivery, true);
   }
 
   function cancelEdit(): void {
@@ -254,28 +265,31 @@
     edit: MessageEdit,
     item: QueuedRequest,
     text: string,
-    images: ImageUpload[]
+    images: ImageUpload[],
+    delivery: Delivery
   ): Promise<boolean> {
     const base = $state.snapshot(detail?.queued ?? []);
     if (!queuedMessages || !base.some((other) => other.id === item.id)) {
       toasts.show('This message already left the queue', 'error');
       return false;
     }
-    const saved = await queuedMessages.change(
-      base,
-      base.map((other) =>
-        other.id === item.id
-          ? {
-              ...queueEntry(other),
-              text,
-              modeId: edit.modeId,
-              modelId: edit.modelId,
-              permission: edit.permission,
-              images
-            }
-          : queueEntry(other)
-      )
+    const queue = base.map((other) =>
+      other.id === item.id
+        ? {
+            ...queueEntry(other),
+            delivery,
+            text,
+            modeId: edit.modeId,
+            modelId: edit.modelId,
+            permission: edit.permission,
+            images
+          }
+        : queueEntry(other)
     );
+    const saved = await queuedMessages.change(base, [
+      ...queue.filter((entry) => entry.delivery === 'steering'),
+      ...queue.filter((entry) => entry.delivery === 'queued')
+    ]);
     if (!saved) return false;
     editing = null;
     composer?.fill(draft, false);
@@ -315,7 +329,7 @@
   function restored(request: RequestView): void {
     const current = composer?.current();
     if (!current || current.text.trim() || current.images.length > 0) return;
-    fillFrom(request.message, request.id, request.images, false);
+    fillFrom(request.message, request.id, request.images, current.delivery, false);
   }
 
   async function handoff(agent: Agent, item: Handoff, autopilot: boolean): Promise<void> {
@@ -462,6 +476,7 @@
             editingId={editingQueued}
             onchange={changeQueue}
             onedit={editQueued}
+            onsendnow={sendNow}
           />
         {/if}
         {#if tool}
@@ -484,7 +499,7 @@
         {/if}
         <Composer
           bind:this={composer}
-          busy={busy && !editing}
+          busy={editing ? editingQueued !== null : busy}
           disabled={!connected}
           agentLabel={agentLabel(hostWindow.agents, picked.modeId)}
           modelLabel={modelLabel(hostWindow.models, picked.modelId)}

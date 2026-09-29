@@ -89,6 +89,9 @@ export class Controller {
       case 'setQueue':
         await this.queue.apply(command);
         return;
+      case 'sendQueuedNow':
+        await this.queue.sendNow(command);
+        return;
       case 'stop':
         await focusChat(command.sessionId);
         await vscode.commands.executeCommand('workbench.action.chat.cancel');

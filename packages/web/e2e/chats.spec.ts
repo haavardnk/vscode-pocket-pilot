@@ -170,7 +170,7 @@ test('edits queued messages with their agent, model, approvals and photos', asyn
     .getByRole('button', { name: /^Default approvals/ })
     .click();
   await message.fill('Draft a short announcement');
-  await page.getByRole('button', { name: 'Send' }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
   const sheet = page.getByRole('dialog', { name: 'Drop attachments?' });
   await expect(sheet.getByText('1 attachment will be dropped')).toBeVisible();
   await sheet.getByRole('button', { name: 'Continue' }).click();
@@ -193,6 +193,49 @@ test('edits queued messages with their agent, model, approvals and photos', asyn
   await banner.getByRole('button', { name: 'Cancel' }).click();
   await expect(message).toHaveValue('Unsent draft');
   await expect(page.getByRole('button', { name: 'Approvals: Bypass approvals' })).toBeVisible();
+});
+
+test('sends steering messages immediately', async ({ page }) => {
+  await openSession(page, 'Plan the release');
+  const queue = page.getByRole('list', { name: 'Queued messages' });
+  await queue
+    .getByRole('listitem')
+    .filter({ hasText: 'Keep the changelog short' })
+    .getByRole('button', { name: 'Send now' })
+    .click();
+  await expect(page.getByText('Stopped')).toBeVisible();
+  await expect(page.getByText('Done: Keep the changelog short')).toBeVisible();
+  await expect(queue).not.toContainText('Keep the changelog short');
+});
+
+test('switches queued messages between steer and queue while editing', async ({ page }) => {
+  await openSession(page, 'Plan the release');
+  const queue = page.getByRole('list', { name: 'Queued messages' });
+  const delivery = page.getByRole('radiogroup', { name: 'Delivery' });
+
+  await queue.getByRole('button', { name: 'Tag the release' }).click();
+  await expect(delivery.getByRole('radio', { name: 'Queue' })).toBeChecked();
+  await delivery.getByRole('radio', { name: 'Steer' }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Drop attachments?' })
+    .getByRole('button', { name: 'Continue' })
+    .click();
+  await expect(queue.getByRole('listitem')).toHaveText([
+    /Steer\s*Keep the changelog short/,
+    /Steer\s*Tag the release/,
+    /Queued\s*Draft the announcement/
+  ]);
+
+  await queue.getByRole('button', { name: 'Keep the changelog short' }).click();
+  await expect(delivery.getByRole('radio', { name: 'Steer' })).toBeChecked();
+  await delivery.getByRole('radio', { name: 'Queue' }).click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(queue.getByRole('listitem')).toHaveText([
+    /Steer\s*Tag the release/,
+    /Queued\s*Keep the changelog short/,
+    /Queued\s*Draft the announcement/
+  ]);
 });
 
 test('removes and collapses queued messages', async ({ page }) => {

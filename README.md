@@ -13,7 +13,7 @@ tunnel. It works with GitHub Copilot Chat in VS Code; other agents and editors a
 - Attach photos to messages
 - Open files, search results and screenshots linked from chats
 - Edit sent messages, restore checkpoints and redo them
-- Edit, reorder and remove queued messages
+- Edit, reorder, remove and send queued messages immediately; switch them between queue and steer
 - Switch agent, model, thinking effort and approval level
 - Browse files, review diffs, and keep or undo the agent's edits
 - View, type into, create and kill terminals, including the ones the agent runs

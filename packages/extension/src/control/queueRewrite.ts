@@ -9,8 +9,10 @@ import {
   PHONE_QUEUE_PREFIX,
   type QueuedRequest,
   type QueueEntry,
+  queueEntry,
   queuePlan,
   type RequestImage,
+  sendNowSplit,
   type SessionDetail
 } from '@pocket-pilot/protocol';
 import * as vscode from 'vscode';
@@ -69,18 +71,55 @@ export class QueueRewrite {
       );
       return;
     }
-    const submits: QueuedSubmit[] = [];
-    for (const entry of command.queue) {
-      submits.push(await this.queuedSubmit(command.sessionId, entry, current));
+    this.sources.expectQueue(
+      command.sessionId,
+      await this.rewrite(command.sessionId, detail, command.queue, false)
+    );
+  }
+
+  async sendNow(command: Extract<Command, { kind: 'sendQueuedNow' }>): Promise<void> {
+    const detail = await this.sources.detail(command.sessionId);
+    if (!detail) throw new Error('Chat not found');
+    const { target, rest } = sendNowSplit(detail.queued, command.expected, command.id);
+    if (target.id.startsWith(PHONE_QUEUE_PREFIX)) {
+      const others = detail.queued.filter((item) => item !== target);
+      const queued = await this.rewrite(
+        command.sessionId,
+        detail,
+        [target, ...others].map(queueEntry),
+        true
+      );
+      this.sources.expectQueue(command.sessionId, queued.slice(1));
+      return;
     }
-    await focusChat(command.sessionId);
+    await vscode.commands.executeCommand('workbench.action.chat.sendPendingImmediately', {
+      message: target.text,
+      id: target.id,
+      pendingKind: target.delivery,
+      sessionResource: sessionResource(command.sessionId)
+    });
+    this.sources.expectQueue(command.sessionId, rest);
+  }
+
+  private async rewrite(
+    sessionId: string,
+    detail: SessionDetail,
+    entries: readonly QueueEntry[],
+    cancel: boolean
+  ): Promise<QueuedRequest[]> {
+    const submits: QueuedSubmit[] = [];
+    for (const entry of entries) {
+      submits.push(await this.queuedSubmit(sessionId, entry, detail.queued));
+    }
+    await focusChat(sessionId);
+    if (cancel) await vscode.commands.executeCommand('workbench.action.chat.cancel');
     await vscode.commands.executeCommand('workbench.action.chat.removeAllPendingRequests');
     let input: ChatInput = detail;
     const queued: QueuedRequest[] = [];
     try {
       for (const submit of submits) {
-        input = await this.inputs.change(command.sessionId, input, submit);
-        await submitChat(command.sessionId, submit.entry.text, submit.paths, submit.entry.delivery);
+        input = await this.inputs.change(sessionId, input, submit);
+        await submitChat(sessionId, submit.entry.text, submit.paths, submit.entry.delivery);
         queued.push({
           id: PHONE_QUEUE_PREFIX + randomUUID(),
           delivery: submit.entry.delivery,
@@ -92,13 +131,13 @@ export class QueueRewrite {
       }
     } finally {
       const model = (await this.sources.models()).find((item) => item.id === detail.modelId);
-      await this.inputs.change(command.sessionId, input, {
+      await this.inputs.change(sessionId, input, {
         modeId: detail.modeId,
         model: model ?? null,
         permission: detail.permission
       });
     }
-    this.sources.expectQueue(command.sessionId, queued);
+    return queued;
   }
 
   private async queuedSubmit(

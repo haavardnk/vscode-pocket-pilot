@@ -2,10 +2,12 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import CornerDownLeft from '@lucide/svelte/icons/corner-down-left';
   import Paperclip from '@lucide/svelte/icons/paperclip';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import X from '@lucide/svelte/icons/x';
   import {
+    PHONE_QUEUE_PREFIX,
     type QueuedRequest,
     type QueueEntry,
     queueEntry,
@@ -21,15 +23,15 @@
     editingId: string | null;
     onchange: (expected: string[], queue: QueueEntry[]) => Promise<boolean>;
     onedit: (item: QueuedRequest) => void;
+    onsendnow: (expected: string[], id: string) => Promise<boolean>;
   }
 
-  const { queued, disabled, editingId, onchange, onedit }: Props = $props();
+  const { queued, disabled, editingId, onchange, onedit, onsendnow }: Props = $props();
 
   let open = $state(true);
   let confirming = $state.raw<{
-    base: QueuedRequest[];
-    queue: QueueEntry[];
     dropped: number;
+    run: () => Promise<boolean>;
     resolve: (saved: boolean) => void;
   } | null>(null);
   let saving = $state(false);
@@ -39,37 +41,34 @@
   onDestroy(() => confirming?.resolve(false));
 
   export function change(base: QueuedRequest[], queue: QueueEntry[]): Promise<boolean> {
+    const expected = base.map((item) => item.id);
     const kept = new Set(queue.map((item) => item.id));
-    const rewrite =
-      queuePlan(
-        base,
-        base.map((item) => item.id),
-        queue
-      ).kind === 'rewrite';
+    const rewrite = queuePlan(base, expected, queue).kind === 'rewrite';
     const dropped = rewrite
       ? base.reduce((sum, item) => sum + (kept.has(item.id) ? item.attachments : 0), 0)
       : 0;
-    if (dropped === 0) return commit(base, queue);
+    return confirmDrop(dropped, () => onchange(expected, queue));
+  }
+
+  function confirmDrop(dropped: number, run: () => Promise<boolean>): Promise<boolean> {
+    if (dropped === 0) return commit(run);
     confirming?.resolve(false);
     return new Promise((resolve) => {
-      confirming = { base, queue, dropped, resolve };
+      confirming = { dropped, run, resolve };
     });
   }
 
-  async function commit(base: QueuedRequest[], queue: QueueEntry[]): Promise<boolean> {
+  async function commit(run: () => Promise<boolean>): Promise<boolean> {
     saving = true;
-    const saved = await onchange(
-      base.map((item) => item.id),
-      queue
-    );
+    const saved = await run();
     saving = false;
     return saved;
   }
 
   async function proceed(): Promise<void> {
     if (!confirming) return;
-    const { base, queue, resolve } = confirming;
-    const saved = await commit(base, queue);
+    const { run, resolve } = confirming;
+    const saved = await commit(run);
     if (!saved) return;
     confirming = null;
     resolve(true);
@@ -87,6 +86,19 @@
   function remove(id: string): void {
     const base = $state.snapshot(queued);
     void change(base, base.filter((other) => other.id !== id).map(queueEntry));
+  }
+
+  function sendNow(id: string): void {
+    const base = $state.snapshot(queued);
+    const dropped = id.startsWith(PHONE_QUEUE_PREFIX)
+      ? base.reduce((sum, item) => sum + item.attachments, 0)
+      : 0;
+    void confirmDrop(dropped, () =>
+      onsendnow(
+        base.map((item) => item.id),
+        id
+      )
+    );
   }
 
   function close(): void {
@@ -149,6 +161,14 @@
             onclick={() => move(index, 1)}
           >
             <ChevronDown class="size-4" />
+          </button>
+          <button
+            class="btn btn-square btn-ghost btn-xs"
+            aria-label="Send now"
+            disabled={locked}
+            onclick={() => sendNow(item.id)}
+          >
+            <CornerDownLeft class="size-4" />
           </button>
           <button
             class="btn btn-square btn-ghost btn-xs"

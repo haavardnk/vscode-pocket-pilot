@@ -4,6 +4,7 @@ import {
   type ImageUpload,
   queuePlan,
   type RequestImage,
+  sendNowSplit,
   type SessionDetail
 } from '@pocket-pilot/protocol';
 
@@ -105,16 +106,15 @@ export class MockChats {
       this.host.changed(window, detail.id);
       return;
     }
+    if (command.kind === 'sendQueuedNow') {
+      const { sent, rest } = sendNowSplit(detail.queued, command.expected, command.id);
+      this.cancel(detail);
+      detail.queued = rest;
+      this.ask(window, detail.id, sent.map((item) => item.text).join('\n\n'));
+      return;
+    }
     if (command.kind === 'stop') {
-      const last = detail.requests.at(-1);
-      if (last?.state === 'pending') last.state = 'cancelled';
-      last?.parts.forEach((part) => {
-        if (part.kind !== 'tool') return;
-        part.awaitingConfirmation = false;
-        part.grouped = true;
-        if (part.status === 'running') part.status = 'failed';
-      });
-      detail.status = 'idle';
+      this.cancel(detail);
       detail.queued = [];
       this.host.changed(window, detail.id);
       return;
@@ -224,6 +224,21 @@ export class MockChats {
     if (command.kind === 'setMode') detail.modeId = command.modeId;
     if (command.kind === 'setModel') detail.modelId = command.modelId;
     this.host.changed(window, detail.id);
+  }
+
+  private cancel(detail: SessionDetail): void {
+    const last = detail.requests.at(-1);
+    if (last?.state === 'pending' || last?.state === 'needsInput') last.state = 'cancelled';
+    last?.parts.forEach((part) => {
+      if ((part.kind === 'questions' || part.kind === 'confirmation') && part.state === 'pending') {
+        part.state = 'expired';
+      }
+      if (part.kind !== 'tool') return;
+      part.awaitingConfirmation = false;
+      part.grouped = true;
+      if (part.status === 'running') part.status = 'failed';
+    });
+    detail.status = 'idle';
   }
 
   private keepPhotos(requestId: string, images: ImageUpload[]): RequestImage[] {

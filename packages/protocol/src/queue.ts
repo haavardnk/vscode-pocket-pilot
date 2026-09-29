@@ -18,17 +18,44 @@ export function queueEntry({
   return { id, delivery, text, modeId, modelId, permission, images: null };
 }
 
-export function queuePlan(
-  current: readonly QueuedRequest[],
-  expected: readonly string[],
-  queue: readonly QueueEntry[]
-): QueuePlan {
+export interface SendNowSplit {
+  target: QueuedRequest;
+  sent: QueuedRequest[];
+  rest: QueuedRequest[];
+}
+
+function requireExpected(current: readonly QueuedRequest[], expected: readonly string[]): void {
   if (
     current.length !== expected.length ||
     current.some((item, index) => item.id !== expected[index])
   ) {
     throw new Error('The queue changed. Check it and try again');
   }
+}
+
+export function sendNowSplit(
+  current: readonly QueuedRequest[],
+  expected: readonly string[],
+  id: string
+): SendNowSplit {
+  requireExpected(current, expected);
+  const target = current.find((item) => item.id === id);
+  if (!target) throw new Error('Unknown queued message');
+  const others = current.filter((item) => item !== target);
+  if (target.delivery === 'queued') return { target, sent: [target], rest: others };
+  return {
+    target,
+    sent: [target, ...others.filter((item) => item.delivery === 'steering')],
+    rest: others.filter((item) => item.delivery === 'queued')
+  };
+}
+
+export function queuePlan(
+  current: readonly QueuedRequest[],
+  expected: readonly string[],
+  queue: readonly QueueEntry[]
+): QueuePlan {
+  requireExpected(current, expected);
   const ids = queue.map((item) => item.id);
   if (new Set(ids).size !== ids.length || ids.some((id) => !expected.includes(id))) {
     throw new Error('Unknown queued message');

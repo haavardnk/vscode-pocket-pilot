@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { type QueuedRequest, type QueueEntry, queueEntry as entry, queuePlan } from '../src';
+import {
+  type QueuedRequest,
+  type QueueEntry,
+  queueEntry as entry,
+  queuePlan,
+  sendNowSplit
+} from '../src';
 
 const queued = (id: string, delivery: QueuedRequest['delivery'] = 'queued'): QueuedRequest => ({
   id,
@@ -49,6 +55,17 @@ describe('queuePlan', () => {
     ['model change', current, ids, edited({ modelId: 'copilot/o3' }), { kind: 'rewrite' }],
     ['approval change', current, ids, edited({ permission: 'autopilot' }), { kind: 'rewrite' }],
     ['photo change', current, ids, edited({ images: [] }), { kind: 'rewrite' }],
+    [
+      'delivery change',
+      current,
+      ids,
+      [
+        entry(queued('s', 'steering')),
+        { ...entry(queued('a')), delivery: 'steering' },
+        entry(queued('b'))
+      ],
+      { kind: 'rewrite' }
+    ],
     ['stale queue', current, ['s', 'a'], [], 'The queue changed'],
     ['unknown message', current, ids, [entry(queued('x'))], 'Unknown queued message'],
     [
@@ -69,5 +86,26 @@ describe('queuePlan', () => {
     const run = () => queuePlan(before, expected, queue);
     if (typeof plan === 'string') expect(run).toThrow(plan);
     else expect(run()).toEqual(plan);
+  });
+});
+
+describe('sendNowSplit', () => {
+  const steering = [queued('s1', 'steering'), queued('s2', 'steering'), queued('a'), queued('b')];
+  const order = steering.map((item) => item.id);
+
+  it.each([
+    ['steering with every steering message', 's2', ['s2', 's1'], ['a', 'b']],
+    ['a queued message alone', 'b', ['b'], ['s1', 's2', 'a']]
+  ])('sends %s', (_name, id, sent, rest) => {
+    const split = sendNowSplit(steering, order, id);
+    expect(split.sent.map((item) => item.id)).toEqual(sent);
+    expect(split.rest.map((item) => item.id)).toEqual(rest);
+  });
+
+  it.each([
+    ['a stale queue', ['s1'], 's1', 'The queue changed'],
+    ['an unknown message', order, 'x', 'Unknown queued message']
+  ])('rejects %s', (_name, expected, id, error) => {
+    expect(() => sendNowSplit(steering, expected, id)).toThrow(error);
   });
 });

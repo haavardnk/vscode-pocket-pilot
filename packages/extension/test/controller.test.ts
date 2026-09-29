@@ -207,6 +207,63 @@ describe('controller queue', () => {
     expect(await Promise.all(files.map((id) => readFile(fileURLToPath(id))))).toEqual([PNG, JPEG]);
   });
 
+  it('sends a known message immediately through VS Code', async () => {
+    const current = detail([
+      queued('q1', { delivery: 'steering' }),
+      queued('q2', { delivery: 'steering' }),
+      queued('q3')
+    ]);
+    await controller(current).run({
+      kind: 'sendQueuedNow',
+      windowId: 'w1',
+      sessionId: 's1',
+      expected: ['q1', 'q2', 'q3'],
+      id: 'q2'
+    });
+
+    expect(calls).toEqual([
+      [
+        'workbench.action.chat.sendPendingImmediately',
+        {
+          message: 'Do q2',
+          id: 'q2',
+          pendingKind: 'steering',
+          sessionResource: expect.anything()
+        }
+      ]
+    ]);
+    expect(expected?.map((item) => item.id)).toEqual(['q3']);
+  });
+
+  it('cancels and queues again to send a message only the phone knows', async () => {
+    const current = detail([queued('q1', { delivery: 'steering' }), queued('phone:1')]);
+    await controller(current).run({
+      kind: 'sendQueuedNow',
+      windowId: 'w1',
+      sessionId: 's1',
+      expected: ['q1', 'phone:1'],
+      id: 'phone:1'
+    });
+
+    expect(calls.map(([name]) => name)).toEqual([
+      'vscode.open',
+      'workbench.action.chat.cancel',
+      'workbench.action.chat.removeAllPendingRequests',
+      'vscode.open',
+      'workbench.action.chat.submit',
+      'vscode.open',
+      'workbench.action.chat.submit'
+    ]);
+    const submits = calls.filter(([name]) => name === 'workbench.action.chat.submit');
+    expect(submits.map(([, options]) => options)).toEqual([
+      { inputValue: 'Do phone:1', acceptInputOptions: { queue: 'queued' } },
+      { inputValue: 'Do q1', acceptInputOptions: { queue: 'steering' } }
+    ]);
+    expect(expected?.map(({ delivery, text }) => ({ delivery, text }))).toEqual([
+      { delivery: 'steering', text: 'Do q1' }
+    ]);
+  });
+
   it('keeps the queue when a kept photo is gone', async () => {
     const lost: RequestImage = { id: 'lost', name: 'Pasted Image', mimeType: 'image/png' };
     const current = detail([queued('q1', { images: [lost] }), queued('q2')]);
