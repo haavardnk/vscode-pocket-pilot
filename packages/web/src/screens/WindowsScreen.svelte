@@ -1,5 +1,6 @@
 <script lang="ts">
   import AppWindow from '@lucide/svelte/icons/app-window';
+  import FolderPlus from '@lucide/svelte/icons/folder-plus';
   import X from '@lucide/svelte/icons/x';
   import type { WindowState } from '@pocket-pilot/protocol';
   import { onDestroy } from 'svelte';
@@ -7,6 +8,7 @@
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
   import SettingsGroup from '../lib/components/SettingsGroup.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
+  import { routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
 
@@ -69,7 +71,17 @@
 {/snippet}
 
 <div class="flex flex-1 flex-col">
-  <ScreenHeader title="VS Code windows" back={{ name: 'settings' }} />
+  <ScreenHeader title="VS Code windows" back={{ name: 'settings' }}>
+    {#snippet actions()}
+      <a
+        class="btn btn-square btn-ghost"
+        href={routeHash({ name: 'open' })}
+        aria-label="Open folder"
+      >
+        <FolderPlus class="size-5" />
+      </a>
+    {/snippet}
+  </ScreenHeader>
 
   <main class="flex flex-col gap-6 p-4 pb-8">
     <SettingsGroup title="Open windows" caption={lastWindow ? lastWindowCaption : undefined}>

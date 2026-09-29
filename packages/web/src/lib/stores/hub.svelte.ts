@@ -1,9 +1,9 @@
 import {
   applyPatch,
   applyTerminalPatch,
-  type CodeQuery,
-  type CodeResultFor,
   type Command,
+  type Query,
+  type QueryResultFor,
   type ServerMessage,
   type SessionDetail,
   type TerminalDetail,
@@ -140,11 +140,11 @@ class HubStore {
     return this.socket.command(command);
   }
 
-  async query<Q extends CodeQuery>(query: Q): Promise<CodeResultFor<Q['kind']>> {
+  async query<Q extends Query>(query: Q): Promise<QueryResultFor<Q['kind']>> {
     if (!this.socket) throw new Error('Not connected');
     const result = await this.socket.query(query);
     if (result.kind !== query.kind) throw new Error('Unexpected response');
-    return result as CodeResultFor<Q['kind']>;
+    return result as QueryResultFor<Q['kind']>;
   }
 
   private readonly wake = (): void => {

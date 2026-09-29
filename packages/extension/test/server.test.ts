@@ -210,6 +210,7 @@ describe('server', () => {
       {
         windowId: 'ws1',
         name: 'ws1',
+        workspace: null,
         repositories: [],
         folders: [],
         sessions: [],
@@ -256,6 +257,7 @@ describe('server', () => {
       {
         windowId: 'ws2',
         name: 'ws2',
+        workspace: null,
         repositories: [],
         folders: [],
         sessions: [],

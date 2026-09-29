@@ -7,6 +7,7 @@
   import GitDiffScreen from './GitDiffScreen.svelte';
   import HomeScreen from './HomeScreen.svelte';
   import NewSessionScreen from './NewSessionScreen.svelte';
+  import OpenFolderScreen from './OpenFolderScreen.svelte';
   import SessionChangesScreen from './SessionChangesScreen.svelte';
   import SessionDiffScreen from './SessionDiffScreen.svelte';
   import SessionScreen from './SessionScreen.svelte';
@@ -31,6 +32,8 @@
   <NewSessionScreen />
 {:else if route.name === 'windows'}
   <WindowsScreen />
+{:else if route.name === 'open'}
+  <OpenFolderScreen />
 {:else if route.name === 'terminal'}
   {#key hash}
     <TerminalScreen

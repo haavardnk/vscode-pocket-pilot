@@ -1,8 +1,8 @@
 import type {
-  CodeQuery,
-  CodeResult,
   Command,
   HookEvent,
+  Query,
+  QueryResult,
   SessionDetail,
   SessionWatch,
   TerminalDetail,
@@ -26,7 +26,7 @@ export interface LocalWindow {
   setWatches(watches: readonly SessionWatch[]): void;
   setTerminalWatches(terminalIds: readonly string[]): void;
   run(command: Command): Promise<void>;
-  query(query: CodeQuery): Promise<CodeResult>;
+  query(query: Query): Promise<QueryResult>;
   hook(event: HookEvent): Promise<void>;
   readonly onDidChangeState: Subscribe<WindowState>;
   readonly onDidChangeSession: Subscribe<{ sessionId: string; detail: SessionDetail | null }>;

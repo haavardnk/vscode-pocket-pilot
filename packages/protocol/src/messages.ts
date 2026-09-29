@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { codeQuerySchema, codeResultSchema } from './code.ts';
 import { commandSchema, sessionWatchSchema } from './commands.ts';
 import { sessionDetailSchema, windowStateSchema } from './domain.ts';
 import { sessionPatchSchema } from './patch.ts';
+import { queryResultSchema, querySchema } from './query.ts';
 import { terminalDetailSchema, terminalPatchSchema } from './terminal.ts';
 
 const hookTarget = { sessionId: z.string(), at: z.number() };
@@ -25,7 +25,7 @@ export const hookEventSchema = z.discriminatedUnion('kind', [
 const queryResult = {
   type: z.literal('queryResult'),
   requestId: z.string(),
-  result: codeResultSchema.nullable(),
+  result: queryResultSchema.nullable(),
   error: z.string().nullable()
 };
 
@@ -47,7 +47,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('watchTerminal'), windowId: z.string(), terminalId: z.string() }),
   z.object({ type: z.literal('unwatchTerminal') }),
   z.object({ type: z.literal('command'), requestId: z.string(), command: commandSchema }),
-  z.object({ type: z.literal('query'), requestId: z.string(), query: codeQuerySchema }),
+  z.object({ type: z.literal('query'), requestId: z.string(), query: querySchema }),
   z.object({ type: z.literal('presence'), visible: z.boolean() })
 ]);
 
@@ -115,7 +115,7 @@ export const leaderMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('watch'), sessions: z.array(sessionWatchSchema) }),
   z.object({ type: z.literal('watchTerminals'), terminalIds: z.array(z.string()) }),
   z.object({ type: z.literal('command'), requestId: z.string(), command: commandSchema }),
-  z.object({ type: z.literal('query'), requestId: z.string(), query: codeQuerySchema }),
+  z.object({ type: z.literal('query'), requestId: z.string(), query: querySchema }),
   z.object({ type: z.literal('hook'), requestId: z.string(), event: hookEventSchema })
 ]);
 

@@ -1,8 +1,8 @@
 import {
-  type CodeQuery,
-  type CodeResult,
   type Command,
   diffDetail,
+  type Query,
+  type QueryResult,
   queuePlan,
   type ServerMessage,
   type SessionDetail,
@@ -19,6 +19,8 @@ import {
   initialWindows,
   line,
   type MockWindow,
+  OPEN_TARGETS,
+  openedWindow,
   ownedTerminal,
   refreshSummary
 } from './fixtures.ts';
@@ -100,9 +102,10 @@ export class MockHub {
     client.send({ type: 'terminal', windowId, terminalId, detail });
   }
 
-  query(query: CodeQuery): CodeResult {
+  query(query: Query): QueryResult {
     if (!this.windows.some((window) => window.state.windowId === query.windowId))
       throw new Error('Window is no longer open');
+    if (query.kind === 'openTargets') return { kind: 'openTargets', ...OPEN_TARGETS };
     return this.code.query(query);
   }
 
@@ -115,6 +118,10 @@ export class MockHub {
         this.windows = this.windows.filter((candidate) => candidate !== window);
         this.broadcast({ type: 'windowRemoved', windowId: command.windowId });
       });
+      return;
+    }
+    if (command.kind === 'openWindow') {
+      this.open(command.target);
       return;
     }
     if (command.kind === 'setModelConfig') {
@@ -490,6 +497,19 @@ export class MockHub {
         client.terminal?.windowId === window.state.windowId &&
         client.terminal.terminalId === terminalId
     );
+  }
+
+  private open(targetId: string): void {
+    const opened = [...OPEN_TARGETS.recent, ...OPEN_TARGETS.projects].find(
+      (candidate) => candidate.id === targetId
+    );
+    if (!opened) throw new Error('This folder is no longer in the list');
+    if (this.windows.some((window) => window.state.workspace === targetId)) return;
+    const window = openedWindow(this.id('window'), opened);
+    this.later(() => {
+      this.windows.push(window);
+      this.broadcast({ type: 'window', window: window.state });
+    });
   }
 
   private configure(command: Extract<Command, { kind: 'setModelConfig' }>): void {

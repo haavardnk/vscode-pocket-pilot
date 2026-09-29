@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
-  type CodeQuery,
-  type CodeResult,
   type Command,
   type HookEvent,
+  type Query,
+  type QueryResult,
   type ServerMessage,
   type SessionDetail,
   type SessionWatch,
@@ -50,6 +50,7 @@ class FakeWindow implements LocalWindow {
     return {
       windowId: this.windowId,
       name: this.windowId,
+      workspace: null,
       repositories: [],
       folders: [],
       sessions: [],
@@ -80,7 +81,7 @@ class FakeWindow implements LocalWindow {
     return Promise.resolve();
   }
 
-  query(query: CodeQuery): Promise<CodeResult> {
+  query(query: Query): Promise<QueryResult> {
     return query.kind === 'tree'
       ? Promise.resolve({ kind: 'tree', entries: [], truncated: false })
       : Promise.reject(new Error('Not a git repository'));

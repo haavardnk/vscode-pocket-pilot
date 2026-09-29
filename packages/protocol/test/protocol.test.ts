@@ -26,6 +26,7 @@ import {
 const window: WindowState = {
   windowId: 'w1',
   name: 'demo',
+  workspace: 'file:///demo',
   repositories: [{ key: 'acme/demo', label: 'acme/demo', github: { owner: 'acme', name: 'demo' } }],
   folders: [
     {

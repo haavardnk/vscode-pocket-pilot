@@ -12,6 +12,7 @@ function windowState(windowId: string): WindowState {
   return {
     windowId,
     name: windowId,
+    workspace: null,
     repositories: [],
     folders: [],
     sessions: [],

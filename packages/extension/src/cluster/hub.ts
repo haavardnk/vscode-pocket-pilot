@@ -1,10 +1,10 @@
 import {
   applyTerminalPatch,
-  type CodeQuery,
-  type CodeResult,
   type Command,
   diffDetail,
   type HookEvent,
+  type Query,
+  type QueryResult,
   type ServerMessage,
   type SessionDetail,
   type SessionWatch,
@@ -20,7 +20,7 @@ export interface WindowLink {
   watch(sessions: SessionWatch[]): void;
   watchTerminals(terminalIds: string[]): void;
   run(command: Command): Promise<void>;
-  query(query: CodeQuery): Promise<CodeResult>;
+  query(query: Query): Promise<QueryResult>;
   hook(event: HookEvent): Promise<void>;
 }
 
@@ -208,7 +208,7 @@ export class Hub {
     await entry.link.run(command);
   }
 
-  async query(query: CodeQuery): Promise<CodeResult> {
+  async query(query: Query): Promise<QueryResult> {
     const entry = this.windows.get(query.windowId);
     if (!entry) throw new Error('Window is no longer open');
     return entry.link.query(query);

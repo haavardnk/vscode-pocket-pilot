@@ -218,6 +218,7 @@ export const modelSchema = z.object({
 export const windowStateSchema = z.object({
   windowId: z.string(),
   name: z.string(),
+  workspace: z.string().nullable(),
   repositories: z.array(repositorySchema),
   folders: z.array(workspaceFolderSchema),
   sessions: z.array(sessionSummarySchema),

@@ -14,6 +14,7 @@ tunnel. It works with GitHub Copilot Chat in VS Code; other agents and editors a
 - Switch agent, model, thinking effort and approval level
 - Browse files, review diffs, and keep or undo the agent's edits
 - View, type into, create and kill terminals, including the ones the agent runs
+- Open recent folders and projects in new VS Code windows, and close windows
 - Push notifications when an agent finishes, needs input or fails
 
 ## Requirements
@@ -41,8 +42,8 @@ Reload every open VS Code window afterwards.
 
 By default the phone connects through a free Cloudflare quick tunnel, which needs no account.
 `cloudflared` is downloaded on first start and verified against a pinned checksum. A quick tunnel
-gets a new address every time VS Code restarts, so the phone has to pair again and the app cannot
-be added to the home screen.
+keeps its address while VS Code runs, but gets a new one once VS Code has been closed for half a
+minute, so the phone has to pair again and the app cannot be added to the home screen.
 
 ## Permanent address
 
@@ -106,6 +107,7 @@ All commands are also in the **Pilot** status bar menu.
 | `pocketPilot.tunnel.cloudflaredPath` | `""`    | Use this cloudflared binary instead of downloading one.                    |
 | `pocketPilot.devices.expireDays`     | `30`    | Forget devices unused this long. `0` keeps them.                           |
 | `pocketPilot.liveMirror`             | `full`  | `full` streams replies, `hooks` updates at tool calls, `off` only on save. |
+| `pocketPilot.projectRoots`           | `[]`    | Folders whose git repositories the phone can open, such as `~/Git`.        |
 
 ## Security
 

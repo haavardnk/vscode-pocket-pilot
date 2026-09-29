@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import {
-  type CodeResult,
   type FollowerMessage,
   followerMessageSchema,
   type LeaderMessage,
   parseMessage,
+  type QueryResult,
   stableRegisterSchema,
   stableRequestSchema,
   VERSION_MISMATCH
@@ -31,7 +31,7 @@ function commandOutcome(reply: Reply): void {
   if (!reply.ok) throw new Error(reply.error ?? 'Command failed');
 }
 
-function queryOutcome(reply: Reply): CodeResult {
+function queryOutcome(reply: Reply): QueryResult {
   if (reply.type !== 'queryResult') throw new Error('Unexpected reply');
   if (!reply.result) throw new Error(reply.error ?? 'Query failed');
   return reply.result;

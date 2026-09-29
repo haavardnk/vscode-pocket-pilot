@@ -33,6 +33,7 @@ function windows(...sessions: SessionSummary[]): WindowState[] {
     {
       windowId: 'w1',
       name: 'demo',
+      workspace: null,
       repositories: [],
       folders: [],
       sessions,

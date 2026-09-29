@@ -13,6 +13,7 @@ function window(statuses: (GitStatus | null)[]): WindowState {
   return {
     windowId: 'w',
     name: 'w',
+    workspace: null,
     repositories: [],
     folders: statuses.map((status, index) => ({
       id: `f${index}`,

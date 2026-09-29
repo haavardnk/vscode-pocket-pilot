@@ -15,6 +15,7 @@ function window(githubs: Repository['github'][]): WindowState {
   return {
     windowId: 'w',
     name: 'w',
+    workspace: null,
     repositories: githubs.map((github, index) => ({
       key: `k${index}`,
       label: `r${index}`,

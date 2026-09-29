@@ -1,9 +1,9 @@
 import {
   type ClientMessage,
-  type CodeQuery,
-  type CodeResult,
   type Command,
   parseMessage,
+  type Query,
+  type QueryResult,
   type ServerMessage,
   serverMessageSchema,
   stableRequestSchema,
@@ -17,7 +17,7 @@ const MIN_RETRY_MS = 500;
 const MAX_RETRY_MS = 10_000;
 
 interface Handlers {
-  resolve: (result: CodeResult | null) => void;
+  resolve: (result: QueryResult | null) => void;
   reject: (error: Error) => void;
 }
 
@@ -108,8 +108,8 @@ export class HubSocket {
     });
   }
 
-  query(query: CodeQuery): Promise<CodeResult> {
-    return new Promise<CodeResult>((resolve, reject) => {
+  query(query: Query): Promise<QueryResult> {
+    return new Promise<QueryResult>((resolve, reject) => {
       this.request((requestId) => ({ type: 'query', requestId, query }), {
         resolve: (result) => (result ? resolve(result) : reject(new Error('Empty result'))),
         reject
@@ -138,7 +138,7 @@ export class HubSocket {
     this.pending.set(requestId, { ...handlers, timer });
   }
 
-  private settle(requestId: string, error: string | null, result: CodeResult | null = null): void {
+  private settle(requestId: string, error: string | null, result: QueryResult | null = null): void {
     const pending = this.pending.get(requestId);
     if (!pending) return;
     this.pending.delete(requestId);

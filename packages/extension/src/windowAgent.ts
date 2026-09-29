@@ -4,11 +4,11 @@ import { basename, dirname, join } from 'node:path';
 
 import type {
   Agent,
-  CodeQuery,
-  CodeResult,
   Command,
   HookEvent,
   Model,
+  Query,
+  QueryResult,
   Repository,
   SessionDetail,
   SessionWatch,
@@ -39,7 +39,12 @@ import { LiveMirror } from './sessions/liveMirror';
 import { SessionStore } from './sessions/sessionStore';
 import { liveMirrorMode, SECTION } from './settings';
 import { isTerminalCommand, TerminalService } from './terminals/terminalService';
-import { isWindowCommand, runWindowCommand } from './windows/windowCommands';
+import {
+  currentWorkspace,
+  isWindowCommand,
+  listOpenTargets,
+  runWindowCommand
+} from './windows/windowService';
 
 const PUBLISH_DELAY_MS = 100;
 const EXPORT_COMMAND = 'workbench.action.chat.export';
@@ -213,6 +218,7 @@ export class WindowAgent implements vscode.Disposable {
     return {
       windowId: this.windowId,
       name: vscode.workspace.name ?? 'Empty window',
+      workspace: currentWorkspace(),
       repositories: this.repositories,
       folders: this.folders.map(({ id, name, root }) => ({
         id,
@@ -244,7 +250,7 @@ export class WindowAgent implements vscode.Disposable {
 
   async run(command: Command): Promise<void> {
     if (isWindowCommand(command)) {
-      runWindowCommand(command, this.report);
+      await runWindowCommand(command, this.report);
       return;
     }
     if (isTerminalCommand(command)) {
@@ -258,7 +264,8 @@ export class WindowAgent implements vscode.Disposable {
     this.mirror.poke();
   }
 
-  query(query: CodeQuery): Promise<CodeResult> {
+  query(query: Query): Promise<QueryResult> {
+    if (query.kind === 'openTargets') return listOpenTargets(this.report);
     return this.code.query(query);
   }
 

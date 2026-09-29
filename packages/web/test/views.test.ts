@@ -43,6 +43,7 @@ function window(windowId: string, keys: string[], sessions: SessionSummary[]): W
   return {
     windowId,
     name: windowId,
+    workspace: null,
     repositories: keys.map((key) => ({ key, label: key.split('/').at(-1) ?? key, github: null })),
     folders: [],
     sessions,
@@ -258,6 +259,7 @@ describe('routing', () => {
     ['#/settings', { name: 'settings' }],
     ['#/new', { name: 'new' }],
     ['#/windows', { name: 'windows' }],
+    ['#/open', { name: 'open' }],
     ['#/code', { name: 'code' }],
     ['#/terminals', { name: 'terminals' }],
     ['#/terminal/w/t', { name: 'terminal', windowId: 'w', terminalId: 't', executionId: null }],

@@ -1,5 +1,6 @@
 import {
   type Model,
+  type OpenTarget,
   SEGMENT_BOLD,
   type SessionDetail,
   type TerminalColor,
@@ -218,12 +219,48 @@ function buildWindow(
   return window;
 }
 
+function target(name: string, kind: OpenTarget['kind'] = 'folder'): OpenTarget {
+  const file = kind === 'workspace' ? `${name}.code-workspace` : name;
+  return { id: `file:///Users/me/Git/${file}`, name, path: `~/Git/${file}`, kind };
+}
+
+export const OPEN_TARGETS = {
+  recent: [
+    target('vscode-pocket-pilot'),
+    target('immich-edit'),
+    target('photo-tools'),
+    target('home-lab', 'workspace')
+  ],
+  projects: [target('dotfiles'), target('raw-pipeline')]
+};
+
+export function openedWindow(windowId: string, opened: OpenTarget): MockWindow {
+  const key = `github.com/haavardnk/${opened.name}`;
+  return buildWindow(
+    {
+      windowId,
+      name: opened.name,
+      workspace: opened.id,
+      repositories: [
+        { key, label: opened.name, github: { owner: 'haavardnk', name: opened.name } }
+      ],
+      agents: AGENTS,
+      models: models(),
+      folders: [{ id: `${windowId}-f`, name: opened.name, repositoryKey: key, git: null }],
+      canOrganize: true
+    },
+    [],
+    Date.now()
+  );
+}
+
 export function initialWindows(now: number): MockWindow[] {
   return [
     buildWindow(
       {
         windowId: 'w1',
         name: 'vscode-pocket-pilot',
+        workspace: 'file:///Users/me/Git/vscode-pocket-pilot',
         repositories: [
           {
             key: 'github.com/haavardnk/vscode-pocket-pilot',
@@ -485,6 +522,7 @@ export function initialWindows(now: number): MockWindow[] {
       {
         windowId: 'w2',
         name: 'immich-edit',
+        workspace: 'file:///Users/me/Git/immich-edit',
         repositories: [
           {
             key: 'github.com/haavardnk/immich-edit',

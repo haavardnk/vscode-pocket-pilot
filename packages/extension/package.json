@@ -175,6 +175,15 @@
           "default": "full",
           "scope": "machine",
           "markdownDescription": "How closely the phone follows a running chat. `full` and `hooks` install a Copilot hook file at `~/.copilot/hooks/pocket-pilot.json` that reports prompts and tool calls to Pocket Pilot on `127.0.0.1`. `full` also exports the focused chat every few hundred milliseconds while an agent is working."
+        },
+        "pocketPilot.projectRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "machine",
+          "markdownDescription": "Folders that hold your projects, such as `~/Git`. The phone can open any Git repository up to two levels below them in a new window, next to the folders VS Code opened recently."
         }
       }
     }
