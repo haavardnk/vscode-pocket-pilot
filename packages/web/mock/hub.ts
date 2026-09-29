@@ -327,6 +327,16 @@ export class MockHub {
       this.changed(window, detail.id);
       return;
     }
+    if (command.kind === 'editRequest') {
+      restoreCheckpoint(detail, command.requestId);
+      dropDisabled(detail);
+      if (command.modeId) detail.modeId = command.modeId;
+      if (command.modelId) detail.modelId = command.modelId;
+      detail.permission = command.permission;
+      this.changed(window, detail.id);
+      this.later(() => this.ask(window, detail.id, command.text));
+      return;
+    }
     if (command.kind === 'setPermission') {
       dropDisabled(detail);
       detail.permission = command.level;

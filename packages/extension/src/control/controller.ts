@@ -84,11 +84,7 @@ export class Controller {
         return;
       case 'setMode':
         await this.requireAgent(command.modeId);
-        await vscode.commands.executeCommand('workbench.action.chat.toggleAgentMode', {
-          modeId: command.modeId,
-          sessionResource: sessionResource(command.sessionId)
-        });
-        this.sources.expectMode(command.sessionId, command.modeId);
+        await this.setMode(command.sessionId, command.modeId);
         return;
       case 'handoff':
         await this.handoff(command);
@@ -96,8 +92,11 @@ export class Controller {
       case 'setModel':
         await selectModel(await this.requireModel(command.modelId));
         return;
+      case 'editRequest':
+        await this.editRequest(command);
+        return;
       case 'restoreCheckpoint':
-        await this.sources.checkpoints.restore(command.sessionId, command.requestId);
+        await this.sources.checkpoints.restore(command.sessionId, command.requestId, true);
         return;
       case 'redoCheckpoint':
         await this.sources.checkpoints.redo(command.sessionId);
@@ -291,6 +290,32 @@ export class Controller {
         attachments: 0
       }))
     );
+  }
+
+  private async editRequest(command: Extract<Command, { kind: 'editRequest' }>): Promise<void> {
+    if (command.modeId) await this.requireAgent(command.modeId);
+    const model = command.modelId ? await this.requireModel(command.modelId) : null;
+    const detail = await this.sources.detail(command.sessionId);
+    if (!detail) throw new Error('Chat not found');
+    await this.sources.checkpoints.restore(command.sessionId, command.requestId, false);
+    await this.sources.checkpoints.submitting(command.sessionId, async () => {
+      if (command.modeId && command.modeId !== detail.modeId) {
+        await this.setMode(command.sessionId, command.modeId);
+      }
+      if (model) await selectModel(model);
+      if (command.permission !== detail.permission) {
+        await this.setPermission(command.sessionId, command.permission);
+      }
+      await submitChat(command.sessionId, command.text);
+    });
+  }
+
+  private async setMode(sessionId: string, modeId: string): Promise<void> {
+    await vscode.commands.executeCommand('workbench.action.chat.toggleAgentMode', {
+      modeId,
+      sessionResource: sessionResource(sessionId)
+    });
+    this.sources.expectMode(sessionId, modeId);
   }
 
   private async setPermission(sessionId: string, level: PermissionLevel): Promise<void> {

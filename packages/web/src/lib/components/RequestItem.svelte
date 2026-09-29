@@ -20,7 +20,8 @@
     windowId: string;
     sessionId: string;
     disabled: boolean;
-    onmessage: () => void;
+    dimmed: boolean;
+    onmessage: (() => void) | null;
     onanswer: (resolveId: string, answers: QuestionAnswers | null) => Promise<boolean>;
     onconfirm: (button: string) => Promise<boolean>;
     onelicit: () => Promise<boolean>;
@@ -31,6 +32,7 @@
     windowId,
     sessionId,
     disabled,
+    dimmed,
     onmessage,
     onanswer,
     onconfirm,
@@ -54,12 +56,12 @@
 </script>
 
 <article
-  class={['flex flex-col gap-3', request.disabled && 'opacity-50']}
+  class={['flex flex-col gap-3', (request.disabled || dimmed) && 'opacity-50']}
   data-request={request.id}
 >
   {#if request.message}
     <div class="chat-end chat">
-      {#if request.editable && !request.disabled}
+      {#if onmessage && request.editable && !request.disabled}
         <button
           class="chat-bubble cursor-pointer chat-bubble-primary text-left whitespace-pre-wrap"
           aria-haspopup="dialog"

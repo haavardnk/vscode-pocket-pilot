@@ -166,6 +166,23 @@ describe('protocol', () => {
       clientMessageSchema,
       {
         type: 'command',
+        requestId: 'r2',
+        command: {
+          kind: 'editRequest',
+          windowId: 'w1',
+          sessionId: 's1',
+          requestId: 'q1',
+          text: 'again',
+          modeId: null,
+          modelId: 'copilot/gpt-5',
+          permission: 'autopilot'
+        }
+      }
+    ],
+    [
+      clientMessageSchema,
+      {
+        type: 'command',
         requestId: 'r3',
         command: { kind: 'restoreCheckpoint', windowId: 'w1', sessionId: 's1', requestId: 'q1' }
       }
@@ -236,6 +253,20 @@ describe('protocol', () => {
   it.each([
     'not json',
     JSON.stringify({ type: 'command', requestId: 'r', command: { kind: 'send', text: '' } }),
+    JSON.stringify({
+      type: 'command',
+      requestId: 'r',
+      command: {
+        kind: 'editRequest',
+        windowId: 'w1',
+        sessionId: 's1',
+        requestId: 'q1',
+        text: '',
+        modeId: null,
+        modelId: null,
+        permission: 'default'
+      }
+    }),
     JSON.stringify({ type: 'unknown' })
   ])('rejects %s', (raw) => {
     expect(parseMessage(clientMessageSchema, raw)).toBeNull();

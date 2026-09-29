@@ -1,8 +1,15 @@
-import type { RequestView } from '@pocket-pilot/protocol';
+import type { PermissionLevel, RequestView } from '@pocket-pilot/protocol';
 
 export interface RestoreImpact {
   messages: number;
   files: number;
+}
+
+export interface MessageEdit {
+  request: RequestView;
+  modeId: string | null;
+  modelId: string | null;
+  permission: PermissionLevel;
 }
 
 export function restoreImpact(requests: readonly RequestView[], index: number): RestoreImpact {

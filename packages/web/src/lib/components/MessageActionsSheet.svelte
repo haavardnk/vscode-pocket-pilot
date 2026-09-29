@@ -1,5 +1,6 @@
 <script lang="ts">
   import History from '@lucide/svelte/icons/history';
+  import Pencil from '@lucide/svelte/icons/pencil';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
   import type { RequestView } from '@pocket-pilot/protocol';
 
@@ -13,17 +14,23 @@
     windowId: string;
     sessionId: string;
     disabled: boolean;
+    onedit: (request: RequestView) => void;
     onrestored: (request: RequestView) => void;
     onclose: () => void;
   }
 
-  const { target, windowId, sessionId, disabled, onrestored, onclose }: Props = $props();
+  const { target, windowId, sessionId, disabled, onedit, onrestored, onclose }: Props = $props();
 
   let confirming = $state(false);
 
   function close(): void {
     confirming = false;
     onclose();
+  }
+
+  function edit(request: RequestView): void {
+    close();
+    onedit(request);
   }
 
   function restore(request: RequestView): void {
@@ -56,6 +63,17 @@
         {request.message}
       </p>
       <ul class="menu w-full p-0">
+        <li>
+          <button class="flex items-start gap-3 py-3" {disabled} onclick={() => edit(request)}>
+            <Pencil class="mt-0.5 size-4 shrink-0" />
+            <span class="flex min-w-0 flex-col items-start text-left">
+              <span class="font-medium">Edit message</span>
+              <span class="text-xs text-base-content/60">
+                Change the text, agent, model or approvals and send again.
+              </span>
+            </span>
+          </button>
+        </li>
         <li>
           <button
             class="flex items-start gap-3 py-3"

@@ -25,6 +25,7 @@
   import CheckpointBar from '../lib/components/CheckpointBar.svelte';
   import Composer from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
+  import EditingBar from '../lib/components/EditingBar.svelte';
   import HandoffBar from '../lib/components/HandoffBar.svelte';
   import Loading from '../lib/components/Loading.svelte';
   import MessageActionsSheet from '../lib/components/MessageActionsSheet.svelte';
@@ -38,7 +39,7 @@
   import TodoList from '../lib/components/TodoList.svelte';
   import { windowRef } from '../lib/git';
   import { windowGitHub } from '../lib/github';
-  import { restoreImpact } from '../lib/hub/checkpoints';
+  import { type MessageEdit, restoreImpact } from '../lib/hub/checkpoints';
   import { handoffSource } from '../lib/hub/handoffs';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { getPane } from '../lib/pane';
@@ -68,8 +69,10 @@
   let handingOff = $state(false);
   let echo = $state<{ text: string; after: string | null } | null>(null);
   let acting = $state<RequestView | null>(null);
+  let editing = $state<MessageEdit | null>(null);
   let root = $state<HTMLElement>();
   let composer = $state<ReturnType<typeof Composer>>();
+  let draft = '';
   let followBottom = true;
   let scrolled = 0;
 
@@ -93,8 +96,12 @@
     echo && detail && (detail.requests.at(-1)?.id ?? null) === echo.after ? echo.text : null
   );
   const handoffAgent = $derived(
-    detail && hostWindow && !echoing ? handoffSource(hostWindow.agents, detail, modeId) : null
+    detail && hostWindow && !echoing && !editing
+      ? handoffSource(hostWindow.agents, detail, modeId)
+      : null
   );
+  const picked = $derived(editing ?? { modeId, modelId, permission: detail?.permission ?? null });
+  const editIndex = $derived(indexOf(editing?.request ?? null));
   const actionTarget = $derived.by(() => {
     const index = indexOf(acting);
     if (!acting || !detail || index < 0) return null;
@@ -104,6 +111,7 @@
   $effect(() => {
     echo = null;
     acting = null;
+    editing = null;
     const key = `${windowId}/${sessionId}`;
     const restored =
       saved?.key === key && untrack(() => hub.detail?.id) === sessionId ? saved.top : null;
@@ -160,6 +168,7 @@
   }
 
   async function send(text: string, delivery: Delivery | null): Promise<boolean> {
+    if (editing) return sendEdit(editing, text);
     followBottom = true;
     if (delivery === null) echo = { text, after: detail?.requests.at(-1)?.id ?? null };
     const sent = await run(() =>
@@ -176,6 +185,47 @@
   function indexOf(request: RequestView | null): number {
     if (!request || !detail) return -1;
     return detail.requests.findIndex((candidate) => candidate.id === request.id);
+  }
+
+  function startEdit(request: RequestView): void {
+    if (!detail) return;
+    draft = composer?.current() ?? '';
+    editing = {
+      request,
+      modeId,
+      modelId: request.modelId ?? modelId,
+      permission: detail.permission
+    };
+    composer?.fill(request.message);
+  }
+
+  function cancelEdit(): void {
+    editing = null;
+    composer?.fill(draft, false);
+  }
+
+  async function sendEdit(edit: MessageEdit, text: string): Promise<boolean> {
+    followBottom = true;
+    echo = { text, after: detail?.requests[editIndex - 1]?.id ?? null };
+    const sent = await run(() =>
+      hub.command({
+        kind: 'editRequest',
+        windowId,
+        sessionId,
+        requestId: edit.request.id,
+        text,
+        modeId: edit.modeId,
+        modelId: edit.modelId,
+        permission: edit.permission
+      })
+    );
+    if (!sent) {
+      echo = null;
+      return false;
+    }
+    editing = null;
+    composer?.fill(draft, false);
+    return true;
   }
 
   function restored(request: RequestView): void {
@@ -231,16 +281,28 @@
 
   function selectPermission(level: PermissionLevel): void {
     sheet = null;
+    if (editing) {
+      editing.permission = level;
+      return;
+    }
     void run(() => hub.command({ kind: 'setPermission', windowId, sessionId, level }));
   }
 
   function selectMode(agent: Agent): void {
     sheet = null;
+    if (editing) {
+      editing.modeId = agent.id;
+      return;
+    }
     void run(() => hub.command({ kind: 'setMode', windowId, sessionId, modeId: agent.id }));
   }
 
   function selectModel(model: Model): void {
     sheet = null;
+    if (editing) {
+      editing.modelId = model.id;
+      return;
+    }
     void run(() => hub.command({ kind: 'setModel', windowId, sessionId, modelId: model.id }));
   }
 
@@ -332,7 +394,8 @@
           {windowId}
           {sessionId}
           disabled={!connected}
-          onmessage={() => (acting = request)}
+          dimmed={editIndex >= 0 && index >= editIndex}
+          onmessage={editing ? null : () => (acting = request)}
           onanswer={answer}
           onconfirm={confirm}
           onelicit={elicit}
@@ -401,14 +464,20 @@
             onselect={(item, autopilot) => void handoff(agent, item, autopilot)}
           />
         {/if}
+        {#if editing}
+          <EditingBar
+            impact={editIndex >= 0 ? restoreImpact(detail.requests, editIndex) : null}
+            oncancel={cancelEdit}
+          />
+        {/if}
         <Composer
           bind:this={composer}
-          {busy}
+          busy={busy && !editing}
           disabled={!connected}
-          agentLabel={agentLabel(hostWindow.agents, modeId)}
-          modelLabel={modelLabel(hostWindow.models, modelId)}
-          permission={detail.permission}
-          placeholder={busy ? 'Steer or queue a message' : 'Message'}
+          agentLabel={agentLabel(hostWindow.agents, picked.modeId)}
+          modelLabel={modelLabel(hostWindow.models, picked.modelId)}
+          permission={picked.permission}
+          placeholder={editing ? 'Edit message' : busy ? 'Steer or queue a message' : 'Message'}
           onmode={() => (sheet = 'mode')}
           onmodel={() => (sheet = 'model')}
           onpermission={() => (sheet = 'permission')}
@@ -419,21 +488,21 @@
     <ModeSheet
       open={sheet === 'mode'}
       agents={hostWindow.agents}
-      current={modeId}
+      current={picked.modeId}
       onselect={selectMode}
       onclose={() => (sheet = null)}
     />
     <ModelSheet
       open={sheet === 'model'}
       models={hostWindow.models}
-      current={modelId}
+      current={picked.modelId}
       onselect={selectModel}
       onconfig={configure}
       onclose={() => (sheet = null)}
     />
     <PermissionSheet
       open={sheet === 'permission'}
-      current={detail.permission}
+      current={picked.permission ?? detail.permission}
       onselect={selectPermission}
       onclose={() => (sheet = null)}
     />
@@ -442,6 +511,7 @@
       {windowId}
       {sessionId}
       disabled={!connected}
+      onedit={startEdit}
       onrestored={restored}
       onclose={() => (acting = null)}
     />

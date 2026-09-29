@@ -54,7 +54,8 @@
   async function submit(): Promise<void> {
     if (!ready) return;
     sending = true;
-    if (await onsend(text.trim(), busy ? delivery : null)) text = '';
+    const value = text.trim();
+    if ((await onsend(value, busy ? delivery : null)) && text.trim() === value) text = '';
     sending = false;
   }
 

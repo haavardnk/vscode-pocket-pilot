@@ -17,7 +17,7 @@ export interface CheckpointSources {
 export class CheckpointCommands {
   constructor(private readonly sources: CheckpointSources) {}
 
-  async restore(sessionId: string, requestId: string): Promise<void> {
+  async restore(sessionId: string, requestId: string, refill: boolean): Promise<void> {
     const requests = await this.sources.requests(sessionId);
     const index = requests.findIndex((request) => request.id === requestId);
     const request = requests[index];
@@ -29,7 +29,7 @@ export class CheckpointCommands {
         id: request.id,
         sessionResource: sessionResource(sessionId),
         message: { text: request.message, parts: [] },
-        messageText: request.message,
+        messageText: refill ? request.message : '',
         attachedContext: []
       })
     );
