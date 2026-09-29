@@ -71,17 +71,14 @@ describe('SessionStore', () => {
     const current = async (): Promise<string | null | undefined> =>
       change.read(await store.detail(SESSION_ID, 1));
 
+    const changedAt = Date.now();
     change.expect();
     expect(await current()).toBe(change.phone);
 
-    const logged = new Promise<void>((resolve) => {
-      store.onDidChange((sessionId) => {
-        if (sessionId === SESSION_ID) resolve();
-      });
-    });
-    await appendFile(join(sessions, `${SESSION_ID}.jsonl`), logLines(change.mutation));
-    await logged;
-    expect(await current()).toBe(change.logged);
+    const log = join(sessions, `${SESSION_ID}.jsonl`);
+    await appendFile(log, logLines(change.mutation));
+    await utimes(log, new Date(changedAt - 5), new Date(changedAt - 5));
+    await expect.poll(current, { timeout: 3000 }).toBe(change.logged);
   });
 
   it('hides removed requests until the log is written', async () => {
@@ -96,14 +93,8 @@ describe('SessionStore', () => {
     store.expectRemoved(SESSION_ID, 'r2');
     expect(await messages()).toEqual(['Build it']);
 
-    const logged = new Promise<void>((resolve) => {
-      store.onDidChange((sessionId) => {
-        if (sessionId === SESSION_ID) resolve();
-      });
-    });
     await appendFile(log, logLines({ kind: 1, k: ['customTitle'], v: 'Release' }));
-    await logged;
-    expect(await messages()).toEqual(['Build it', 'Ship it']);
+    await expect.poll(messages, { timeout: 5000 }).toEqual(['Build it', 'Ship it']);
   });
 
   it('lists non-empty sessions and follows appended mutations', async () => {
@@ -385,11 +376,6 @@ describe('SessionStore', () => {
     await store.hook({ kind: 'prompt', sessionId: SESSION_ID, at: at + 1000, prompt: 'Next' });
     expect(await ids()).toEqual(['phone:2']);
 
-    const logged = new Promise<void>((resolve) => {
-      store.onDidChange((sessionId) => {
-        if (sessionId === SESSION_ID) resolve();
-      });
-    });
     await appendFile(
       join(sessions, `${SESSION_ID}.jsonl`),
       logLines({
@@ -411,8 +397,7 @@ describe('SessionStore', () => {
         ]
       })
     );
-    await logged;
-    expect(await ids()).toEqual(['q2']);
+    await expect.poll(ids, { timeout: 5000 }).toEqual(['q2']);
     expect(await photoData('q2', 'img')).toBe(PNG.toString('base64'));
   });
 });

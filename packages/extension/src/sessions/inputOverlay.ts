@@ -3,6 +3,7 @@ import type { Expected, SessionEntry } from './sessionEntry';
 import { requestsOf } from './sessionSummary';
 
 const INPUT_OVERLAY_MS = 120_000;
+const COARSE_MTIME_LAG_MS = 20;
 
 export function expectedOr<T>(expected: Expected<T> | null, logged: T): T {
   return expected && Date.now() - expected.at < INPUT_OVERLAY_MS ? expected.value : logged;
@@ -17,8 +18,9 @@ export function withoutRemoved(root: unknown, removed: Expected<string> | null):
 }
 
 export function clearLoggedInputs(entry: SessionEntry, modified: number): void {
-  if (entry.permission && modified >= entry.permission.at) entry.permission = null;
-  if (entry.mode && modified >= entry.mode.at) entry.mode = null;
-  if (entry.model && modified >= entry.model.at) entry.model = null;
-  if (entry.removed && modified >= entry.removed.at) entry.removed = null;
+  const written = modified + COARSE_MTIME_LAG_MS;
+  if (entry.permission && written >= entry.permission.at) entry.permission = null;
+  if (entry.mode && written >= entry.mode.at) entry.mode = null;
+  if (entry.model && written >= entry.model.at) entry.model = null;
+  if (entry.removed && written >= entry.removed.at) entry.removed = null;
 }
