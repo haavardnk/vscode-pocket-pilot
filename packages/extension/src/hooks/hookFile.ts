@@ -25,7 +25,7 @@ export function hookHeadersPath(storage: string): string {
   return join(storage, 'hook-headers');
 }
 
-export function hookFileContent(port: number, headersFile: string): string {
+function hookFileContent(port: number, headersFile: string): string {
   const url = `http://${LOOPBACK}:${port}${HOOK_PATH}`;
   const sh = `'@${headersFile.replaceAll("'", "'\\''")}'`;
   const powershell = `'@${headersFile.replaceAll("'", "''")}'`;

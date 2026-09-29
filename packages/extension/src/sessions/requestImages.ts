@@ -83,7 +83,7 @@ function isByte(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 255;
 }
 
-export function imageBytes(value: unknown): Buffer | null {
+function imageBytes(value: unknown): Buffer | null {
   const encoded = asString(asRecord(value).$base64);
   if (encoded !== null) return Buffer.from(encoded, 'base64');
   const values = Array.isArray(value) ? value : Object.values(asRecord(value));

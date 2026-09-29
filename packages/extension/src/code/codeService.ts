@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { CodeQuery, CodeResult, FileChange, TreeEntry } from '@pocket-pilot/protocol';
 
-import { diffBlobs, type DiffCounts, diffCounts } from './diff';
+import { diffBlobs, type DiffCounts, diffCounts, UNKNOWN_COUNTS } from './diff';
 import { fileContent, readBlob } from './files';
 import { type CodeFolder, locate } from './folders';
 import {
@@ -18,7 +18,6 @@ import type { SessionChanges } from './sessionChanges';
 import { listDirectory } from './tree';
 
 const MAX_CHANGES = 2000;
-const UNKNOWN_COUNTS: DiffCounts = { additions: null, deletions: null };
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 

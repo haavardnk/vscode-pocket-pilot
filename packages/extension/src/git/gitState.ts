@@ -20,7 +20,7 @@ export interface GitRef {
   readonly remote?: string;
 }
 
-export interface GitWorktree {
+interface GitWorktree {
   readonly path: string;
   readonly ref: string;
   readonly detached: boolean;

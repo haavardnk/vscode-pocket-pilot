@@ -3,11 +3,10 @@ import type { ResponsePart, SessionDetail } from '@pocket-pilot/protocol';
 import type { EditingSessions } from '../sessions/editingState';
 import type { LiveEdit, LiveEdits } from '../sessions/liveEdits';
 import { stopEdit, type Timeline } from '../sessions/timeline';
-import { diffBlobs, type DiffCounts, diffCounts } from './diff';
+import { diffBlobs, type DiffCounts, diffCounts, UNKNOWN_COUNTS } from './diff';
 import { textBlob } from './files';
 
 const MAX_CACHED = 2000;
-const UNKNOWN: DiffCounts = { additions: null, deletions: null };
 
 export interface EditTarget {
   requestId: string;
@@ -73,12 +72,12 @@ export class EditChanges {
     target: EditTarget,
     timeline: TimelineLoader
   ): Promise<DiffCounts> {
-    if (target.stopId === null && target.callId === null) return UNKNOWN;
+    if (target.stopId === null && target.callId === null) return UNKNOWN_COUNTS;
     const key = cacheKey(sessionId, target);
     const cached = this.counts.get(key);
     if (cached) return cached;
     const edit = await this.resolve(sessionId, target, timeline);
-    if (!edit) return UNKNOWN;
+    if (!edit) return UNKNOWN_COUNTS;
     const counts = diffCounts(diffBlobs(edit.before, edit.after));
     if (!edit.final) return counts;
     this.counts.set(key, counts);

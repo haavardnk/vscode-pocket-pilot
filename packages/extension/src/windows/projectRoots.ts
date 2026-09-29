@@ -2,8 +2,8 @@ import type { Dirent } from 'node:fs';
 import { readdir } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
-export const MAX_DEPTH = 2;
-export const MAX_PROJECTS = 1000;
+const MAX_DEPTH = 2;
+const MAX_PROJECTS = 1000;
 
 const SKIPPED = new Set(['node_modules']);
 

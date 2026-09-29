@@ -11,7 +11,7 @@ import type {
 import { type EditingEntry, type EditingSessions, EMPTY_HASH } from '../sessions/editingState';
 import type { LiveEdits, LiveSpan } from '../sessions/liveEdits';
 import { requestEdit, requestPaths, type Timeline } from '../sessions/timeline';
-import { diffBlobs, diffCounts } from './diff';
+import { diffBlobs, diffCounts, UNKNOWN_COUNTS } from './diff';
 import type { EditChanges, EditTarget } from './editChanges';
 import { type Blob, textBlob } from './files';
 import { type CodeFolder, type FolderLocation, locate } from './folders';
@@ -208,7 +208,7 @@ export class SessionChanges {
         change: changeKind(before.blob, after, known),
         state,
         baseline: before.kind,
-        ...(known ? diffCounts(diff) : { additions: null, deletions: null })
+        ...(known ? diffCounts(diff) : UNKNOWN_COUNTS)
       }
     };
   }

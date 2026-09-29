@@ -12,6 +12,8 @@ export interface DiffCounts {
   deletions: number | null;
 }
 
+export const UNKNOWN_COUNTS: DiffCounts = { additions: null, deletions: null };
+
 export function diffBlobs(before: Blob, after: Blob): DiffContent {
   if (before === 'tooLarge' || after === 'tooLarge') return { kind: 'tooLarge' };
   const oldData = before === 'missing' ? Buffer.alloc(0) : before;
@@ -39,7 +41,7 @@ export function diffBlobs(before: Blob, after: Blob): DiffContent {
 }
 
 export function diffCounts(diff: DiffContent): DiffCounts {
-  if (diff.kind !== 'text') return { additions: null, deletions: null };
+  if (diff.kind !== 'text') return UNKNOWN_COUNTS;
   const lines = diff.hunks.flatMap((hunk) => hunk.lines);
   return {
     additions: lines.filter((line) => line.startsWith('+')).length,
