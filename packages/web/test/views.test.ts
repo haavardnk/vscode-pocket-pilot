@@ -177,7 +177,7 @@ describe('terminalTargets', () => {
 });
 
 describe('labels', () => {
-  const agents = [{ id: 'agent', name: 'Agent', description: null, builtin: true }];
+  const agents = [{ id: 'agent', name: 'Agent', description: null, builtin: true, handoffs: [] }];
   const models = [
     {
       id: 'copilot/gpt-5',
@@ -230,6 +230,7 @@ describe('response parts', () => {
       timestamp: 0,
       message: 'm',
       modelId: null,
+      agentName: null,
       state: 'pending' as const,
       error: null,
       parts

@@ -59,7 +59,24 @@ const window: WindowState = {
   ],
   terminals: [],
   canOrganize: true,
-  agents: [{ id: 'agent', name: 'Agent', description: null, builtin: true }],
+  agents: [
+    { id: 'agent', name: 'Agent', description: null, builtin: true, handoffs: [] },
+    {
+      id: 'plan',
+      name: 'Plan',
+      description: null,
+      builtin: true,
+      handoffs: [
+        {
+          id: 'agent:start-implementation',
+          label: 'Start Implementation',
+          agent: 'agent',
+          prompt: 'Start implementation',
+          send: true
+        }
+      ]
+    }
+  ],
   models: []
 };
 
@@ -70,6 +87,7 @@ const turn = (id: string, parts: ResponsePart[]): RequestView => ({
   timestamp: 1,
   message: id,
   modelId: null,
+  agentName: null,
   state: 'pending',
   error: null,
   parts

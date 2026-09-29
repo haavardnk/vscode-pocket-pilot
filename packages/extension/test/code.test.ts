@@ -121,6 +121,7 @@ describe('code queries', () => {
     timestamp,
     message,
     modelId: null,
+    agentName: null,
     state: 'complete',
     error: null,
     parts: paths.map((path) => ({

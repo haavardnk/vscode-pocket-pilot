@@ -153,6 +153,7 @@ export const requestViewSchema = z.object({
   timestamp: z.number(),
   message: z.string(),
   modelId: z.string().nullable(),
+  agentName: z.string().nullable(),
   state: requestStateSchema,
   error: z.string().nullable(),
   parts: z.array(responsePartSchema)
@@ -181,11 +182,20 @@ export const sessionDetailSchema = z.object({
   queued: z.array(queuedRequestSchema)
 });
 
+export const handoffSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  agent: z.string(),
+  prompt: z.string(),
+  send: z.boolean()
+});
+
 export const agentSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullable(),
-  builtin: z.boolean()
+  builtin: z.boolean(),
+  handoffs: z.array(handoffSchema)
 });
 
 export const modelConfigKeySchema = z.enum(['reasoningEffort', 'contextSize']);
@@ -249,6 +259,7 @@ export type RequestView = z.infer<typeof requestViewSchema>;
 export type Delivery = z.infer<typeof deliverySchema>;
 export type QueuedRequest = z.infer<typeof queuedRequestSchema>;
 export type SessionDetail = z.infer<typeof sessionDetailSchema>;
+export type Handoff = z.infer<typeof handoffSchema>;
 export type Agent = z.infer<typeof agentSchema>;
 export type ModelConfigKey = z.infer<typeof modelConfigKeySchema>;
 export type ConfigValue = z.infer<typeof configValueSchema>;

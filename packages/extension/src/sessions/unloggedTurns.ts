@@ -46,6 +46,7 @@ export function pendingTurns(
     timestamp: turn.at,
     message: turn.content,
     modelId,
+    agentName: null,
     state: turn === last && !settled ? 'pending' : 'complete',
     error: null,
     parts: activityParts(turn.events, statuses, false)

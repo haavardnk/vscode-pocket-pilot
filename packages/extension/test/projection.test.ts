@@ -287,6 +287,16 @@ describe('projection', () => {
     );
   });
 
+  it('names the custom agent each request ran in', () => {
+    const custom = { kind: 'agent', isBuiltin: false, modeInstructions: { name: 'Plan' } };
+    const root = snapshot([
+      { ...request('r1', 'plan', 1), modeInfo: custom },
+      { ...request('r2', 'go', 1), modeInfo: { kind: 'agent', isBuiltin: true } }
+    ]);
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 2, quiet, []);
+    expect(detail.requests.map((item) => item.agentName)).toEqual(['Plan', null]);
+  });
+
   const carousel = (extra: object) => ({
     kind: 'questionCarousel',
     resolveId: 'q1',

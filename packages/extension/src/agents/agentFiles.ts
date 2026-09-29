@@ -1,14 +1,21 @@
-import type { Agent } from '@pocket-pilot/protocol';
+import type { Agent, Handoff } from '@pocket-pilot/protocol';
 import { parse } from 'yaml';
 
-import { asRecord, asString } from '../json';
+import { asArray, asRecord, asString } from '../json';
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
 const AGENT_SUFFIX = /\.agent\.md$|\.chatmode\.md$|\.md$/;
 const MARKDOWN_FOLDERS = ['/.github/agents', '/.claude/agents', '/.copilot/agents'];
+const DESKTOP_EDITOR = 'untitled:';
 
 export const BUILTIN_AGENTS: readonly Agent[] = [
-  { id: 'agent', name: 'Agent', description: 'Describe what to build', builtin: true }
+  {
+    id: 'agent',
+    name: 'Agent',
+    description: 'Describe what to build',
+    builtin: true,
+    handoffs: []
+  }
 ];
 
 export interface AgentFileRef {
@@ -34,6 +41,25 @@ function frontmatter(text: string): Record<string, unknown> {
   }
 }
 
+function handoffs(value: unknown): Handoff[] {
+  const parsed = asArray(value).flatMap((raw) => {
+    const item = asRecord(raw);
+    const agent = asString(item.agent);
+    const label = asString(item.label);
+    const prompt = asString(item.prompt);
+    if (!agent || !label?.trim() || prompt === null || prompt.includes(DESKTOP_EDITOR)) return [];
+    const slug = label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const send = item.send === true || item.send === 'true';
+    return [{ id: `${agent}:${slug}`, label, agent, prompt, send }];
+  });
+  return parsed.filter(
+    (handoff, index) => parsed.findIndex((other) => other.id === handoff.id) === index
+  );
+}
+
 export function parseAgentFile(ref: AgentFileRef, text: string): Agent | null {
   const header = frontmatter(text);
   if (header['user-invocable'] === false || header['user-invokable'] === false) return null;
@@ -43,6 +69,7 @@ export function parseAgentFile(ref: AgentFileRef, text: string): Agent | null {
     id: ref.id,
     name,
     description: asString(header.description)?.trim() || null,
-    builtin: ref.builtin
+    builtin: ref.builtin,
+    handoffs: handoffs(header.handoffs)
   };
 }

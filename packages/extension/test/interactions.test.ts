@@ -44,7 +44,16 @@ const detail = (parts: ResponsePart[]): SessionDetail => ({
   editedFiles: 0,
   todos: null,
   requests: [
-    { id: 'r', timestamp: 0, message: 'go', modelId: null, state: 'needsInput', error: null, parts }
+    {
+      id: 'r',
+      timestamp: 0,
+      message: 'go',
+      modelId: null,
+      agentName: null,
+      state: 'needsInput',
+      error: null,
+      parts
+    }
   ],
   queued: []
 });

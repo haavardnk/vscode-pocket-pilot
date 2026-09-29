@@ -35,6 +35,13 @@ export const commandSchema = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('stop'), ...sessionTarget }),
   z.object({ kind: z.literal('setMode'), ...sessionTarget, modeId: z.string().min(1) }),
+  z.object({
+    kind: z.literal('handoff'),
+    ...sessionTarget,
+    agentId: z.string().min(1),
+    handoffId: z.string().min(1),
+    autopilot: z.boolean()
+  }),
   z.object({ kind: z.literal('setModel'), ...sessionTarget, modelId: z.string().min(1) }),
   z.object({
     kind: z.literal('toolDecision'),

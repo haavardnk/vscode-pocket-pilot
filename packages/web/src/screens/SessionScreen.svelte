@@ -11,6 +11,7 @@
     Agent,
     ConfigValue,
     Delivery,
+    Handoff,
     Model,
     ModelConfigOption,
     PermissionLevel,
@@ -22,6 +23,7 @@
   import { setChatRepository } from '../lib/chatRepository';
   import Composer from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
+  import HandoffBar from '../lib/components/HandoffBar.svelte';
   import Loading from '../lib/components/Loading.svelte';
   import ModelSheet from '../lib/components/ModelSheet.svelte';
   import ModeSheet from '../lib/components/ModeSheet.svelte';
@@ -33,6 +35,7 @@
   import TodoList from '../lib/components/TodoList.svelte';
   import { windowRef } from '../lib/git';
   import { windowGitHub } from '../lib/github';
+  import { handoffSource } from '../lib/hub/handoffs';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { getPane } from '../lib/pane';
   import { inChat, parseRoute, routeHash } from '../lib/routing';
@@ -58,8 +61,10 @@
   let sheet = $state<'mode' | 'model' | 'permission' | 'actions' | null>(null);
   let deciding = $state(false);
   let stopping = $state(false);
+  let handingOff = $state(false);
   let echo = $state<{ text: string; after: string | null } | null>(null);
   let root = $state<HTMLElement>();
+  let composer = $state<ReturnType<typeof Composer>>();
   let followBottom = true;
   let scrolled = 0;
 
@@ -81,6 +86,9 @@
   const connected = $derived(hub.connection === 'open' && hostWindow !== undefined);
   const echoing = $derived(
     echo && detail && (detail.requests.at(-1)?.id ?? null) === echo.after ? echo.text : null
+  );
+  const handoffAgent = $derived(
+    detail && hostWindow && !echoing ? handoffSource(hostWindow.agents, detail, modeId) : null
   );
 
   $effect(() => {
@@ -152,6 +160,25 @@
 
   function changeQueue(expected: string[], queue: QueueEntry[]): Promise<boolean> {
     return run(() => hub.command({ kind: 'setQueue', windowId, sessionId, expected, queue }));
+  }
+
+  async function handoff(agent: Agent, item: Handoff, autopilot: boolean): Promise<void> {
+    followBottom = true;
+    handingOff = true;
+    if (item.send) echo = { text: item.prompt, after: detail?.requests.at(-1)?.id ?? null };
+    const done = await run(() =>
+      hub.command({
+        kind: 'handoff',
+        windowId,
+        sessionId,
+        agentId: agent.id,
+        handoffId: item.id,
+        autopilot
+      })
+    );
+    handingOff = false;
+    if (!done) echo = null;
+    else if (!item.send) composer?.fill(item.prompt);
   }
 
   async function stop(): Promise<void> {
@@ -342,7 +369,16 @@
             </div>
           </div>
         {/if}
+        {#if handoffAgent}
+          {@const agent = handoffAgent}
+          <HandoffBar
+            {agent}
+            disabled={handingOff || !connected}
+            onselect={(item, autopilot) => void handoff(agent, item, autopilot)}
+          />
+        {/if}
         <Composer
+          bind:this={composer}
           {busy}
           disabled={!connected}
           agentLabel={agentLabel(hostWindow.agents, modeId)}

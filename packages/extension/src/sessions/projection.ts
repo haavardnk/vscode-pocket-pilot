@@ -309,6 +309,7 @@ function projectRequest(request: JsonRecord, latest: boolean, activity: Activity
     timestamp: asNumber(request.timestamp) ?? 0,
     message: requestText(request),
     modelId: asString(request.modelId),
+    agentName: asString(asRecord(asRecord(request.modeInfo).modeInstructions).name),
     state,
     error: state === 'failed' ? (asString(error.message) ?? 'Request failed') : null,
     parts: mergeParts(parts)

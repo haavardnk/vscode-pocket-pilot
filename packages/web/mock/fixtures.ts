@@ -26,13 +26,45 @@ const MINUTE = 60_000;
 const RED = 1;
 export const GREEN = 2;
 
+const PLAN_AGENT =
+  'vscode-userdata:/User/globalStorage/github.copilot-chat/plan-agent/Plan.agent.md';
+
 const AGENTS: WindowState['agents'] = [
-  { id: 'agent', name: 'Agent', description: 'Edits files and runs tools', builtin: true },
+  {
+    id: 'agent',
+    name: 'Agent',
+    description: 'Edits files and runs tools',
+    builtin: true,
+    handoffs: []
+  },
+  {
+    id: PLAN_AGENT,
+    name: 'Plan',
+    description: 'Researches and outlines multi-step plans',
+    builtin: true,
+    handoffs: [
+      {
+        id: 'agent:start-implementation',
+        label: 'Start Implementation',
+        agent: 'agent',
+        prompt: 'Start implementation',
+        send: true
+      },
+      {
+        id: 'Plan:refine-the-plan',
+        label: 'Refine the Plan',
+        agent: 'Plan',
+        prompt: 'Refine the plan: ',
+        send: false
+      }
+    ]
+  },
   {
     id: 'file:///repo/.github/agents/reviewer.agent.md',
     name: 'Reviewer',
     description: 'Reviews changes',
-    builtin: false
+    builtin: false,
+    handoffs: []
   }
 ];
 
@@ -323,6 +355,7 @@ export function initialWindows(now: number): MockWindow[] {
               timestamp: now - 3 * MINUTE,
               message: 'Build the phone app with a session list and composer.',
               modelId: 'copilot/claude-opus',
+              agentName: null,
               state: 'pending',
               error: null,
               parts: [
@@ -388,6 +421,7 @@ export function initialWindows(now: number): MockWindow[] {
               timestamp: now - 30 * MINUTE,
               message: 'Why does the cluster test time out?',
               modelId: 'copilot/gpt-5',
+              agentName: 'Reviewer',
               state: 'complete',
               error: null,
               parts: [
@@ -449,6 +483,7 @@ export function initialWindows(now: number): MockWindow[] {
               timestamp: now - 10 * MINUTE,
               message: 'Plan the 0.2 release.',
               modelId: 'copilot/claude-opus',
+              agentName: null,
               state: 'needsInput',
               error: null,
               parts: [
@@ -508,6 +543,35 @@ export function initialWindows(now: number): MockWindow[] {
           ]
         },
         {
+          id: 's6',
+          title: 'Plan offline mode',
+          status: 'idle',
+          modelId: 'copilot/claude-opus',
+          modeId: PLAN_AGENT,
+          permission: 'default',
+          editedFiles: 0,
+          todos: null,
+          totalRequests: 1,
+          requests: [
+            {
+              id: 'r6',
+              timestamp: now - 45 * MINUTE,
+              message: 'Plan offline mode for the phone app.',
+              modelId: 'copilot/claude-opus',
+              agentName: 'Plan',
+              state: 'complete',
+              error: null,
+              parts: [
+                {
+                  kind: 'markdown',
+                  text: '## Plan: Offline mode\n\n1. Cache the last snapshot.\n2. Queue commands while offline.'
+                }
+              ]
+            }
+          ],
+          queued: []
+        },
+        {
           id: 's5',
           title: 'Bump dependencies',
           status: 'idle',
@@ -523,6 +587,7 @@ export function initialWindows(now: number): MockWindow[] {
               timestamp: now - 80 * MINUTE,
               message: 'Bump the web dependencies.',
               modelId: 'copilot/gpt-5',
+              agentName: null,
               state: 'complete',
               error: null,
               parts: [{ kind: 'markdown', text: 'Bumped Svelte and Vite.' }]
@@ -581,6 +646,7 @@ export function initialWindows(now: number): MockWindow[] {
               timestamp: now - 60 * MINUTE,
               message: 'Speed up demosaic.',
               modelId: 'copilot/claude-opus',
+              agentName: null,
               state: 'complete',
               error: null,
               parts: [

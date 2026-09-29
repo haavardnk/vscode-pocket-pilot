@@ -299,6 +299,21 @@ export class MockHub {
       this.changed(window, detail.id);
       return;
     }
+    if (command.kind === 'handoff') {
+      const agents = window.state.agents;
+      const handoff = agents
+        .find((agent) => agent.id === command.agentId)
+        ?.handoffs.find((item) => item.id === command.handoffId);
+      if (!handoff) throw new Error('This handoff is no longer offered');
+      const target =
+        agents.find((agent) => agent.id === handoff.agent) ??
+        agents.find((agent) => agent.name === handoff.agent);
+      if (target) detail.modeId = target.id;
+      if (command.autopilot) detail.permission = 'autopilot';
+      this.changed(window, detail.id);
+      if (handoff.send) this.later(() => this.ask(window, detail.id, handoff.prompt));
+      return;
+    }
     if (command.kind === 'setPermission') detail.permission = command.level;
     if (command.kind === 'setMode') detail.modeId = command.modeId;
     if (command.kind === 'setModel') detail.modelId = command.modelId;
@@ -313,6 +328,9 @@ export class MockHub {
       timestamp: Date.now(),
       message: text,
       modelId: detail.modelId,
+      agentName:
+        window.state.agents.find((agent) => agent.id === detail.modeId && agent.id !== 'agent')
+          ?.name ?? null,
       state: 'pending',
       error: null,
       parts: [

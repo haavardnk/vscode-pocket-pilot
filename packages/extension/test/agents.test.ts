@@ -34,8 +34,67 @@ describe('agent files', () => {
     ).toEqual({
       id: 'x',
       builtin: false,
+      handoffs: [],
       ...expected
     });
+  });
+
+  it.each([
+    [
+      [
+        '- label: Start Implementation',
+        '  agent: agent',
+        '  prompt: Start implementation',
+        '  send: true'
+      ],
+      [
+        {
+          id: 'agent:start-implementation',
+          label: 'Start Implementation',
+          agent: 'agent',
+          prompt: 'Start implementation',
+          send: true
+        }
+      ]
+    ],
+    [
+      ['- label: "  Review it! "', '  agent: Reviewer', '  prompt: ""'],
+      [
+        {
+          id: 'Reviewer:review-it',
+          label: '  Review it! ',
+          agent: 'Reviewer',
+          prompt: '',
+          send: false
+        }
+      ]
+    ],
+    [
+      [
+        '- { label: Go, agent: agent, prompt: first }',
+        '- { label: go, agent: agent, prompt: second }',
+        '- { label: " ", agent: agent, prompt: x }',
+        '- { label: No agent, prompt: x }',
+        '- { label: No prompt, agent: agent }',
+        '- plain'
+      ],
+      [{ id: 'agent:go', label: 'Go', agent: 'agent', prompt: 'first', send: false }]
+    ],
+    [
+      [
+        '- label: Open in Editor',
+        '  agent: agent',
+        "  prompt: '#createFile the plan as is into an untitled file (`untitled:plan-${camelCaseName}.prompt.md` without frontmatter) for further refinement.'",
+        '  send: true',
+        '  showContinueOn: false'
+      ],
+      []
+    ]
+  ])('parses handoffs %#', (lines, expected) => {
+    const text = `---\nname: Plan\nhandoffs:\n${lines.map((line) => `  ${line}`).join('\n')}\n---\n`;
+    expect(
+      parseAgentFile({ id: 'x', fileName: 'Plan.agent.md', builtin: true }, text)?.handoffs
+    ).toEqual(expected);
   });
 
   it('hides agents that are not user invocable', () => {

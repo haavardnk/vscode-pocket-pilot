@@ -38,8 +38,14 @@
   let text = $state('');
   let delivery = $state<Delivery>('queued');
   let sending = $state(false);
+  let input = $state<HTMLTextAreaElement>();
 
   const ready = $derived(text.trim().length > 0 && !disabled && !sending);
+
+  export function fill(value: string): void {
+    text = value;
+    input?.focus();
+  }
 
   async function submit(): Promise<void> {
     if (!ready) return;
@@ -118,6 +124,7 @@
       class="textarea field-sizing-content max-h-40 min-h-11 flex-1 resize-none text-base"
       rows="1"
       bind:value={text}
+      bind:this={input}
       {placeholder}
       aria-label="Message"
       onkeydown={keydown}></textarea>

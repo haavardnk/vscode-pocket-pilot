@@ -53,6 +53,11 @@ function sessionResource(sessionId: string): vscode.Uri {
   });
 }
 
+interface HandoffResult {
+  success: boolean;
+  error?: string;
+}
+
 export class Controller {
   constructor(private readonly sources: ControllerSources) {}
 
@@ -92,6 +97,9 @@ export class Controller {
           sessionResource: sessionResource(command.sessionId)
         });
         this.sources.expectMode(command.sessionId, command.modeId);
+        return;
+      case 'handoff':
+        await this.handoff(command);
         return;
       case 'setModel':
         await this.selectModel(await this.requireModel(command.modelId));
@@ -227,6 +235,33 @@ export class Controller {
     for (const path of command.path === null ? files : [command.path]) {
       await vscode.commands.executeCommand(action, vscode.Uri.file(path));
     }
+  }
+
+  private async handoff(command: Extract<Command, { kind: 'handoff' }>): Promise<void> {
+    const agents = await this.sources.agents();
+    const handoff = agents
+      .find((agent) => agent.id === command.agentId)
+      ?.handoffs.find((item) => item.id === command.handoffId);
+    if (!handoff) throw new Error('This handoff is no longer offered');
+    if (command.autopilot) {
+      await this.submit(command.sessionId, PERMISSION_COMMANDS.autopilot);
+      this.sources.expectPermission(command.sessionId, 'autopilot');
+    } else {
+      await this.focus(command.sessionId);
+    }
+    const result = await vscode.commands.executeCommand<HandoffResult | undefined>(
+      'workbench.action.chat.executeHandoff',
+      {
+        id: handoff.id,
+        sessionResource: sessionResource(command.sessionId).toString(),
+        sourceCustomAgent: command.agentId
+      }
+    );
+    if (!result?.success) throw new Error(result?.error ?? 'VS Code could not run the handoff');
+    const target =
+      agents.find((agent) => agent.id === handoff.agent) ??
+      agents.find((agent) => agent.name === handoff.agent);
+    if (target) this.sources.expectMode(command.sessionId, target.id);
   }
 
   private async setQueue(command: Extract<Command, { kind: 'setQueue' }>): Promise<void> {
