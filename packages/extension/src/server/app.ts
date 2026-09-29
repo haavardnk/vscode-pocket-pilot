@@ -1,4 +1,5 @@
 import type { Server } from 'node:http';
+import { posix } from 'node:path';
 
 import fastifyCookie from '@fastify/cookie';
 import fastifyHelmet from '@fastify/helmet';
@@ -241,7 +242,6 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
 
   await app.register(fastifyStatic, {
     root: options.webRoot,
-    wildcard: false,
     setHeaders: (reply, file) => {
       const immutable = /[/\\]assets[/\\]/.test(file);
       reply.header('cache-control', immutable ? 'public, max-age=31536000, immutable' : 'no-cache');
@@ -249,7 +249,8 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   });
 
   app.setNotFoundHandler((request, reply) => {
-    if (request.method !== 'GET' || request.url.startsWith('/api/')) {
+    const file = posix.extname(request.url.split('?')[0] ?? '') !== '';
+    if (request.method !== 'GET' || request.url.startsWith('/api/') || file) {
       return reply.code(404).send({ error: 'Not found' });
     }
     return reply.header('cache-control', 'no-cache').sendFile('index.html');

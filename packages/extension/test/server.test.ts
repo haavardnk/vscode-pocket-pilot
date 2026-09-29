@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { type IncomingHttpHeaders, type IncomingMessage, request } from 'node:http';
 import { type AddressInfo, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -191,6 +191,21 @@ describe('server', () => {
   it('sends a returning sign-in to the app', async () => {
     const response = await send(fixture, '/signin', { tunnel: true, headers: viaTunnel() });
     expect([response.status, response.headers.location]).toEqual([302, '/']);
+  });
+
+  it('serves web files installed after start and refuses missing ones', async () => {
+    await mkdir(join(fixture.folder, 'assets'), { recursive: true });
+    await writeFile(join(fixture.folder, 'assets', 'index-new.js'), 'export {};');
+    const get = (path: string): Promise<Response> =>
+      send(fixture, path, { tunnel: true, headers: viaTunnel() });
+    const [script, missing, page] = await Promise.all([
+      get('/assets/index-new.js'),
+      get('/assets/index-old.js?v=1'),
+      get('/chats')
+    ]);
+    expect([script.status, script.body]).toEqual([200, 'export {};']);
+    expect(missing.status).toBe(404);
+    expect([page.status, page.body]).toEqual([200, '<!doctype html><title>app</title>']);
   });
 
   it('refuses cluster links through the tunnel', async () => {
