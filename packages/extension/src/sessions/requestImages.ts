@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+
 import {
   type ImageResult,
   type RequestImage,
@@ -47,6 +50,10 @@ function sniffedType(value: unknown): ShownImageType | null {
   return match?.mimeType ?? null;
 }
 
+export function bytesType(bytes: Uint8Array): ShownImageType | null {
+  return sniffedType([...bytes.subarray(0, HEADER_BYTES)]);
+}
+
 function hasData(value: unknown): boolean {
   if (Array.isArray(value)) return value.length > 0;
   const record = asRecord(value);
@@ -92,6 +99,17 @@ export function requestImage(request: JsonRecord, imageId: string): ImageResult 
   const image = imageVariables(request).find((variable) => variable.id === imageId);
   const bytes = image ? imageBytes(image.value) : null;
   if (!image || !bytes || bytes.length === 0) return null;
+  return shownImage(image.mimeType, bytes);
+}
+
+export async function fileImage(image: RequestImage): Promise<ImageResult | null> {
+  if (!image.id.startsWith('file:')) return null;
+  const bytes = await readFile(fileURLToPath(image.id)).catch(() => null);
+  if (!bytes || bytes.length === 0) return null;
+  return shownImage(image.mimeType, bytes);
+}
+
+function shownImage(mimeType: ShownImageType, bytes: Buffer): ImageResult {
   if (bytes.length > MAX_SHOWN_IMAGE_BYTES) throw new Error('Photo is too large to show');
-  return { kind: 'requestImage', mimeType: image.mimeType, data: bytes.toString('base64') };
+  return { kind: 'requestImage', mimeType, data: bytes.toString('base64') };
 }

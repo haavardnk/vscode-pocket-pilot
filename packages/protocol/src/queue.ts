@@ -7,6 +7,17 @@ export type QueueEntry = Extract<Command, { kind: 'setQueue' }>['queue'][number]
 
 export type QueuePlan = { kind: 'remove'; ids: string[] } | { kind: 'rewrite' };
 
+export function queueEntry({
+  id,
+  delivery,
+  text,
+  modeId,
+  modelId,
+  permission
+}: QueuedRequest): QueueEntry {
+  return { id, delivery, text, modeId, modelId, permission, images: null };
+}
+
 export function queuePlan(
   current: readonly QueuedRequest[],
   expected: readonly string[],
@@ -33,7 +44,15 @@ export function queuePlan(
   const removed = current.filter((item) => !ids.includes(item.id));
   const unchanged = kept.every((item, index) => {
     const entry = queue[index];
-    return entry?.id === item.id && entry.delivery === item.delivery && entry.text === item.text;
+    return (
+      entry?.id === item.id &&
+      entry.delivery === item.delivery &&
+      entry.text === item.text &&
+      entry.modeId === item.modeId &&
+      entry.modelId === item.modelId &&
+      entry.permission === item.permission &&
+      entry.images === null
+    );
   });
   if (unchanged && removed.every((item) => !item.id.startsWith(PHONE_QUEUE_PREFIX))) {
     return { kind: 'remove', ids: removed.map((item) => item.id) };

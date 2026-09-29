@@ -107,6 +107,18 @@ describe('projection', () => {
         {
           id: 'q1',
           kind: 'steering',
+          sendOptions: {
+            modeInfo: {
+              isBuiltin: false,
+              modeId: 'custom',
+              permissionLevel: 'autopilot',
+              modeInstructions: {
+                uri: { $mid: 1, external: 'vscode-userdata:/agents/Plan.agent.md' },
+                name: 'Plan'
+              }
+            },
+            userSelectedModelId: 'copilot/gpt-5'
+          },
           request: {
             message: { text: 'faster #file:a.ts' },
             variableData: {
@@ -116,10 +128,19 @@ describe('projection', () => {
                 { id: 'rules', kind: 'promptFile', automaticallyAdded: true },
                 { id: 'owner/repo', kind: 'workspace' },
                 { id: 'ref', kind: 'file', range: { start: 7, endExclusive: 17 } },
-                { id: 'shot', kind: 'image' }
+                { id: 'shot', kind: 'image' },
+                { id: 'photo', kind: 'image', value: { $base64: 'iVBORw0KGgo=' } }
               ]
             }
           }
+        },
+        {
+          id: 'q2',
+          kind: 'queued',
+          sendOptions: {
+            modeInfo: { isBuiltin: true, telemetryModeId: 'ask', permissionLevel: 'bogus' }
+          },
+          request: { message: { text: 'later' } }
         }
       ]
     });
@@ -137,7 +158,26 @@ describe('projection', () => {
     const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, activity, []);
     expect(detail.totalRequests).toBe(2);
     expect(detail.queued).toEqual([
-      { id: 'q1', delivery: 'steering', text: 'faster #file:a.ts', attachments: 1 }
+      {
+        id: 'q1',
+        delivery: 'steering',
+        text: 'faster #file:a.ts',
+        modeId: 'vscode-userdata:/agents/Plan.agent.md',
+        modelId: 'copilot/gpt-5',
+        permission: 'autopilot',
+        images: [{ id: 'photo', name: 'Image', mimeType: 'image/png' }],
+        attachments: 1
+      },
+      {
+        id: 'q2',
+        delivery: 'queued',
+        text: 'later',
+        modeId: 'ask',
+        modelId: null,
+        permission: null,
+        images: [],
+        attachments: 0
+      }
     ]);
     expect(detail.requests).toHaveLength(1);
     expect(detail.requests[0]?.parts).toEqual([

@@ -122,7 +122,7 @@ test('reorders queued messages after warning about attachments', async ({ page }
 
   await row('Tag the release').getByRole('button', { name: 'Move up' }).click();
   const sheet = page.getByRole('dialog', { name: 'Drop attachments?' });
-  await expect(sheet.getByText('2 attachments will be dropped')).toBeVisible();
+  await expect(sheet.getByText('1 attachment will be dropped')).toBeVisible();
   await sheet.getByRole('button', { name: 'Cancel' }).click();
   await expect(sheet).toBeHidden();
   await expect(queue.getByRole('listitem').nth(1)).toContainText('Draft the announcement');
@@ -135,31 +135,76 @@ test('reorders queued messages after warning about attachments', async ({ page }
     /Tag the release/,
     /Draft the announcement/
   ]);
-  await expect(queue.getByRole('img', { name: /attachment/ })).toHaveCount(0);
+  await expect(queue.getByRole('img', { name: /attachment/ })).toHaveCount(1);
+  await expect(
+    row('Draft the announcement').getByRole('img', { name: '1 attachment' })
+  ).toBeVisible();
 });
 
-test('edits, removes and collapses queued messages', async ({ page }) => {
+test('edits queued messages with their agent, model, approvals and photos', async ({ page }) => {
   await openSession(page, 'Plan the release');
   const queue = page.getByRole('list', { name: 'Queued messages' });
-  await queue.getByRole('button', { name: 'Keep the changelog short' }).click();
-  const sheet = page.getByRole('dialog', { name: 'Queued message' });
-  await sheet.getByRole('textbox', { name: 'Queued message' }).fill('Keep the changelog tiny');
-  await sheet.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByRole('dialog', { name: 'Drop attachments?' })).toBeVisible();
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await expect(queue.getByRole('listitem').first()).toContainText('Keep the changelog tiny');
+  const row = (text: string) => queue.getByRole('listitem').filter({ hasText: text });
+  const message = page.getByRole('textbox', { name: 'Message' });
+  const banner = page.getByRole('region', { name: 'Editing queued message' });
+  const attached = page.getByRole('list', { name: 'Attached photos' });
+  await message.fill('Unsent draft');
 
   await queue.getByRole('button', { name: 'Draft the announcement' }).click();
-  await sheet.getByRole('button', { name: 'Remove' }).click();
-  await expect(sheet).toBeHidden();
+  await expect(banner).toBeVisible();
+  await expect(row('Draft the announcement')).toHaveAttribute('aria-current', 'true');
+  await expect(row('Tag the release').getByRole('button', { name: 'Remove' })).toBeDisabled();
+  await expect(message).toHaveValue('Draft the announcement');
+  await expect(attached.getByRole('img')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approvals: Autopilot' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Plan', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Agent' })
+    .getByRole('button', { name: /^Agent/ })
+    .click();
+  await page.getByRole('button', { name: 'Approvals: Autopilot' }).click();
+  await page
+    .getByRole('dialog', { name: 'Approvals' })
+    .getByRole('button', { name: /^Default approvals/ })
+    .click();
+  await message.fill('Draft a short announcement');
+  await page.getByRole('button', { name: 'Send' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Drop attachments?' });
+  await expect(sheet.getByText('1 attachment will be dropped')).toBeVisible();
+  await sheet.getByRole('button', { name: 'Continue' }).click();
+
+  await expect(banner).toHaveCount(0);
+  await expect(message).toHaveValue('Unsent draft');
+  await expect(queue.getByRole('listitem')).toHaveText([
+    /Keep the changelog short/,
+    /Draft a short announcement/,
+    /Tag the release/
+  ]);
+  await expect(
+    row('Draft a short announcement').getByRole('img', { name: '1 attachment' })
+  ).toBeVisible();
+
+  await queue.getByRole('button', { name: 'Draft a short announcement' }).click();
+  await expect(page.getByRole('button', { name: 'Agent', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approvals: Default approvals' })).toBeVisible();
+  await expect(attached.getByRole('img')).toHaveCount(1);
+  await banner.getByRole('button', { name: 'Cancel' }).click();
+  await expect(message).toHaveValue('Unsent draft');
+  await expect(page.getByRole('button', { name: 'Approvals: Bypass approvals' })).toBeVisible();
+});
+
+test('removes and collapses queued messages', async ({ page }) => {
+  await openSession(page, 'Plan the release');
+  const queue = page.getByRole('list', { name: 'Queued messages' });
+  const remove = (text: string) =>
+    queue.getByRole('listitem').filter({ hasText: text }).getByRole('button', { name: 'Remove' });
+  await remove('Draft the announcement').click();
   await expect(queue.getByRole('listitem')).toHaveCount(2);
   await expect(queue).not.toContainText('Draft the announcement');
 
-  await queue
-    .getByRole('listitem')
-    .filter({ hasText: 'Tag the release' })
-    .getByRole('button', { name: 'Remove' })
-    .click();
+  await remove('Tag the release').click();
   await expect(queue.getByRole('listitem')).toHaveCount(1);
   await expect(queue).not.toContainText('Tag the release');
 

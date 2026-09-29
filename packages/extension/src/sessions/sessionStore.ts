@@ -20,12 +20,13 @@ import {
   editedPaths,
   lastRequestAt,
   type LogSummary,
+  pendingRequest,
   projectDetail,
   projectSummary,
   requestText
 } from './projection';
 import { currentQueue } from './queue';
-import { requestImage } from './requestImages';
+import { fileImage, requestImage } from './requestImages';
 import {
   type Expected,
   markOf,
@@ -197,10 +198,16 @@ export class SessionStore {
     imageId: string
   ): Promise<ImageResult | null> {
     const entry = await this.loaded(sessionId);
-    const request = entry
-      ? requestsOf(rootOf(entry)).find((candidate) => candidate.requestId === requestId)
-      : undefined;
-    return request ? requestImage(request, imageId) : null;
+    if (!entry) return null;
+    const root = rootOf(entry);
+    const request =
+      requestsOf(root).find((candidate) => candidate.requestId === requestId) ??
+      pendingRequest(root, requestId);
+    if (request) return requestImage(request, imageId);
+    const image = entry.queue?.items
+      .find((item) => item.id === requestId)
+      ?.images.find((candidate) => candidate.id === imageId);
+    return image ? fileImage(image) : null;
   }
 
   async hook(event: HookEvent): Promise<void> {

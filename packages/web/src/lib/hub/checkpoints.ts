@@ -1,4 +1,4 @@
-import type { PermissionLevel, RequestView } from '@pocket-pilot/protocol';
+import type { PermissionLevel, QueuedRequest, RequestView } from '@pocket-pilot/protocol';
 
 export interface RestoreImpact {
   messages: number;
@@ -6,7 +6,7 @@ export interface RestoreImpact {
 }
 
 export interface MessageEdit {
-  request: RequestView;
+  target: { kind: 'request'; request: RequestView } | { kind: 'queued'; item: QueuedRequest };
   modeId: string | null;
   modelId: string | null;
   permission: PermissionLevel;

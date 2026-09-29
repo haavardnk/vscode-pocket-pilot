@@ -7,6 +7,7 @@ import {
   type Query,
   type QueryResult,
   queuePlan,
+  type RequestImage,
   type ServerMessage,
   type SessionDetail,
   type TerminalDetail,
@@ -217,11 +218,16 @@ export class MockHub {
         this.changed(window, detail.id);
         this.later(() => this.ask(window, detail.id, command.text, command.images));
       } else {
+        const id = this.id('queued');
         detail.queued.push({
-          id: this.id('queued'),
+          id,
           delivery: command.delivery ?? 'queued',
           text: command.text,
-          attachments: command.images.length
+          modeId: detail.modeId,
+          modelId: detail.modelId,
+          permission: detail.permission,
+          images: this.keepPhotos(id, command.images),
+          attachments: 0
         });
         this.changed(window, detail.id);
       }
@@ -232,7 +238,20 @@ export class MockHub {
       detail.queued =
         plan.kind === 'remove'
           ? detail.queued.filter((item) => !plan.ids.includes(item.id))
-          : command.queue.map((item) => ({ ...item, id: this.id('queued'), attachments: 0 }));
+          : command.queue.map(({ images, ...entry }) => {
+              const id = this.id('queued');
+              const before = detail.queued.find((item) => item.id === entry.id);
+              before?.images.forEach((image) => {
+                const photo = this.photos.get(`${entry.id}/${image.id}`);
+                if (photo) this.photos.set(`${id}/${image.id}`, photo);
+              });
+              return {
+                ...entry,
+                id,
+                images: images ? this.keepPhotos(id, images) : (before?.images ?? []),
+                attachments: 0
+              };
+            });
       this.changed(window, detail.id);
       return;
     }
@@ -356,6 +375,14 @@ export class MockHub {
     this.changed(window, detail.id);
   }
 
+  private keepPhotos(requestId: string, images: ImageUpload[]): RequestImage[] {
+    return images.map((image, index) => {
+      const id = `photo-${index + 1}`;
+      this.photos.set(`${requestId}/${id}`, { kind: 'requestImage', ...image });
+      return { id, name: `Photo ${index + 1}`, mimeType: image.mimeType };
+    });
+  }
+
   private ask(
     window: MockWindow,
     sessionId: string,
@@ -365,9 +392,6 @@ export class MockHub {
     const detail = window.details.get(sessionId);
     if (!detail) return;
     const requestId = this.id('request');
-    images.forEach((image, index) =>
-      this.photos.set(`${requestId}/photo-${index + 1}`, { kind: 'requestImage', ...image })
-    );
     detail.requests.push({
       id: requestId,
       timestamp: Date.now(),
@@ -381,11 +405,7 @@ export class MockHub {
       editable: true,
       disabled: false,
       editedPaths: [],
-      images: images.map((image, index) => ({
-        id: `photo-${index + 1}`,
-        name: `Photo ${index + 1}`,
-        mimeType: image.mimeType
-      })),
+      images: this.keepPhotos(requestId, images),
       parts: [
         {
           kind: 'tool',

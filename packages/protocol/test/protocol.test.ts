@@ -197,6 +197,39 @@ describe('protocol', () => {
       }
     ],
     [
+      clientMessageSchema,
+      {
+        type: 'command',
+        requestId: 'r4',
+        command: {
+          kind: 'setQueue',
+          windowId: 'w1',
+          sessionId: 's1',
+          expected: ['q1', 'q2'],
+          queue: [
+            {
+              id: 'q2',
+              delivery: 'queued',
+              text: 'first',
+              modeId: 'agent',
+              modelId: 'copilot/gpt-5',
+              permission: 'autopilot',
+              images: [{ mimeType: 'image/png', data: 'iVBO' }]
+            },
+            {
+              id: 'q1',
+              delivery: 'queued',
+              text: 'second',
+              modeId: null,
+              modelId: null,
+              permission: null,
+              images: null
+            }
+          ]
+        }
+      }
+    ],
+    [
       serverMessageSchema,
       {
         type: 'snapshot',
@@ -297,6 +330,25 @@ describe('protocol', () => {
         modeId: null,
         modelId: null,
         permission: 'default'
+      }
+    }),
+    JSON.stringify({
+      type: 'command',
+      requestId: 'r',
+      command: {
+        kind: 'setQueue',
+        windowId: 'w1',
+        sessionId: 's1',
+        expected: ['q1', 'q2'],
+        queue: ['q1', 'q2'].map((id) => ({
+          id,
+          delivery: 'queued',
+          text: id,
+          modeId: null,
+          modelId: null,
+          permission: null,
+          images: []
+        }))
       }
     }),
     JSON.stringify({ type: 'unknown' })

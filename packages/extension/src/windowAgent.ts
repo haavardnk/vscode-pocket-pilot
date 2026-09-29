@@ -171,6 +171,8 @@ export class WindowAgent implements vscode.Disposable {
       models: () => Promise.resolve(this.models),
       agents: () => Promise.resolve(this.agents),
       detail: (sessionId) => this.store.detail(sessionId, 1),
+      image: (sessionId, requestId, imageId) =>
+        this.store.requestImage(sessionId, requestId, imageId),
       editedFiles: (sessionId) => sessionChanges.paths(sessionId),
       expectFlags: (sessionId, flags) => this.flags.expect(sessionId, flags),
       expectQueue: (sessionId, items) => this.store.expectQueue(sessionId, items),

@@ -7,6 +7,7 @@ import {
   type Question,
   questionAnswersSchema,
   type QueuedRequest,
+  type RequestImage,
   type RequestState,
   type RequestView,
   type ResponsePart,
@@ -322,28 +323,52 @@ function projectRequest(request: JsonRecord, latest: boolean, activity: Activity
   };
 }
 
-function attachmentCount(request: JsonRecord): number {
+function attachmentCount(request: JsonRecord, images: readonly RequestImage[]): number {
   return asArray(asRecord(request.variableData).variables).filter((raw) => {
     const variable = asRecord(raw);
+    const id = asString(variable.id) ?? '';
     return (
       variable.kind !== 'implicit' &&
       variable.kind !== 'workspace' &&
-      !(asString(variable.id) ?? '').startsWith('vscode.implicit') &&
+      !id.startsWith('vscode.implicit') &&
       variable.automaticallyAdded !== true &&
-      variable.range === undefined
+      variable.range === undefined &&
+      !images.some((image) => image.id === id)
     );
   }).length;
+}
+
+function queuedMode(modeInfo: JsonRecord): string | null {
+  if (modeInfo.isBuiltin === false) {
+    return asString(asRecord(asRecord(modeInfo.modeInstructions).uri).external);
+  }
+  return asString(modeInfo.modeId) ?? asString(modeInfo.telemetryModeId);
+}
+
+export function pendingRequest(root: unknown, id: string): JsonRecord | null {
+  const pending = asArray(asRecord(root).pendingRequests)
+    .map(asRecord)
+    .find((candidate) => candidate.id === id);
+  return pending ? asRecord(pending.request) : null;
 }
 
 function projectQueued(root: JsonRecord): QueuedRequest[] {
   return asArray(root.pendingRequests).map((raw) => {
     const pending = asRecord(raw);
     const request = asRecord(pending.request);
+    const options = asRecord(pending.sendOptions);
+    const modeInfo = asRecord(options.modeInfo ?? request.modeInfo);
+    const permission = permissionLevelSchema.safeParse(modeInfo.permissionLevel);
+    const images = requestImages(request);
     return {
       id: asString(pending.id) ?? '',
       delivery: pending.kind === 'steering' ? 'steering' : 'queued',
       text: requestText(request),
-      attachments: attachmentCount(request)
+      modeId: queuedMode(modeInfo),
+      modelId: asString(options.userSelectedModelId),
+      permission: permission.success ? permission.data : null,
+      images,
+      attachments: attachmentCount(request, images)
     };
   });
 }

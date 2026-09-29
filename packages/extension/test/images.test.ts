@@ -12,6 +12,7 @@ import { request, snapshot } from './fixtures';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 3]);
+const WEBP = Buffer.from('RIFF\u0004\u0000\u0000\u0000WEBPVP8 ', 'latin1');
 const BATCH = '0f8fad5b-d9cb-469f-a165-70867728950e';
 const quiet: Activity = { statuses: new Map(), events: [], toolsOnly: false, settled: false };
 
@@ -109,9 +110,14 @@ describe('chat images', () => {
     const images = new ChatImages(dir);
     const paths = await images.write([
       { mimeType: 'image/jpeg', data: JPEG.toString('base64') },
-      { mimeType: 'image/png', data: PNG.toString('base64') }
+      { mimeType: 'image/png', data: PNG.toString('base64') },
+      { mimeType: 'image/webp', data: WEBP.toString('base64') }
     ]);
-    expect(paths.map((path) => basename(path))).toEqual(['photo-1.jpg', 'photo-2.png']);
+    expect(paths.map((path) => basename(path))).toEqual([
+      'photo-1.jpg',
+      'photo-2.png',
+      'photo-3.webp'
+    ]);
     expect(await readFile(paths[1] ?? '')).toEqual(PNG);
     expect(await images.write([])).toEqual([]);
   });
@@ -120,7 +126,7 @@ describe('chat images', () => {
     const images = new ChatImages(dir);
     await expect(
       images.write([{ mimeType: 'image/jpeg', data: PNG.toString('base64') }])
-    ).rejects.toThrow('Photo is not a valid JPEG or PNG image');
+    ).rejects.toThrow('Photo does not match its image type');
     expect(await readdir(dir)).toEqual([]);
   });
 

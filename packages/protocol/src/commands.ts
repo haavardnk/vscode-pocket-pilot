@@ -30,10 +30,17 @@ export const commandSchema = z.discriminatedUnion('kind', [
         z.object({
           id: z.string(),
           delivery: deliverySchema,
-          text: z.string().min(1).max(100_000)
+          text: z.string().min(1).max(100_000),
+          modeId: z.string().min(1).nullable(),
+          modelId: z.string().min(1).nullable(),
+          permission: permissionLevelSchema.nullable(),
+          images: imageUploadsSchema.nullable()
         })
       )
       .max(100)
+      .refine((queue) => queue.filter((item) => item.images !== null).length <= 1, {
+        message: 'Only one queued message can change its photos at a time'
+      })
   }),
   z.object({ kind: z.literal('stop'), ...sessionTarget }),
   z.object({ kind: z.literal('setMode'), ...sessionTarget, modeId: z.string().min(1) }),

@@ -7,6 +7,10 @@ const item = (id: string, delivery: QueuedRequest['delivery'] = 'queued'): Queue
   id,
   delivery,
   text: `Do ${id}`,
+  modeId: null,
+  modelId: null,
+  permission: null,
+  images: [],
   attachments: 0
 });
 

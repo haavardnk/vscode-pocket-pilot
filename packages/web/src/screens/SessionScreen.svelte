@@ -7,18 +7,21 @@
   import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
   import FileDiff from '@lucide/svelte/icons/file-diff';
   import Square from '@lucide/svelte/icons/square';
-  import type {
-    Agent,
-    ConfigValue,
-    Delivery,
-    Handoff,
-    ImageUpload,
-    Model,
-    ModelConfigOption,
-    PermissionLevel,
-    QuestionAnswers,
-    QueueEntry,
-    RequestView
+  import {
+    type Agent,
+    type ConfigValue,
+    type Delivery,
+    type Handoff,
+    type ImageUpload,
+    type Model,
+    type ModelConfigOption,
+    type PermissionLevel,
+    type QuestionAnswers,
+    type QueuedRequest,
+    type QueueEntry,
+    queueEntry,
+    type RequestImage,
+    type RequestView
   } from '@pocket-pilot/protocol';
   import { tick, untrack } from 'svelte';
 
@@ -75,6 +78,7 @@
   let editing = $state<MessageEdit | null>(null);
   let root = $state<HTMLElement>();
   let composer = $state<ReturnType<typeof Composer>>();
+  let queuedMessages = $state<ReturnType<typeof QueuedMessages>>();
   let draft: Draft = { text: '', images: [] };
   let followBottom = true;
   let scrolled = 0;
@@ -107,7 +111,10 @@
   const photos = $derived(
     hostWindow?.models.find((model) => model.id === picked.modelId)?.vision !== false
   );
-  const editIndex = $derived(indexOf(editing?.request ?? null));
+  const editIndex = $derived(
+    indexOf(editing?.target.kind === 'request' ? editing.target.request : null)
+  );
+  const editingQueued = $derived(editing?.target.kind === 'queued' ? editing.target.item.id : null);
   const actionTarget = $derived.by(() => {
     const index = indexOf(acting);
     if (!acting || !detail || index < 0) return null;
@@ -178,7 +185,12 @@
     delivery: Delivery | null,
     images: ImageUpload[]
   ): Promise<boolean> {
-    if (editing) return sendEdit(editing, text, images);
+    if (editing) {
+      const edit = editing;
+      return edit.target.kind === 'queued'
+        ? saveQueued(edit, edit.target.item, text, images)
+        : sendEdit(edit, edit.target.request, text, images);
+    }
     followBottom = true;
     if (delivery === null) echo = { text, images, after: detail?.requests.at(-1)?.id ?? null };
     const sent = await run(() =>
@@ -197,27 +209,39 @@
     return detail.requests.findIndex((candidate) => candidate.id === request.id);
   }
 
-  function photosOf(request: RequestView): Promise<ImageUpload>[] {
-    return request.images.map((image) =>
-      requestPhoto(windowId, sessionId, request.id, image.id).then(reusePhoto)
+  function photosOf(requestId: string, images: RequestImage[]): Promise<ImageUpload>[] {
+    return images.map((image) =>
+      requestPhoto(windowId, sessionId, requestId, image.id).then(reusePhoto)
     );
   }
 
-  function fillFrom(request: RequestView, focus: boolean): void {
-    composer?.fill({ text: request.message, images: [] }, focus);
-    void composer?.attach(photosOf(request));
+  function fillFrom(text: string, requestId: string, images: RequestImage[], focus: boolean): void {
+    composer?.fill({ text, images: [] }, focus);
+    void composer?.attach(photosOf(requestId, images));
   }
 
   function startEdit(request: RequestView): void {
     if (!detail) return;
     draft = composer?.current() ?? { text: '', images: [] };
     editing = {
-      request,
+      target: { kind: 'request', request },
       modeId,
       modelId: request.modelId ?? modelId,
       permission: detail.permission
     };
-    fillFrom(request, true);
+    fillFrom(request.message, request.id, request.images, true);
+  }
+
+  function editQueued(item: QueuedRequest): void {
+    if (!detail) return;
+    draft = composer?.current() ?? { text: '', images: [] };
+    editing = {
+      target: { kind: 'queued', item: $state.snapshot(item) },
+      modeId: item.modeId ?? modeId,
+      modelId: item.modelId ?? modelId,
+      permission: item.permission ?? detail.permission
+    };
+    fillFrom(item.text, item.id, item.images, true);
   }
 
   function cancelEdit(): void {
@@ -225,8 +249,41 @@
     composer?.fill(draft, false);
   }
 
+  async function saveQueued(
+    edit: MessageEdit,
+    item: QueuedRequest,
+    text: string,
+    images: ImageUpload[]
+  ): Promise<boolean> {
+    const base = $state.snapshot(detail?.queued ?? []);
+    if (!queuedMessages || !base.some((other) => other.id === item.id)) {
+      toasts.show('This message already left the queue', 'error');
+      return false;
+    }
+    const saved = await queuedMessages.change(
+      base,
+      base.map((other) =>
+        other.id === item.id
+          ? {
+              ...queueEntry(other),
+              text,
+              modeId: edit.modeId,
+              modelId: edit.modelId,
+              permission: edit.permission,
+              images
+            }
+          : queueEntry(other)
+      )
+    );
+    if (!saved) return false;
+    editing = null;
+    composer?.fill(draft, false);
+    return true;
+  }
+
   async function sendEdit(
     edit: MessageEdit,
+    request: RequestView,
     text: string,
     images: ImageUpload[]
   ): Promise<boolean> {
@@ -237,7 +294,7 @@
         kind: 'editRequest',
         windowId,
         sessionId,
-        requestId: edit.request.id,
+        requestId: request.id,
         text,
         images,
         modeId: edit.modeId,
@@ -257,7 +314,7 @@
   function restored(request: RequestView): void {
     const current = composer?.current();
     if (!current || current.text.trim() || current.images.length > 0) return;
-    fillFrom(request, false);
+    fillFrom(request.message, request.id, request.images, false);
   }
 
   async function handoff(agent: Agent, item: Handoff, autopilot: boolean): Promise<void> {
@@ -464,7 +521,14 @@
           <TodoList {todos} />
         {/if}
         {#if detail.queued.length > 0}
-          <QueuedMessages queued={detail.queued} disabled={!connected} onchange={changeQueue} />
+          <QueuedMessages
+            bind:this={queuedMessages}
+            queued={detail.queued}
+            disabled={!connected || editing?.target.kind === 'request'}
+            editingId={editingQueued}
+            onchange={changeQueue}
+            onedit={editQueued}
+          />
         {/if}
         {#if tool}
           <div
@@ -509,6 +573,7 @@
         {/if}
         {#if editing}
           <EditingBar
+            title={editingQueued ? 'Editing queued message' : 'Editing message'}
             impact={editIndex >= 0 ? restoreImpact(detail.requests, editIndex) : null}
             oncancel={cancelEdit}
           />

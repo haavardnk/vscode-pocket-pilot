@@ -30,7 +30,11 @@ const SAMPLE_PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 export function samplePhotos(): Map<string, ImageResult> {
-  return new Map([['r2/shot', { kind: 'requestImage', mimeType: 'image/png', data: SAMPLE_PNG }]]);
+  const photo: ImageResult = { kind: 'requestImage', mimeType: 'image/png', data: SAMPLE_PNG };
+  return new Map([
+    ['r2/shot', photo],
+    ['q2/shot', photo]
+  ]);
 }
 
 const PLAN_AGENT =
@@ -558,9 +562,36 @@ export function initialWindows(now: number): MockWindow[] {
             }
           ],
           queued: [
-            { id: 'q1', delivery: 'steering', text: 'Keep the changelog short', attachments: 0 },
-            { id: 'q2', delivery: 'queued', text: 'Draft the announcement', attachments: 2 },
-            { id: 'q3', delivery: 'queued', text: 'Tag the release', attachments: 0 }
+            {
+              id: 'q1',
+              delivery: 'steering',
+              text: 'Keep the changelog short',
+              modeId: 'agent',
+              modelId: 'copilot/claude-opus',
+              permission: 'autoApprove',
+              images: [],
+              attachments: 0
+            },
+            {
+              id: 'q2',
+              delivery: 'queued',
+              text: 'Draft the announcement',
+              modeId: PLAN_AGENT,
+              modelId: 'copilot/claude-opus',
+              permission: 'autopilot',
+              images: [{ id: 'shot', name: 'Pasted Image', mimeType: 'image/png' }],
+              attachments: 1
+            },
+            {
+              id: 'q3',
+              delivery: 'queued',
+              text: 'Tag the release',
+              modeId: 'agent',
+              modelId: 'copilot/claude-opus',
+              permission: 'autoApprove',
+              images: [],
+              attachments: 0
+            }
           ]
         },
         {

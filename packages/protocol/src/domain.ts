@@ -170,6 +170,10 @@ export const queuedRequestSchema = z.object({
   id: z.string(),
   delivery: deliverySchema,
   text: z.string(),
+  modeId: z.string().nullable(),
+  modelId: z.string().nullable(),
+  permission: permissionLevelSchema.nullable(),
+  images: z.array(requestImageSchema),
   attachments: z.number().int().nonnegative()
 });
 

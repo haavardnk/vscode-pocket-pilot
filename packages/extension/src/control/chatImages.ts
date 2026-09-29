@@ -2,27 +2,35 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { ImageUpload } from '@pocket-pilot/protocol';
+import type { ShownImageType } from '@pocket-pilot/protocol';
+
+import { bytesType } from '../sessions/requestImages';
 
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 const BATCH_NAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const FORMATS: Record<ImageUpload['mimeType'], { signature: number[]; extension: string }> = {
-  'image/jpeg': { signature: [0xff, 0xd8, 0xff], extension: 'jpg' },
-  'image/png': { signature: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], extension: 'png' }
+const EXTENSIONS: Record<ShownImageType, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp'
 };
+
+export interface ImageData {
+  mimeType: ShownImageType;
+  data: string;
+}
 
 export class ChatImages {
   constructor(private readonly dir: string) {}
 
-  async write(images: readonly ImageUpload[]): Promise<string[]> {
+  async write(images: readonly ImageData[]): Promise<string[]> {
     if (images.length === 0) return [];
     const files = images.map((image, index) => {
-      const format = FORMATS[image.mimeType];
       const bytes = Buffer.from(image.data, 'base64');
-      if (!format.signature.every((byte, offset) => bytes[offset] === byte)) {
-        throw new Error('Photo is not a valid JPEG or PNG image');
+      if (bytesType(bytes) !== image.mimeType) {
+        throw new Error('Photo does not match its image type');
       }
-      return { name: `photo-${index + 1}.${format.extension}`, bytes };
+      return { name: `photo-${index + 1}.${EXTENSIONS[image.mimeType]}`, bytes };
     });
     const batch = join(this.dir, randomUUID());
     await mkdir(batch, { recursive: true });

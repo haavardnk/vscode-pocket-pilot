@@ -1,12 +1,15 @@
 import { appendFile, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-import type { HookEvent, QueuedRequest, SessionDetail } from '@pocket-pilot/protocol';
+import type { HookEvent, QueuedRequest, RequestImage, SessionDetail } from '@pocket-pilot/protocol';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SessionStore } from '../src/sessions/sessionStore';
 import { logLines, request, SESSION_ID, snapshot, transcriptLine } from './fixtures';
+
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
 
 describe('SessionStore', () => {
   let folder: string;
@@ -348,19 +351,34 @@ describe('SessionStore', () => {
 
   it('holds a phone queue change until the log catches up', async () => {
     await store.start();
+    const photo = join(folder, 'photo-1.png');
+    await writeFile(photo, PNG);
+    const image: RequestImage = {
+      id: pathToFileURL(photo).href,
+      name: 'photo-1.png',
+      mimeType: 'image/png'
+    };
     const queued = (id: string, text: string): QueuedRequest => ({
       id,
       delivery: 'queued',
       text,
+      modeId: 'agent',
+      modelId: null,
+      permission: 'default',
+      images: id === 'phone:2' ? [image] : [],
       attachments: 0
     });
     const ids = async (): Promise<string[] | undefined> =>
       (await store.detail(SESSION_ID, 10))?.queued.map((item) => item.id);
+    const photoData = async (requestId: string, imageId: string): Promise<string | undefined> =>
+      (await store.requestImage(SESSION_ID, requestId, imageId))?.data;
 
     const at = Date.now();
     await store.hook({ kind: 'prompt', sessionId: SESSION_ID, at, prompt: 'Build it' });
     store.expectQueue(SESSION_ID, [queued('phone:1', 'Next'), queued('phone:2', 'Later')]);
     expect(await ids()).toEqual(['phone:1', 'phone:2']);
+    expect(await photoData('phone:2', image.id)).toBe(PNG.toString('base64'));
+    expect(await photoData('phone:1', image.id)).toBeUndefined();
 
     await store.hook({ kind: 'prompt', sessionId: SESSION_ID, at: at + 1000, prompt: 'Next' });
     expect(await ids()).toEqual(['phone:2']);
@@ -375,11 +393,25 @@ describe('SessionStore', () => {
       logLines({
         kind: 1,
         k: ['pendingRequests'],
-        v: [{ id: 'q2', kind: 'queued', request: { message: { text: 'Later' } } }]
+        v: [
+          {
+            id: 'q2',
+            kind: 'queued',
+            request: {
+              message: { text: 'Later' },
+              variableData: {
+                variables: [
+                  { id: 'img', kind: 'image', value: { $base64: PNG.toString('base64') } }
+                ]
+              }
+            }
+          }
+        ]
       })
     );
     await logged;
     expect(await ids()).toEqual(['q2']);
+    expect(await photoData('q2', 'img')).toBe(PNG.toString('base64'));
   });
 });
 
