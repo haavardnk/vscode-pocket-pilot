@@ -278,6 +278,7 @@ describe('routing', () => {
     { name: 'folder', windowId: 'w', folderId: 'f', tab: 'changes', path: '' },
     { name: 'file', windowId: 'w', folderId: 'f', path: 'src/%20.ts' },
     { name: 'gitDiff', windowId: 'w', folderId: 'f', path: 'a/b.ts' },
+    { name: 'branches', windowId: 'w/1', folderId: 'f 1' },
     { name: 'sessionChanges', windowId: 'w', sessionId: 's', requestId: null },
     { name: 'sessionChanges', windowId: 'w', sessionId: 's', requestId: 'r/1' },
     {

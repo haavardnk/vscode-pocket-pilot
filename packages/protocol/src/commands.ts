@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { branchCommandSchema } from './branches.ts';
 import {
   configValueSchema,
   deliverySchema,
@@ -94,7 +95,8 @@ export const commandSchema = z.discriminatedUnion('kind', [
     folderId: z.string().nullable()
   }),
   z.object({ kind: z.literal('closeWindow'), windowId: z.string() }),
-  z.object({ kind: z.literal('openWindow'), windowId: z.string(), target: z.string().min(1) })
+  z.object({ kind: z.literal('openWindow'), windowId: z.string(), target: z.string().min(1) }),
+  ...branchCommandSchema.options
 ]);
 
 export type Command = z.infer<typeof commandSchema>;

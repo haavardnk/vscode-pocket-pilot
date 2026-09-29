@@ -10,9 +10,11 @@ import {
   type TerminalExecution,
   type TerminalLine,
   type TerminalSummary,
-  type WindowState
+  type WindowState,
+  type WorkspaceFolder
 } from '@pocket-pilot/protocol';
 
+import { MockBranches } from './branches.ts';
 import { MockCode } from './code.ts';
 import {
   GREEN,
@@ -44,11 +46,18 @@ export interface MockClient {
   terminal: TerminalWatch | null;
 }
 
+function folderOf(window: MockWindow, folderId: string): WorkspaceFolder {
+  const folder = window.state.folders.find((candidate) => candidate.id === folderId);
+  if (!folder) throw new Error('Workspace folder is no longer open');
+  return folder;
+}
+
 export class MockHub {
   private windows: MockWindow[] = [];
   private readonly clients = new Set<MockClient>();
   private readonly sent = new Map<MockClient, SessionDetail>();
   private readonly code = new MockCode();
+  private readonly branches = new MockBranches();
   private timers: ReturnType<typeof setTimeout>[] = [];
   private nextId = 1;
 
@@ -67,6 +76,7 @@ export class MockHub {
     const now = Date.now();
     this.windows = initialWindows(now);
     this.code.reset();
+    this.branches.reset();
     this.sent.clear();
     for (const client of this.clients) {
       client.subscription = null;
@@ -103,9 +113,12 @@ export class MockHub {
   }
 
   query(query: Query): QueryResult {
-    if (!this.windows.some((window) => window.state.windowId === query.windowId))
-      throw new Error('Window is no longer open');
+    const window = this.windows.find((candidate) => candidate.state.windowId === query.windowId);
+    if (!window) throw new Error('Window is no longer open');
     if (query.kind === 'openTargets') return { kind: 'openTargets', ...OPEN_TARGETS };
+    if (query.kind === 'branches') {
+      return this.branches.list(query.windowId, folderOf(window, query.folderId));
+    }
     return this.code.query(query);
   }
 
@@ -122,6 +135,15 @@ export class MockHub {
     }
     if (command.kind === 'openWindow') {
       this.open(command.target);
+      return;
+    }
+    if (
+      command.kind === 'checkoutBranch' ||
+      command.kind === 'createBranch' ||
+      command.kind === 'fetchBranches'
+    ) {
+      this.branches.run(command, folderOf(window, command.folderId));
+      this.broadcast({ type: 'window', window: window.state });
       return;
     }
     if (command.kind === 'setModelConfig') {

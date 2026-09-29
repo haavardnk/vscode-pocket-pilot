@@ -7,6 +7,7 @@ const change = (fsPath: string): GitChange => ({ uri: { fsPath } });
 function state(HEAD: GitBranch | undefined, index: string[] = [], workingTree: string[] = []) {
   return {
     HEAD,
+    worktrees: [],
     mergeChanges: [],
     indexChanges: index.map(change),
     workingTreeChanges: workingTree.map(change),

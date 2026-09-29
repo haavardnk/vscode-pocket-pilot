@@ -15,6 +15,7 @@ export type Route =
   | { name: 'session'; windowId: string; sessionId: string }
   | { name: 'terminal'; windowId: string; terminalId: string; executionId: string | null }
   | { name: 'folder'; windowId: string; folderId: string; tab: FolderTab; path: string }
+  | { name: 'branches'; windowId: string; folderId: string }
   | { name: 'file'; windowId: string; folderId: string; path: string }
   | { name: 'gitDiff'; windowId: string; folderId: string; path: string }
   | { name: 'sessionChanges'; windowId: string; sessionId: string; requestId: string | null }
@@ -57,6 +58,8 @@ export function parseRoute(hash: string): Route {
       return { name: 'folder', windowId: first, folderId: second, tab: 'files', path: third };
     case 'changes':
       return { name: 'folder', windowId: first, folderId: second, tab: 'changes', path: '' };
+    case 'branches':
+      return { name: 'branches', windowId: first, folderId: second };
     case 'file':
       return { name: 'file', windowId: first, folderId: second, path: third };
     case 'diff':
@@ -118,6 +121,8 @@ export function routeHash(route: Route): string {
       return route.tab === 'changes'
         ? hashOf('changes', route.windowId, route.folderId)
         : hashOf('tree', route.windowId, route.folderId, route.path);
+    case 'branches':
+      return hashOf('branches', route.windowId, route.folderId);
     case 'file':
       return hashOf('file', route.windowId, route.folderId, route.path);
     case 'gitDiff':
@@ -162,6 +167,7 @@ export function tabOf(route: Route): Tab {
     case 'editDiff':
       return 'chats';
     case 'folder':
+    case 'branches':
     case 'file':
     case 'gitDiff':
       return 'code';

@@ -60,7 +60,7 @@ function lastActivity(window: WindowState): number {
   return Math.max(0, ...window.sessions.map((session) => session.updatedAt));
 }
 
-function busyCount(window: WindowState): number {
+export function activeChats(window: WindowState): number {
   return window.sessions.filter(
     (session) => session.status === 'running' || session.status === 'needsInput'
   ).length;
@@ -86,7 +86,7 @@ export function repositoryGroups(windows: WindowState[]): RepositoryGroup[] {
       };
       group.windowIds.push(window.windowId);
       group.updatedAt = Math.max(group.updatedAt, lastActivity(window));
-      group.running += busyCount(window);
+      group.running += activeChats(window);
       groups.set(repository.key, group);
     }
   }

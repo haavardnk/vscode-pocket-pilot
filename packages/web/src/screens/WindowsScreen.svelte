@@ -8,6 +8,7 @@
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
   import SettingsGroup from '../lib/components/SettingsGroup.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
+  import { activeChats } from '../lib/hub/views';
   import { routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -37,12 +38,6 @@
   onDestroy(() => {
     if (closing) clearTimeout(closing.timer);
   });
-
-  function activeChats(window: WindowState): number {
-    return window.sessions.filter(
-      (session) => session.status === 'running' || session.status === 'needsInput'
-    ).length;
-  }
 
   function describe(window: WindowState): string {
     const active = activeChats(window);

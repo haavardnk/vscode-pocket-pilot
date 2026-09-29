@@ -31,8 +31,12 @@ export class GitStatusSource implements vscode.Disposable {
   }
 
   statusFor(root: string): GitStatus | null {
-    const repository = this.api?.getRepository(vscode.Uri.file(root));
+    const repository = this.repositoryFor(root);
     return repository ? gitStatusOf(repository.state) : null;
+  }
+
+  repositoryFor(root: string): GitRepository | null {
+    return this.api?.getRepository(vscode.Uri.file(root)) ?? null;
   }
 
   dispose(): void {

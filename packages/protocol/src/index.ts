@@ -1,4 +1,5 @@
 export * from './auth.ts';
+export * from './branches.ts';
 export * from './code.ts';
 export * from './commands.ts';
 export * from './domain.ts';

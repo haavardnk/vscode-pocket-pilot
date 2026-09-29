@@ -1,16 +1,19 @@
 import { z } from 'zod';
 
+import { branchQuerySchema, branchResultSchema } from './branches.ts';
 import { codeQuerySchema, codeResultSchema } from './code.ts';
 import { windowQuerySchema, windowResultSchema } from './windows.ts';
 
 export const querySchema = z.discriminatedUnion('kind', [
   ...codeQuerySchema.options,
-  windowQuerySchema
+  windowQuerySchema,
+  branchQuerySchema
 ]);
 
 export const queryResultSchema = z.discriminatedUnion('kind', [
   ...codeResultSchema.options,
-  windowResultSchema
+  windowResultSchema,
+  branchResultSchema
 ]);
 
 export type Query = z.infer<typeof querySchema>;

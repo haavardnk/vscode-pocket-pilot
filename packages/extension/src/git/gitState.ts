@@ -13,8 +13,22 @@ export interface GitBranch {
   readonly behind?: number;
 }
 
+export interface GitRef {
+  readonly type: number;
+  readonly name?: string;
+  readonly commit?: string;
+  readonly remote?: string;
+}
+
+export interface GitWorktree {
+  readonly path: string;
+  readonly ref: string;
+  readonly detached: boolean;
+}
+
 export interface GitRepositoryState {
   readonly HEAD: GitBranch | undefined;
+  readonly worktrees: readonly GitWorktree[];
   readonly mergeChanges: readonly GitChange[];
   readonly indexChanges: readonly GitChange[];
   readonly workingTreeChanges: readonly GitChange[];
@@ -23,7 +37,14 @@ export interface GitRepositoryState {
 }
 
 export interface GitRepository {
+  readonly rootUri: Uri;
   readonly state: GitRepositoryState;
+  getBranches(query: { remote?: boolean; sort?: 'committerdate' }): Promise<GitRef[]>;
+  checkout(treeish: string): Promise<void>;
+  createBranch(name: string, checkout: boolean, ref?: string): Promise<void>;
+  setBranchUpstream(name: string, upstream: string): Promise<void>;
+  fetch(options: { all?: boolean; prune?: boolean }): Promise<void>;
+  createStash(options: { message?: string; includeUntracked?: boolean }): Promise<void>;
 }
 
 export interface GitApi {

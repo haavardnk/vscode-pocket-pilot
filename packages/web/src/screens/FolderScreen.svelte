@@ -1,10 +1,12 @@
 <script lang="ts">
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import SquareArrowOutUpRight from '@lucide/svelte/icons/square-arrow-out-up-right';
 
   import { parentPath } from '../lib/code/paths';
   import FileTree from '../lib/components/code/FileTree.svelte';
   import GitChangeList from '../lib/components/code/GitChangeList.svelte';
   import GitHubSheet from '../lib/components/code/GitHubSheet.svelte';
+  import GitSummary from '../lib/components/code/GitSummary.svelte';
   import QueryView from '../lib/components/QueryView.svelte';
   import RefreshButton from '../lib/components/RefreshButton.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
@@ -61,6 +63,17 @@
       {/if}
       <RefreshButton loading={active.loading} onrefresh={() => void active.refresh()} />
     {/snippet}
+    {#if folder?.git}
+      <a
+        class="flex items-center justify-between gap-2 px-4 pb-2 active:bg-base-200"
+        aria-label="Branches"
+        aria-describedby="folder-git"
+        href={routeHash({ name: 'branches', windowId, folderId })}
+      >
+        <GitSummary git={folder.git} id="folder-git" />
+        <ChevronRight class="size-4 shrink-0 text-base-content/40" />
+      </a>
+    {/if}
     <div role="tablist" class="tabs tabs-border px-2">
       {#each tabs as item (item.name)}
         <a

@@ -27,6 +27,7 @@ import { type CodeFolder, codeFolder } from './code/folders';
 import { LanguageIndex } from './code/languageIndex';
 import { SessionChanges } from './code/sessionChanges';
 import { Controller } from './control/controller';
+import { BranchService, isBranchCommand } from './git/branchService';
 import { GitStatusSource } from './git/gitStatus';
 import { folderRepository } from './git/repository';
 import { ModelSettingsFile } from './models/modelSettings';
@@ -85,6 +86,7 @@ export class WindowAgent implements vscode.Disposable {
   private readonly mirror: LiveMirror;
   private readonly terminals: TerminalService;
   private readonly git: GitStatusSource;
+  private readonly branches: BranchService;
   private readonly paths: ChatPaths;
   private readonly detailQueues = new Map<string, Promise<void>>();
   private watches = new Map<string, number>();
@@ -168,6 +170,7 @@ export class WindowAgent implements vscode.Disposable {
     });
     this.terminals = new TerminalService(() => this.folders, report);
     this.git = new GitStatusSource(report);
+    this.branches = new BranchService(() => this.folders, this.git);
     this.subscriptions.push(
       languages,
       this.terminals,
@@ -253,6 +256,10 @@ export class WindowAgent implements vscode.Disposable {
       await runWindowCommand(command, this.report);
       return;
     }
+    if (isBranchCommand(command)) {
+      await this.branches.run(command);
+      return;
+    }
     if (isTerminalCommand(command)) {
       this.terminals.run(command);
       return;
@@ -266,6 +273,7 @@ export class WindowAgent implements vscode.Disposable {
 
   query(query: Query): Promise<QueryResult> {
     if (query.kind === 'openTargets') return listOpenTargets(this.report);
+    if (query.kind === 'branches') return this.branches.list(query);
     return this.code.query(query);
   }
 

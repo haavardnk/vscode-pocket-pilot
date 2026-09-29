@@ -2,6 +2,7 @@
   import type { AuthInfo, Connection, Device } from '@pocket-pilot/protocol';
 
   import { type Route, routeHash } from '../lib/routing';
+  import BranchesScreen from './BranchesScreen.svelte';
   import FileScreen from './FileScreen.svelte';
   import FolderScreen from './FolderScreen.svelte';
   import GitDiffScreen from './GitDiffScreen.svelte';
@@ -50,6 +51,10 @@
       tab={route.tab}
       path={route.path}
     />
+  {/key}
+{:else if route.name === 'branches'}
+  {#key hash}
+    <BranchesScreen windowId={route.windowId} folderId={route.folderId} />
   {/key}
 {:else if route.name === 'file'}
   {#key hash}

@@ -15,6 +15,7 @@ tunnel. It works with GitHub Copilot Chat in VS Code; other agents and editors a
 - Browse files, review diffs, and keep or undo the agent's edits
 - View, type into, create and kill terminals, including the ones the agent runs
 - Open recent folders and projects in new VS Code windows, and close windows
+- Switch, create and fetch Git branches
 - Push notifications when an agent finishes, needs input or fails
 
 ## Requirements
