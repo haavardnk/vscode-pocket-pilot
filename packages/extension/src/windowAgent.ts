@@ -39,6 +39,7 @@ import { LiveMirror } from './sessions/liveMirror';
 import { SessionStore } from './sessions/sessionStore';
 import { liveMirrorMode, SECTION } from './settings';
 import { isTerminalCommand, TerminalService } from './terminals/terminalService';
+import { isWindowCommand, runWindowCommand } from './windows/windowCommands';
 
 const PUBLISH_DELAY_MS = 100;
 const EXPORT_COMMAND = 'workbench.action.chat.export';
@@ -242,6 +243,10 @@ export class WindowAgent implements vscode.Disposable {
   }
 
   async run(command: Command): Promise<void> {
+    if (isWindowCommand(command)) {
+      runWindowCommand(command, this.report);
+      return;
+    }
     if (isTerminalCommand(command)) {
       this.terminals.run(command);
       return;

@@ -257,6 +257,7 @@ describe('routing', () => {
     ['', { name: 'chats' }],
     ['#/settings', { name: 'settings' }],
     ['#/new', { name: 'new' }],
+    ['#/windows', { name: 'windows' }],
     ['#/code', { name: 'code' }],
     ['#/terminals', { name: 'terminals' }],
     ['#/terminal/w/t', { name: 'terminal', windowId: 'w', terminalId: 't', executionId: null }],

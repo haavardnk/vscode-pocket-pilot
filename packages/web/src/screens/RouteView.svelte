@@ -11,6 +11,7 @@
   import SessionDiffScreen from './SessionDiffScreen.svelte';
   import SessionScreen from './SessionScreen.svelte';
   import TerminalScreen from './TerminalScreen.svelte';
+  import WindowsScreen from './WindowsScreen.svelte';
 
   interface Props {
     route: Route;
@@ -28,6 +29,8 @@
   <SessionScreen windowId={route.windowId} sessionId={route.sessionId} />
 {:else if route.name === 'new'}
   <NewSessionScreen />
+{:else if route.name === 'windows'}
+  <WindowsScreen />
 {:else if route.name === 'terminal'}
   {#key hash}
     <TerminalScreen

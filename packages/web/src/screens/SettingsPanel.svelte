@@ -1,5 +1,6 @@
 <script lang="ts">
   import AppWindow from '@lucide/svelte/icons/app-window';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Globe from '@lucide/svelte/icons/globe';
   import Info from '@lucide/svelte/icons/info';
   import LogOut from '@lucide/svelte/icons/log-out';
@@ -12,6 +13,7 @@
   import NotificationSettings from '../lib/components/NotificationSettings.svelte';
   import SettingsGroup from '../lib/components/SettingsGroup.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
+  import { routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { theme, THEMES } from '../lib/stores/theme.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -102,15 +104,22 @@
         {connection === 'quickTunnel' ? 'Temporary' : 'Cloudflare tunnel'}
       </span>
     </li>
-    <li class="list-row items-center py-3">
-      <AppWindow class="size-5 text-base-content/70" />
-      <div class="min-w-0 list-col-grow">
-        <p>VS Code windows</p>
-        {#if windowNames}
-          <p class="truncate text-xs text-base-content/60">{windowNames}</p>
-        {/if}
-      </div>
-      <span class="text-base-content/70">{hub.windows.length}</span>
+    <li>
+      <a
+        class="list-row items-center py-3 active:bg-base-300"
+        href={routeHash({ name: 'windows' })}
+      >
+        <AppWindow class="size-5 text-base-content/70" />
+        <span class="min-w-0 list-col-grow">
+          <span class="block">VS Code windows</span>
+          {#if windowNames}
+            <span class="block truncate text-xs text-base-content/60">{windowNames}</span>
+          {/if}
+        </span>
+        <span class="flex items-center gap-1 text-base-content/70">
+          {hub.windows.length}<ChevronRight class="size-4 text-base-content/40" />
+        </span>
+      </a>
     </li>
   </SettingsGroup>
 

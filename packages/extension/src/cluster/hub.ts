@@ -14,6 +14,7 @@ import {
 } from '@pocket-pilot/protocol';
 
 export const EMPTY_WINDOW = 'empty-';
+const LAST_WINDOW = 'Pocket Pilot needs one open VS Code window';
 
 export interface WindowLink {
   watch(sessions: SessionWatch[]): void;
@@ -203,6 +204,7 @@ export class Hub {
   async command(command: Command): Promise<void> {
     const entry = this.windows.get(command.windowId);
     if (!entry) throw new Error('Window is no longer open');
+    if (command.kind === 'closeWindow' && this.windows.size < 2) throw new Error(LAST_WINDOW);
     await entry.link.run(command);
   }
 

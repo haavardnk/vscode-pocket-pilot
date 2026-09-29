@@ -109,6 +109,14 @@ export class MockHub {
   run(command: Command): void {
     const window = this.windows.find((candidate) => candidate.state.windowId === command.windowId);
     if (!window) throw new Error('Window is no longer open');
+    if (command.kind === 'closeWindow') {
+      if (this.windows.length < 2) throw new Error('Pocket Pilot needs one open VS Code window');
+      this.later(() => {
+        this.windows = this.windows.filter((candidate) => candidate !== window);
+        this.broadcast({ type: 'windowRemoved', windowId: command.windowId });
+      });
+      return;
+    }
     if (command.kind === 'setModelConfig') {
       this.configure(command);
       return;

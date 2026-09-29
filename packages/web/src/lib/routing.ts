@@ -10,6 +10,7 @@ export type Route =
   | { name: 'terminals' }
   | { name: 'settings' }
   | { name: 'new' }
+  | { name: 'windows' }
   | { name: 'session'; windowId: string; sessionId: string }
   | { name: 'terminal'; windowId: string; terminalId: string; executionId: string | null }
   | { name: 'folder'; windowId: string; folderId: string; tab: FolderTab; path: string }
@@ -37,7 +38,8 @@ const STATIC: Record<string, Route> = {
   code: { name: 'code' },
   terminals: { name: 'terminals' },
   settings: { name: 'settings' },
-  new: { name: 'new' }
+  new: { name: 'new' },
+  windows: { name: 'windows' }
 };
 
 export function parseRoute(hash: string): Route {
@@ -101,6 +103,7 @@ export function routeHash(route: Route): string {
     case 'terminals':
     case 'settings':
     case 'new':
+    case 'windows':
       return `#/${route.name}`;
     case 'session':
       return hashOf('session', route.windowId, route.sessionId);
@@ -146,6 +149,8 @@ export function tabOf(route: Route): Tab {
       return route.name;
     case 'terminal':
       return 'terminals';
+    case 'windows':
+      return 'settings';
     case 'new':
     case 'session':
     case 'sessionChanges':

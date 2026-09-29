@@ -232,4 +232,16 @@ describe('Hub', () => {
       'Window is no longer open'
     );
   });
+
+  it('refuses to close the last window', async () => {
+    const hub = new Hub('1.0.0');
+    const window = link();
+    hub.addWindow(windowState('w1'), window);
+    const command = { kind: 'closeWindow' as const, windowId: 'w1' };
+    await expect(hub.command(command)).rejects.toThrow('needs one open VS Code window');
+    expect(window.run).not.toHaveBeenCalled();
+    hub.addWindow(windowState('w2'), link());
+    await hub.command(command);
+    expect(window.run).toHaveBeenCalledWith(command);
+  });
 });

@@ -92,7 +92,8 @@ export const commandSchema = z.discriminatedUnion('kind', [
     windowId: z.string(),
     terminalId: z.uuid(),
     folderId: z.string().nullable()
-  })
+  }),
+  z.object({ kind: z.literal('closeWindow'), windowId: z.string() })
 ]);
 
 export type Command = z.infer<typeof commandSchema>;
