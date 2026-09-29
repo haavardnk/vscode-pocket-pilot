@@ -9,8 +9,6 @@ import type {
   Model,
   Query,
   QueryResult,
-  Repository,
-  SessionDetail,
   SessionWatch,
   WindowState
 } from '@pocket-pilot/protocol';
@@ -23,20 +21,20 @@ import type { TerminalUpdate } from './cluster/localWindow';
 import { CodeService } from './code/codeService';
 import { EditChanges } from './code/editChanges';
 import { type Blob, MAX_FILE_BYTES, readBlob } from './code/files';
-import { type CodeFolder, codeFolder } from './code/folders';
 import { LanguageIndex } from './code/languageIndex';
 import { SessionChanges } from './code/sessionChanges';
+import { WorkspaceFolders } from './code/workspaceFolders';
 import { ChatImages } from './control/chatImages';
 import { CheckpointCommands } from './control/checkpointCommands';
 import { Controller } from './control/controller';
 import { RemovalPrompt } from './control/removalPrompt';
 import { BranchService, isBranchCommand } from './git/branchService';
 import { GitStatusSource } from './git/gitStatus';
-import { folderRepository } from './git/repository';
 import { ModelSettingsFile } from './models/modelSettings';
 import { ModelSource } from './models/modelSource';
 import { type ChatPaths, chatPaths } from './paths';
 import { Checkpoints } from './sessions/checkpoints';
+import { DetailFeed, type SessionUpdate } from './sessions/detailFeed';
 import { EditingSessions } from './sessions/editingState';
 import { FlagStore } from './sessions/flagStore';
 import { LiveEdits } from './sessions/liveEdits';
@@ -53,11 +51,6 @@ import {
 
 const PUBLISH_DELAY_MS = 100;
 const EXPORT_COMMAND = 'workbench.action.chat.export';
-
-export interface SessionUpdate {
-  sessionId: string;
-  detail: SessionDetail | null;
-}
 
 async function currentBlob(path: string): Promise<Blob> {
   const document = vscode.workspace.textDocuments.find(
@@ -93,17 +86,13 @@ export class WindowAgent implements vscode.Disposable {
   private readonly mirror: LiveMirror;
   private readonly terminals: TerminalService;
   private readonly git: GitStatusSource;
+  private readonly folders: WorkspaceFolders;
+  private readonly feed: DetailFeed;
   private readonly branches: BranchService;
   private readonly paths: ChatPaths;
-  private readonly detailQueues = new Map<string, Promise<void>>();
-  private watches = new Map<string, number>();
-  private repositories: Repository[] = [];
-  private folders: CodeFolder[] = [];
-  private folderRepositories = new Map<string, string>();
-  private gitKey = '';
   private agents: Agent[] = [];
   private models: Model[] = [];
-  private readonly versions = { agents: 0, models: 0, repositories: 0 };
+  private readonly versions = { agents: 0, models: 0 };
   private publishTimer: NodeJS.Timeout | undefined;
 
   readonly onDidChangeState = this.stateChanged.event;
@@ -123,6 +112,8 @@ export class WindowAgent implements vscode.Disposable {
       report
     );
     this.flags = new FlagStore(this.paths.stateDatabase, report);
+    this.git = new GitStatusSource(report);
+    this.folders = new WorkspaceFolders(this.git, () => this.schedulePublish());
     this.agentSource = new AgentSource(agentUri(this.paths), report);
     const settings = new ModelSettingsFile(this.paths.modelSettings);
     this.modelSource = new ModelSource(this.paths.debugLogs, settings, report);
@@ -139,7 +130,7 @@ export class WindowAgent implements vscode.Disposable {
           .summaries()
           .some(
             (summary) =>
-              this.watches.has(summary.id) &&
+              this.feed.watching(summary.id) &&
               (summary.status === 'running' || summary.status === 'needsInput')
           ),
       apply: (root, at) => this.store.applyExport(root, at),
@@ -152,7 +143,7 @@ export class WindowAgent implements vscode.Disposable {
     this.removalPrompt = new RemovalPrompt(context.globalState);
     this.images = new ChatImages(join(context.globalStorageUri.fsPath, 'chat-images'));
     const sessionChanges = new SessionChanges({
-      folders: () => this.folders,
+      folders: () => this.folders.list(),
       language: (path) => languages.resolve(path),
       editing,
       editedPaths: (sessionId) => this.store.editedPaths(sessionId),
@@ -163,7 +154,7 @@ export class WindowAgent implements vscode.Disposable {
       home: homedir()
     });
     this.code = new CodeService({
-      folders: () => this.folders,
+      folders: () => this.folders.list(),
       language: (path) => languages.resolve(path),
       sessions: sessionChanges,
       referenced: (sessionId) => this.store.files(sessionId)
@@ -194,19 +185,29 @@ export class WindowAgent implements vscode.Disposable {
       canOrganize: this.paths.stateDatabase !== null,
       settings
     });
-    this.terminals = new TerminalService(() => this.folders, report);
-    this.git = new GitStatusSource(report);
-    this.branches = new BranchService(() => this.folders, this.git);
+    this.terminals = new TerminalService(() => this.folders.list(), report);
+    this.branches = new BranchService(() => this.folders.list(), this.git);
+    this.feed = new DetailFeed(
+      async (sessionId, limit) => {
+        const detail = await this.store.detail(sessionId, limit);
+        return (
+          detail &&
+          this.editChanges.decorate(
+            await this.checkpoints.decorate(this.terminals.decorate(detail))
+          )
+        );
+      },
+      (update) => this.sessionChanged.fire(update),
+      report
+    );
     this.subscriptions.push(
       languages,
       this.terminals,
       this.git,
-      this.git.onDidChange(() => this.publishGit()),
+      this.git.onDidChange(() => this.folders.gitChanged()),
       this.terminals.onDidChange(() => this.schedulePublish()),
       this.terminals.onDidUpdate((update) => this.terminalChanged.fire(update)),
-      this.terminals.onDidLink((sessionId) => {
-        if (this.watches.has(sessionId)) this.pushDetail(sessionId);
-      }),
+      this.terminals.onDidLink((sessionId) => this.feed.pushWatched(sessionId)),
       this.modelSource,
       { dispose: () => this.agentSource.dispose() },
       { dispose: () => this.store.dispose() },
@@ -217,7 +218,7 @@ export class WindowAgent implements vscode.Disposable {
       this.modelSource.onDidChange(() => void this.refreshModels()),
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
         this.agentSource.setFolders(agentFolders(this.paths));
-        void this.refreshRepositories();
+        void this.folders.refresh();
       }),
       vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('chat.agentFilesLocations')) {
@@ -228,9 +229,7 @@ export class WindowAgent implements vscode.Disposable {
     );
     this.agentSource.onDidChange(() => void this.refreshAgents());
     this.store.onDidChange((sessionId) => this.onSessionChange(sessionId));
-    this.checkpoints.onDidChange((sessionId) => {
-      if (this.watches.has(sessionId)) this.pushDetail(sessionId);
-    });
+    this.checkpoints.onDidChange((sessionId) => this.feed.pushWatched(sessionId));
     this.flags.onDidChange(() => this.schedulePublish());
   }
 
@@ -248,7 +247,7 @@ export class WindowAgent implements vscode.Disposable {
         .catch((error: unknown) => this.report(`Cannot clean up photos: ${String(error)}`)),
       this.refreshAgents(),
       this.refreshModels(),
-      this.refreshRepositories(),
+      this.folders.refresh(),
       this.refreshMirror(),
       this.git.start()
     ]);
@@ -259,13 +258,7 @@ export class WindowAgent implements vscode.Disposable {
       windowId: this.windowId,
       name: vscode.workspace.name ?? 'Empty window',
       workspace: currentWorkspace(),
-      repositories: this.repositories,
-      folders: this.folders.map(({ id, name, root }) => ({
-        id,
-        name,
-        repositoryKey: this.folderRepositories.get(id) ?? null,
-        git: this.git.statusFor(root)
-      })),
+      ...this.folders.state(),
       sessions: this.store
         .summaries()
         .map((summary) => ({ ...summary, ...this.flags.flags(summary.id) })),
@@ -277,10 +270,7 @@ export class WindowAgent implements vscode.Disposable {
   }
 
   setWatches(watches: readonly SessionWatch[]): void {
-    const next = new Map(watches.map((watch) => [watch.sessionId, watch.limit]));
-    const changed = [...next].filter(([sessionId, limit]) => this.watches.get(sessionId) !== limit);
-    this.watches = next;
-    for (const [sessionId] of changed) this.pushDetail(sessionId);
+    this.feed.setWatches(watches);
     this.mirror.wake();
   }
 
@@ -343,32 +333,10 @@ export class WindowAgent implements vscode.Disposable {
     this.mirror.wake();
     if (sessionId === null) {
       this.schedulePublish();
-      for (const watched of this.watches.keys()) this.pushDetail(watched);
+      this.feed.pushAll();
       return;
     }
-    if (this.watches.has(sessionId)) this.pushDetail(sessionId);
-  }
-
-  private pushDetail(sessionId: string): void {
-    const previous = this.detailQueues.get(sessionId) ?? Promise.resolve();
-    const next = previous
-      .then(async () => {
-        const limit = this.watches.get(sessionId);
-        if (limit === undefined) return;
-        const detail = await this.store.detail(sessionId, limit);
-        const decorated =
-          detail &&
-          (await this.editChanges.decorate(
-            await this.checkpoints.decorate(this.terminals.decorate(detail))
-          ));
-        if (!this.watches.has(sessionId)) return;
-        this.sessionChanged.fire({ sessionId, detail: decorated });
-      })
-      .catch((error: unknown) => this.report(`Session detail failed: ${String(error)}`))
-      .finally(() => {
-        if (this.detailQueues.get(sessionId) === next) this.detailQueues.delete(sessionId);
-      });
-    this.detailQueues.set(sessionId, next);
+    this.feed.pushWatched(sessionId);
   }
 
   private schedulePublish(): void {
@@ -377,13 +345,6 @@ export class WindowAgent implements vscode.Disposable {
       this.publishTimer = undefined;
       this.stateChanged.fire(this.state());
     }, PUBLISH_DELAY_MS);
-  }
-
-  private publishGit(): void {
-    const key = JSON.stringify(this.folders.map((folder) => this.git.statusFor(folder.root)));
-    if (key === this.gitKey) return;
-    this.gitKey = key;
-    this.schedulePublish();
   }
 
   private async refreshAgents(): Promise<void> {
@@ -408,23 +369,5 @@ export class WindowAgent implements vscode.Disposable {
   private async refreshMirror(): Promise<void> {
     const commands = await vscode.commands.getCommands(true);
     this.mirror.setEnabled(liveMirrorMode() === 'full' && commands.includes(EXPORT_COMMAND));
-  }
-
-  private async refreshRepositories(): Promise<void> {
-    const version = ++this.versions.repositories;
-    const folders = (vscode.workspace.workspaceFolders ?? []).filter(
-      (folder) => folder.uri.scheme === 'file'
-    );
-    this.folders = folders.map((folder) => codeFolder(folder.name, folder.uri.fsPath));
-    this.schedulePublish();
-    const resolved = await Promise.all(
-      this.folders.map(async ({ id, root }) => ({ id, repository: await folderRepository(root) }))
-    );
-    if (version !== this.versions.repositories) return;
-    this.folderRepositories = new Map(resolved.map(({ id, repository }) => [id, repository.key]));
-    this.repositories = [
-      ...new Map(resolved.map(({ repository }) => [repository.key, repository])).values()
-    ];
-    this.schedulePublish();
   }
 }
