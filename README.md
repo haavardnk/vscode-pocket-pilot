@@ -82,6 +82,9 @@ reach your machine.
 5. On the phone, open the address, sign in with GitHub and pair. If the app was used on this
    address before, first close its tabs, quit the browser and remove the site's data, so the old
    cached app does not hide the login.
+6. Copy the application's **Audience (AUD) tag** into `pocketPilot.tunnel.access.audience` and
+   your team name into `pocketPilot.tunnel.access.teamDomain`. Pocket Pilot then refuses any
+   tunnel request without a valid Access token.
 
 On iPhone, an app added to the home screen keeps its own cookies, so it asks for the GitHub login
 once more the first time it opens. When the Access session expires, the app reloads into the
@@ -107,6 +110,7 @@ All commands are also in the **Pilot** status bar menu.
 | `pocketPilot.enabled`                | `false` | Run Pocket Pilot in every window.                                          |
 | `pocketPilot.port`                   | `48111` | Loopback port between windows. The tunnel uses the next.                   |
 | `pocketPilot.tunnel.cloudflaredPath` | `""`    | Use this cloudflared binary instead of downloading one.                    |
+| `pocketPilot.tunnel.access.*`        | `""`    | Cloudflare Access team, audience tag and allowed emails to verify.         |
 | `pocketPilot.devices.expireDays`     | `30`    | Forget devices unused this long. `0` keeps them.                           |
 | `pocketPilot.liveMirror`             | `full`  | `full` streams replies, `hooks` updates at tool calls, `off` only on save. |
 | `pocketPilot.projectRoots`           | `[]`    | Folders whose git repositories the phone can open, such as `~/Git`.        |

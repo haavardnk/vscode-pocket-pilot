@@ -77,7 +77,8 @@ export class PocketPilotService {
     if (!previous.enabled || !this.cluster) return this.start();
     if (
       previous.port !== this.settings.port ||
-      previous.cloudflaredPath !== this.settings.cloudflaredPath
+      previous.cloudflaredPath !== this.settings.cloudflaredPath ||
+      JSON.stringify(previous.access) !== JSON.stringify(this.settings.access)
     )
       return this.restart();
     return Promise.resolve();
@@ -133,6 +134,7 @@ export class PocketPilotService {
           storage: this.storage,
           port,
           tunnel: await this.tunnelSettings(),
+          access: readSettings().access,
           keeperScript: this.context.asAbsolutePath('dist/tunnelKeeper.cjs'),
           version,
           webRoot: this.context.asAbsolutePath('media/web'),

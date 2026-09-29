@@ -4,6 +4,7 @@ import type { Socket } from 'node:net';
 import type { Connection } from '@pocket-pilot/protocol';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
+import { ACCESS_TOKEN_HEADER, type AccessCheck } from './accessCheck';
 import { forwardTo } from './forward';
 
 export const INTERNAL_PATH = '/internal';
@@ -19,7 +20,11 @@ export interface TunnelTraffic {
   carries(request: FastifyRequest): boolean;
 }
 
-export function tunnelTraffic(app: FastifyInstance, named: boolean): TunnelTraffic {
+export function tunnelTraffic(
+  app: FastifyInstance,
+  named: boolean,
+  access: AccessCheck | null
+): TunnelTraffic {
   const sockets = new WeakSet<Socket>();
   const server = forwardTo(app.server).on('connection', (socket: Socket) => sockets.add(socket));
   const carries = (request: FastifyRequest): boolean => sockets.has(request.raw.socket);
@@ -32,6 +37,8 @@ export function tunnelTraffic(app: FastifyInstance, named: boolean): TunnelTraff
     }
     if (request.headers['x-forwarded-proto'] !== 'https')
       return reply.redirect(`https://${request.host}${request.url}`, 308);
+    if (access && !(await access.allows(request.headers[ACCESS_TOKEN_HEADER])))
+      return reply.code(403).send({ error: 'Cloudflare Access did not approve this request' });
     if (!named && INSTALL_FILES.has(pathname)) return reply.code(404).send({ error: 'Not found' });
   });
 

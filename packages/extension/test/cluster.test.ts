@@ -164,6 +164,7 @@ function cluster(window: FakeWindow, roles: Role[]): Cluster<Leader> {
         storage,
         port,
         tunnel: { named: null, cloudflaredPath: cloudflared },
+        access: null,
         keeperScript,
         version: 'test',
         webRoot: storage,

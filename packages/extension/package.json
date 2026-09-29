@@ -153,6 +153,27 @@
           "scope": "machine",
           "description": "Path to a cloudflared binary. Leave empty to download a checksum-verified copy."
         },
+        "pocketPilot.tunnel.access.teamDomain": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Cloudflare Access team name or domain, such as `myteam` or `myteam.cloudflareaccess.com`. With `#pocketPilot.tunnel.access.audience#`, every request through the named tunnel must carry a valid Access token, so nothing reaches Pocket Pilot around your Access policy. The quick tunnel ignores this."
+        },
+        "pocketPilot.tunnel.access.audience": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Application Audience (AUD) tag of the Cloudflare Access application that protects the tunnel hostname."
+        },
+        "pocketPilot.tunnel.access.emails": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "machine",
+          "markdownDescription": "Only accept Cloudflare Access tokens for these emails. Leave empty to accept anyone your Access policy lets in."
+        },
         "pocketPilot.devices.expireDays": {
           "type": "integer",
           "default": 30,
@@ -206,6 +227,7 @@
     "diff": "^9.0.0",
     "fastify": "^5.12.5",
     "git-url-parse": "^16.1.0",
+    "jose": "^6.2.12",
     "jsonc-parser": "^3.3.1",
     "picomatch": "^4.0.7",
     "qrcode": "^1.5.4",

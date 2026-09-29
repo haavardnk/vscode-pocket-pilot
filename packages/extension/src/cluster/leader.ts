@@ -6,6 +6,7 @@ import { PushService } from '../push/pushService';
 import { PushStore } from '../push/pushStore';
 import { StatusWatcher } from '../push/statusWatcher';
 import { vapidKeys } from '../push/vapid';
+import { accessCheck, type AccessSettings } from '../server/accessCheck';
 import { type PasswordCheck, startServer } from '../server/app';
 import { DeviceStore } from '../server/devices';
 import { PairingStore } from '../server/pairing';
@@ -22,6 +23,7 @@ export interface LeaderOptions {
   storage: string;
   port: number;
   tunnel: TunnelSettings;
+  access: AccessSettings | null;
   keeperScript: string;
   version: string;
   webRoot: string;
@@ -37,6 +39,12 @@ export interface Leader {
 
 export async function startLeader(options: LeaderOptions): Promise<Leader> {
   const { report } = options;
+  const named = !!options.tunnel.named;
+  if (options.access && !named)
+    report(
+      'Cloudflare Access settings only apply to a named tunnel; the quick tunnel ignores them'
+    );
+  const access = options.access && named ? accessCheck(options.access, report) : null;
   const files = sharedFiles(options.storage);
   const secret = await clusterSecret(options.storage);
   const devices = new DeviceStore(files.devices, options.expireDays);
@@ -64,7 +72,8 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
 
   const server = await startServer({
     port: options.port,
-    namedTunnel: !!options.tunnel.named,
+    namedTunnel: named,
+    access,
     webRoot: options.webRoot,
     clusterSecret: secret,
     hookSecret: await hookSecret(options.storage),

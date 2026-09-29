@@ -14,6 +14,7 @@ import { HOOK_HEADER, installHooks } from '../src/hooks/hookFile';
 import { PushService } from '../src/push/pushService';
 import { PushStore } from '../src/push/pushStore';
 import { vapidKeys } from '../src/push/vapid';
+import { ACCESS_TOKEN_HEADER, type AccessCheck } from '../src/server/accessCheck';
 import { type RunningServer, startServer, TOKEN_COOKIE } from '../src/server/app';
 import { DeviceStore } from '../src/server/devices';
 import { PairingStore } from '../src/server/pairing';
@@ -56,7 +57,7 @@ function closedPort(): Promise<number> {
   );
 }
 
-async function start(namedTunnel = false): Promise<Fixture> {
+async function start(namedTunnel = false, access: AccessCheck | null = null): Promise<Fixture> {
   const folder = await mkdtemp(join(tmpdir(), 'pocket-pilot-server-'));
   await writeFile(join(folder, 'index.html'), '<!doctype html><title>app</title>');
   await writeFile(join(folder, 'manifest.webmanifest'), '{}');
@@ -67,6 +68,7 @@ async function start(namedTunnel = false): Promise<Fixture> {
   const server = await startServer({
     port: 0,
     namedTunnel,
+    access,
     webRoot: folder,
     clusterSecret: 'secret',
     hookSecret: HOOK_SECRET,
@@ -366,6 +368,28 @@ describe.each([
       headers: viaTunnel()
     });
     expect(response.status).toBe(manifest);
+  });
+});
+
+describe('server behind Cloudflare Access', () => {
+  let fixture: Fixture;
+
+  beforeAll(async () => {
+    fixture = await start(true, { allows: async (token) => token === 'approved' });
+  });
+
+  afterAll(() => cleanUp(fixture));
+
+  it.each([
+    [{}, 403],
+    [{ [ACCESS_TOKEN_HEADER]: 'forged' }, 403],
+    [{ [ACCESS_TOKEN_HEADER]: 'approved' }, 200]
+  ])('answers a tunnel request with %o by %i', async (headers, status) => {
+    const response = await send(fixture, '/manifest.webmanifest', {
+      tunnel: true,
+      headers: viaTunnel(headers)
+    });
+    expect(response.status).toBe(status);
   });
 });
 

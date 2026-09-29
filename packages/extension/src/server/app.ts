@@ -20,6 +20,7 @@ import { LOOPBACK, sameSecret } from '../cluster/sharedState';
 import { errorMessage } from '../errors';
 import { parseHook } from '../hooks/hookEvent';
 import { HOOK_HEADER } from '../hooks/hookFile';
+import type { AccessCheck } from './accessCheck';
 import type { DeviceStore } from './devices';
 import { LoginLimit } from './loginLimit';
 import type { PairingStore } from './pairing';
@@ -43,6 +44,7 @@ export interface PasswordCheck {
 export interface ServerOptions {
   port: number;
   namedTunnel: boolean;
+  access: AccessCheck | null;
   webRoot: string;
   clusterSecret: string;
   hookSecret: string;
@@ -80,7 +82,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
   });
 
   app.decorateRequest('device', null);
-  const tunnel = tunnelTraffic(app, options.namedTunnel);
+  const tunnel = tunnelTraffic(app, options.namedTunnel, options.access);
   const sameOrigin = (request: FastifyRequest): boolean => {
     const { origin, upgrade } = request.headers;
     if (origin === undefined) return request.method === 'GET' && upgrade === undefined;
