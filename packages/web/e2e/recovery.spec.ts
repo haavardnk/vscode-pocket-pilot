@@ -23,3 +23,17 @@ test('replaces a crashed screen with a way to reload', async ({ page }) => {
   await page.getByRole('button', { name: 'Reload' }).click();
   await expect(page.getByRole('link', { name: /Build the phone app/ })).toBeVisible();
 });
+
+test('explains an app that never starts', async ({ page }) => {
+  await signIn(page);
+  await page.route('**/assets/index-*.js', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>app</title>' })
+  );
+  await page.reload();
+
+  await expect(page.getByText("Pocket Pilot didn't start")).toBeVisible({ timeout: 10_000 });
+  await page.unrouteAll();
+  await page.getByRole('link', { name: 'Reload' }).click();
+  await expect(page.getByRole('link', { name: /Build the phone app/ })).toBeVisible();
+  await expect(page.getByText("Pocket Pilot didn't start")).toHaveCount(0);
+});

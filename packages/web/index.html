@@ -17,9 +17,39 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Pocket Pilot</title>
     <script src="/theme.js"></script>
+    <style>
+      .boot {
+        display: flex;
+        min-height: 100dvh;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 1.5rem;
+        font-family: system-ui, sans-serif;
+        text-align: center;
+        visibility: hidden;
+        animation: boot-stalled 0s 6s forwards;
+      }
+      .boot a {
+        padding: 0.75rem 1.5rem;
+        font-weight: 600;
+      }
+      @keyframes boot-stalled {
+        to {
+          visibility: visible;
+        }
+      }
+    </style>
   </head>
   <body class="bg-base-100 text-base-content">
-    <div id="app"></div>
+    <div id="app">
+      <main class="boot">
+        <p><strong>Pocket Pilot didn't start</strong></p>
+        <p>After an update, reload every VS Code window, then reload this app.</p>
+        <a href="/">Reload</a>
+      </main>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
