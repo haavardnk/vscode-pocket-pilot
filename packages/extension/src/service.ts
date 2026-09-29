@@ -87,7 +87,7 @@ export class PocketPilotService {
   }
 
   async shutdown(): Promise<void> {
-    await this.stop();
+    await this.enqueue(() => this.stopNow(true));
     this.roleChanged.dispose();
     this.tunnelChanged.dispose();
   }
@@ -126,6 +126,7 @@ export class PocketPilotService {
           storage: this.storage,
           port,
           tunnel: await this.tunnelSettings(),
+          keeperScript: this.context.asAbsolutePath('dist/tunnelKeeper.cjs'),
           version,
           webRoot: this.context.asAbsolutePath('media/web'),
           password: this.password,
@@ -155,7 +156,7 @@ export class PocketPilotService {
     cluster.start();
   }
 
-  private async stopNow(): Promise<void> {
+  private async stopNow(keepTunnel = false): Promise<void> {
     const cluster = this.cluster;
     const window = this.window;
     const tunnelWatcher = this.tunnelWatcher;
@@ -164,7 +165,7 @@ export class PocketPilotService {
     this.tunnelWatcher = null;
     await tunnelWatcher?.close();
     this.setTunnelStatus(null);
-    await cluster?.stop();
+    await cluster?.stop(keepTunnel);
     window?.dispose();
   }
 

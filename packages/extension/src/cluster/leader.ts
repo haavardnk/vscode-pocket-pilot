@@ -21,6 +21,7 @@ export interface LeaderOptions {
   storage: string;
   port: number;
   tunnel: TunnelSettings;
+  keeperScript: string;
   version: string;
   webRoot: string;
   password: PasswordCheck;
@@ -29,7 +30,7 @@ export interface LeaderOptions {
 }
 
 export interface Leader {
-  close(): Promise<void>;
+  close(keepTunnel?: boolean): Promise<void>;
 }
 
 export async function startLeader(options: LeaderOptions): Promise<Leader> {
@@ -75,7 +76,9 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
   const tunnel = await startTunnel({
     ...options.tunnel,
     origin: server.tunnel,
-    port: options.port + 1,
+    leaderPort: options.port,
+    keeperScript: options.keeperScript,
+    version: options.version,
     storage: options.storage,
     statusFile: files.tunnel,
     report
@@ -90,11 +93,11 @@ export async function startLeader(options: LeaderOptions): Promise<Leader> {
   );
 
   return {
-    close: async () => {
+    close: async (keepTunnel = false) => {
       local.dispose();
       alerts.dispose();
       await watcher.close();
-      await tunnel.close();
+      await tunnel.close(keepTunnel);
       await server.close();
     }
   };

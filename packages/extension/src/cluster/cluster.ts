@@ -13,7 +13,7 @@ export type Role =
   | { kind: 'error'; message: string };
 
 export interface LeaderHandle {
-  close(): Promise<void>;
+  close(keepTunnel?: boolean): Promise<void>;
 }
 
 export interface FollowerHandle {
@@ -61,14 +61,14 @@ export class Cluster<L extends LeaderHandle> {
     void this.run(this.generation);
   }
 
-  async stop(): Promise<void> {
+  async stop(keepTunnel = false): Promise<void> {
     this.generation += 1;
     const leader = this.leaderHandle;
     this.leaderHandle = null;
     this.followerHandle?.close();
     this.followerHandle = null;
     this.setRole({ kind: 'stopped' });
-    await leader?.close();
+    await leader?.close(keepTunnel);
   }
 
   private async run(generation: number): Promise<void> {

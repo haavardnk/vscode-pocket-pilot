@@ -11,7 +11,8 @@ const production = !watch && !process.argv.includes('--dev');
 const options = {
   entryPoints: {
     extension: join(root, 'src/extension.ts'),
-    uninstall: join(root, 'src/uninstall.ts')
+    uninstall: join(root, 'src/uninstall.ts'),
+    tunnelKeeper: join(root, 'src/tunnel/keeperMain.ts')
   },
   outdir: join(root, 'dist'),
   outExtension: { '.js': '.cjs' },

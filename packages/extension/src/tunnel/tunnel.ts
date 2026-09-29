@@ -1,13 +1,23 @@
+import { createHash } from 'node:crypto';
 import type { Server as HttpServer } from 'node:http';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
+import { LOOPBACK } from '../cluster/sharedState';
 import { errorMessage } from '../errors';
-import { type Cloudflared, runCloudflared } from './cloudflared';
+import { LineTailer } from '../sessions/lineTailer';
 import { installCloudflared } from './install';
+import { keeperFiles, keeperRunning, spawnKeeper, stopKeeper } from './keeperClient';
+import { type KeeperIdentity, processAlive, readKeeperRecord, sameKeeper } from './keeperRecord';
 import type { NamedTunnel } from './named';
 import { cloudflaredRelease } from './release';
-import { reapStale } from './stalePid';
 import { clearTunnelStatus, type TunnelStatus, writeTunnelStatus } from './status';
+
+const MONITOR_MS = 2_000;
+const MIN_RETRY_MS = 2_000;
+const MAX_RETRY_MS = 60_000;
+const STABLE_MS = 60_000;
+const LOG_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\S+Z /;
 
 export interface TunnelSettings {
   named: NamedTunnel | null;
@@ -16,14 +26,16 @@ export interface TunnelSettings {
 
 export interface TunnelOptions extends TunnelSettings {
   origin: HttpServer;
-  port: number;
+  leaderPort: number;
+  keeperScript: string;
+  version: string;
   storage: string;
   statusFile: string;
   report: (message: string) => void;
 }
 
 export interface Tunnel {
-  close(): Promise<void>;
+  close(keepTunnel: boolean): Promise<void>;
 }
 
 function listen(server: HttpServer, port: number): Promise<void> {
@@ -35,7 +47,7 @@ function listen(server: HttpServer, port: number): Promise<void> {
           : error
       );
     server.once('error', fail);
-    server.listen({ host: '127.0.0.1', port }, () => {
+    server.listen({ host: LOOPBACK, port }, () => {
       server.off('error', fail);
       resolve();
     });
@@ -52,52 +64,119 @@ async function resolveBinary(options: TunnelOptions, signal: AbortSignal): Promi
   return installCloudflared(join(options.storage, 'cloudflared'), release, signal, options.report);
 }
 
+function keeperIdentity(options: TunnelOptions): KeeperIdentity {
+  return {
+    script: options.keeperScript,
+    version: options.version,
+    port: options.leaderPort,
+    cloudflaredPath: options.cloudflaredPath,
+    hostname: options.named?.hostname ?? null,
+    tokenHash: options.named ? createHash('sha256').update(options.named.token).digest('hex') : null
+  };
+}
+
 export async function startTunnel(options: TunnelOptions): Promise<Tunnel> {
+  const { report } = options;
   const quick = !options.named;
-  const pidFile = join(options.storage, 'cloudflared.pid');
+  const port = options.leaderPort + 1;
+  const files = keeperFiles(options.storage);
+  const identity = keeperIdentity(options);
+  const log = new LineTailer(files.log);
   const abort = new AbortController();
   let writing = Promise.resolve();
+  let keeper: number | null = null;
+  let keeperSince = 0;
+  let failures = 0;
+  let retryAt = 0;
 
   const publish = (status: TunnelStatus): void => {
     if (abort.signal.aborted) return;
-    if (status.state === 'ready') options.report(`Cloudflare tunnel ready at ${status.url}`);
-    if (status.state === 'error') options.report(`Cloudflare tunnel: ${status.message}`);
+    if (status.state === 'error') report(`Cloudflare tunnel: ${status.message}`);
     writing = writing
       .then(() => writeTunnelStatus(options.statusFile, status))
       .catch((error: unknown) =>
-        options.report(`Could not save the tunnel status: ${errorMessage(error)}`)
+        report(`Could not save the tunnel status: ${errorMessage(error)}`)
       );
   };
 
-  const launch = async (): Promise<Cloudflared | null> => {
-    await reapStale(pidFile, options.report);
-    const binary = await resolveBinary(options, abort.signal);
-    if (abort.signal.aborted) return null;
-    return runCloudflared({
-      binary,
-      origin: `http://127.0.0.1:${options.port}`,
-      named: options.named,
-      pidFile,
-      onStatus: publish,
-      report: options.report
-    });
+  const fail = (message: string): void => {
+    failures += 1;
+    retryAt = Date.now() + Math.min(MAX_RETRY_MS, MIN_RETRY_MS * 2 ** (failures - 1));
+    publish({ state: 'error', quick, message });
   };
 
-  publish({ state: 'starting', quick });
-  const listening = listen(options.origin, options.port);
-  const running = listening.then(launch).catch((error: unknown) => {
-    publish({ state: 'error', quick, message: errorMessage(error) });
-    return null;
-  });
+  const ensure = async (): Promise<void> => {
+    const record = await readKeeperRecord(files.record);
+    if (keeper !== null && record?.pid === keeper && processAlive(keeper)) {
+      if (Date.now() - keeperSince >= STABLE_MS) failures = 0;
+      return;
+    }
+    if (record && sameKeeper(record, identity) && (await keeperRunning(record))) {
+      report(`Using the running tunnel keeper ${record.pid}`);
+      keeper = record.pid;
+      keeperSince = Date.now();
+      return;
+    }
+    if (keeper !== null) {
+      keeper = null;
+      fail('The tunnel keeper stopped unexpectedly');
+    }
+    if (Date.now() < retryAt) return;
+    await stopKeeper(files, report);
+    publish({ state: 'starting', quick });
+    const binary = await resolveBinary(options, abort.signal);
+    if (abort.signal.aborted) return;
+    keeper = await spawnKeeper({
+      identity,
+      config: {
+        binary,
+        origin: `http://${LOOPBACK}:${port}`,
+        leaderPort: options.leaderPort,
+        hostname: identity.hostname,
+        recordFile: files.record,
+        statusFile: options.statusFile,
+        pidFile: files.cloudflaredPid
+      },
+      token: options.named?.token ?? null,
+      log: files.log
+    });
+    keeperSince = Date.now();
+  };
+
+  const tick = async (): Promise<void> => {
+    try {
+      await ensure();
+    } catch (error) {
+      if (!abort.signal.aborted) fail(errorMessage(error));
+    }
+    const read = await log.read().catch(() => null);
+    for (const line of read?.lines ?? []) report(line.replace(LOG_TIMESTAMP, ''));
+  };
+
+  const listening = listen(options.origin, port);
+  const running = listening.then(
+    async () => {
+      while (!abort.signal.aborted) {
+        await tick();
+        await delay(MONITOR_MS, undefined, { signal: abort.signal }).catch(() => undefined);
+      }
+    },
+    async (error: unknown) => {
+      await stopKeeper(files, report).catch(() => undefined);
+      publish({ state: 'error', quick, message: errorMessage(error) });
+    }
+  );
   await listening.catch(() => undefined);
 
   return {
-    close: async () => {
+    close: async (keepTunnel) => {
       abort.abort();
-      await (await running)?.close();
+      await running;
       options.origin.close();
       options.origin.closeAllConnections();
       await writing;
+      if (keepTunnel && keeper !== null) return;
+      await stopKeeper(files, report);
       await clearTunnelStatus(options.statusFile);
     }
   };

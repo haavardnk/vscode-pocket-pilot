@@ -25,6 +25,10 @@ import type { Disposable, LocalWindow, TerminalUpdate } from '../src/cluster/loc
 import { clusterSecret, hookSecret, sharedFiles } from '../src/cluster/sharedState';
 import { HOOK_HEADER } from '../src/hooks/hookFile';
 import { PairingStore } from '../src/server/pairing';
+import { readOptional } from '../src/storage/sharedFile';
+import { keeperFiles } from '../src/tunnel/keeperClient';
+import { processAlive, readKeeperRecord } from '../src/tunnel/keeperRecord';
+import { bundleKeeper } from './keeperBundle';
 
 const PUBLIC_HOST = 'abc.trycloudflare.com';
 const PUBLIC_ORIGIN = `https://${PUBLIC_HOST}`;
@@ -108,6 +112,7 @@ class FakeWindow implements LocalWindow {
 let storage: string;
 let port: number;
 let cloudflared: string;
+let keeperScript: string;
 const report = (): void => undefined;
 
 async function canListen(candidate: number): Promise<boolean> {
@@ -135,6 +140,20 @@ async function waitFor(check: () => boolean, timeout = 5000): Promise<void> {
   }
 }
 
+async function until(check: () => Promise<boolean>, timeout = 10_000): Promise<void> {
+  const deadline = Date.now() + timeout;
+  while (!(await check())) {
+    if (Date.now() > deadline) throw new Error('Timed out');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+async function tunnelUrl(): Promise<string | null> {
+  const text = await readOptional(sharedFiles(storage).tunnel);
+  const status = text ? (JSON.parse(text) as { state: string; url?: string }) : null;
+  return status?.state === 'ready' ? (status.url ?? null) : null;
+}
+
 function cluster(window: FakeWindow, roles: Role[]): Cluster<Leader> {
   return new Cluster<Leader>({
     lead: () =>
@@ -143,6 +162,7 @@ function cluster(window: FakeWindow, roles: Role[]): Cluster<Leader> {
         storage,
         port,
         tunnel: { named: null, cloudflaredPath: cloudflared },
+        keeperScript,
         version: 'test',
         webRoot: storage,
         password: { enabled: () => Promise.resolve(false), verify: () => Promise.resolve(false) },
@@ -214,8 +234,12 @@ beforeAll(async () => {
   await writeFile(join(storage, 'index.html'), '<!doctype html><title>Pocket Pilot</title>');
   port = await freePortPair();
   cloudflared = join(storage, 'cloudflared');
-  await writeFile(cloudflared, '#!/bin/sh\nexec sleep 60\n');
+  await writeFile(
+    cloudflared,
+    '#!/bin/sh\necho "INF | https://q$$.trycloudflare.com |"\necho "INF Registered tunnel connection"\nexec sleep 60\n'
+  );
   await chmod(cloudflared, 0o755);
+  keeperScript = await bundleKeeper(storage);
 });
 
 afterAll(() => rm(storage, { recursive: true, force: true }));
@@ -402,5 +426,28 @@ describe('cluster', () => {
     again.socket.close();
     await follower.stop();
     expect(firstRoles.at(-1)).toEqual({ kind: 'stopped' });
+  }, 20_000);
+
+  it('keeps the quick tunnel address when the leader window closes', async () => {
+    const first = cluster(new FakeWindow('first'), []);
+    const second = cluster(new FakeWindow('second'), []);
+    first.start();
+    await waitFor(() => first.role.kind === 'leader');
+    second.start();
+    await waitFor(() => second.role.kind === 'follower');
+    await until(async () => (await tunnelUrl()) !== null);
+    const url = await tunnelUrl();
+    const keeper = (await readKeeperRecord(keeperFiles(storage).record))?.pid ?? 0;
+
+    await first.stop(true);
+    await waitFor(() => second.role.kind === 'leader');
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    expect(await tunnelUrl()).toBe(url);
+    expect((await readKeeperRecord(keeperFiles(storage).record))?.pid).toBe(keeper);
+
+    await second.stop();
+    expect(processAlive(keeper)).toBe(false);
+    expect(await readOptional(sharedFiles(storage).tunnel)).toBeNull();
+    expect(await readOptional(keeperFiles(storage).record)).toBeNull();
   }, 20_000);
 });

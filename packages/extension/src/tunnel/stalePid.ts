@@ -11,7 +11,7 @@ const recordSchema = z.object({ pid: z.number().int().positive(), binary: z.stri
 
 export type PidRecord = z.infer<typeof recordSchema>;
 
-async function commandLine(pid: number): Promise<string | null> {
+export async function commandLine(pid: number): Promise<string | null> {
   if (process.platform === 'win32') return null;
   try {
     const { stdout } = await promisify(execFile)('ps', ['-o', 'command=', '-p', String(pid)]);
