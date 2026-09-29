@@ -7,12 +7,13 @@
   import { getChatContext } from '../chatContext';
   import { responseItems } from '../hub/steps';
   import { markdown } from '../markdown';
+  import { requestPhoto } from '../photos/chatPhotos';
   import { routeHash } from '../routing';
   import { chatView } from '../stores/chatView.svelte';
   import EditLink from './EditLink.svelte';
+  import PhotoStrip from './PhotoStrip.svelte';
   import PromptAlert from './PromptAlert.svelte';
   import QuestionCard from './QuestionCard.svelte';
-  import RequestPhotos from './RequestPhotos.svelte';
   import StepGroup from './StepGroup.svelte';
   import SubagentBlock from './SubagentBlock.svelte';
   import ToolLine from './ToolLine.svelte';
@@ -75,7 +76,11 @@
     </div>
   {/if}
   {#if request.images.length > 0}
-    <RequestPhotos {windowId} {sessionId} requestId={request.id} images={request.images} />
+    <PhotoStrip
+      class="justify-end"
+      photos={request.images}
+      load={(imageId) => requestPhoto(windowId, sessionId, request.id, imageId)}
+    />
   {/if}
 
   {#each items as part, index (index)}

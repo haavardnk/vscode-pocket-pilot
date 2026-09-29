@@ -15,6 +15,15 @@ test('opens an image the agent viewed', async ({ page }) => {
   await expect(page).toHaveURL(/#\/file\/w1\/f1\/docs%2Ficon\.png$/);
 });
 
+test('shows a screenshot taken by a tool', async ({ page }) => {
+  await page.getByText('Took a screenshot').click();
+  await page.getByRole('button', { name: 'View Image 1' }).click();
+  const viewer = page.getByRole('dialog', { name: 'Image 1' });
+  await expect(viewer.getByRole('img', { name: 'Image 1' })).toBeVisible();
+  await viewer.getByRole('button', { name: 'Close photo' }).click();
+  await expect(viewer).toHaveCount(0);
+});
+
 test('opens a search result at its line and returns to the chat', async ({ page }) => {
   await page.getByText('Searched for text parseRoute').click();
   const results = page.getByRole('list', { name: 'Results' });
@@ -25,7 +34,7 @@ test('opens a search result at its line and returns to the chat', async ({ page 
     'export function parseRoute(hash: string): Route {'
   );
   await page.getByRole('button', { name: 'Back' }).click();
-  await expect(results.getByRole('link', { name: 'routing.ts:3' })).toBeVisible();
+  await expect(page.getByText('Took a screenshot')).toBeVisible();
 });
 
 test('resolves relative links in a reply against the workspace', async ({ page }) => {

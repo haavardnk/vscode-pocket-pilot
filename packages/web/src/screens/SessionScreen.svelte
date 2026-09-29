@@ -47,8 +47,8 @@
   import { handoffSource } from '../lib/hub/handoffs';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { getPane } from '../lib/pane';
+  import { requestPhoto } from '../lib/photos/chatPhotos';
   import { dataUrl, reusePhoto } from '../lib/photos/prepare';
-  import { requestPhoto } from '../lib/photos/requestPhotos';
   import { inChat, parseRoute, routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';

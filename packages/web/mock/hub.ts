@@ -31,7 +31,8 @@ import {
   openedWindow,
   ownedTerminal,
   refreshSummary,
-  samplePhotos
+  samplePhotos,
+  SCREENSHOT
 } from './fixtures.ts';
 
 const REPLY_DELAY_MS = 800;
@@ -139,6 +140,12 @@ export class MockHub {
       const photo = this.photos.get(`${query.requestId}/${query.imageId}`);
       if (!photo) throw new Error('Photo is no longer available');
       return photo;
+    }
+    if (query.kind === 'toolImage') {
+      if (query.callId !== 'shot' || query.index !== 0) {
+        throw new Error('Image is no longer available');
+      }
+      return SCREENSHOT;
     }
     return this.code.query(query);
   }
@@ -415,6 +422,7 @@ export class MockHub {
           message: 'Read `README.md`',
           detail: null,
           links: [],
+          images: 0,
           title: null,
           grouped: true,
           awaitingConfirmation: false,

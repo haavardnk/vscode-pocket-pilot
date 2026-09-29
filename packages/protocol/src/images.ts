@@ -26,8 +26,23 @@ export const imageQuerySchema = z.object({
   imageId: z.string()
 });
 
+export const toolImageQuerySchema = z.object({
+  kind: z.literal('toolImage'),
+  windowId: z.string(),
+  sessionId: z.string(),
+  requestId: z.string(),
+  callId: z.string(),
+  index: z.number().int().nonnegative()
+});
+
 export const imageResultSchema = z.object({
   kind: z.literal('requestImage'),
+  mimeType: z.enum(SHOWN_IMAGE_TYPES),
+  data: z.string()
+});
+
+export const toolImageResultSchema = z.object({
+  kind: z.literal('toolImage'),
   mimeType: z.enum(SHOWN_IMAGE_TYPES),
   data: z.string()
 });
@@ -37,3 +52,4 @@ export type RequestImage = z.infer<typeof requestImageSchema>;
 export type ShownImageType = RequestImage['mimeType'];
 export type ImageQuery = z.infer<typeof imageQuerySchema>;
 export type ImageResult = z.infer<typeof imageResultSchema>;
+export type ToolImageResult = z.infer<typeof toolImageResultSchema>;

@@ -9,6 +9,7 @@ import {
   type TerminalDetail,
   type TerminalLine,
   type TerminalSummary,
+  type ToolImageResult,
   type WindowState
 } from '@pocket-pilot/protocol';
 
@@ -36,6 +37,12 @@ export function samplePhotos(): Map<string, ImageResult> {
     ['q2/shot', photo]
   ]);
 }
+
+export const SCREENSHOT: ToolImageResult = {
+  kind: 'toolImage',
+  mimeType: 'image/png',
+  data: SAMPLE_PNG
+};
 
 const PLAN_AGENT =
   'vscode-userdata:/User/globalStorage/github.copilot-chat/plan-agent/Plan.agent.md';
@@ -389,6 +396,7 @@ export function initialWindows(now: number): MockWindow[] {
                   message: 'Read `App.svelte`',
                   detail: null,
                   links: [],
+                  images: 0,
                   title: 'Updated the app shell',
                   grouped: true,
                   awaitingConfirmation: false,
@@ -412,6 +420,7 @@ export function initialWindows(now: number): MockWindow[] {
                   message: 'Run `npm test`',
                   detail: 'npm test -- --run',
                   links: [],
+                  images: 0,
                   title: null,
                   grouped: false,
                   awaitingConfirmation: true,
@@ -456,6 +465,7 @@ export function initialWindows(now: number): MockWindow[] {
                   message: 'Find the election timeout',
                   detail: null,
                   links: [],
+                  images: 0,
                   title: null,
                   grouped: false,
                   awaitingConfirmation: false,
@@ -476,6 +486,7 @@ export function initialWindows(now: number): MockWindow[] {
                   message: 'Read `cluster.ts`',
                   detail: null,
                   links: [],
+                  images: 0,
                   title: null,
                   grouped: false,
                   awaitingConfirmation: false,
@@ -491,6 +502,23 @@ export function initialWindows(now: number): MockWindow[] {
                   message: 'Viewed image [icon.png](file:///repo/docs/icon.png)',
                   detail: null,
                   links: [],
+                  images: 0,
+                  title: null,
+                  grouped: false,
+                  awaitingConfirmation: false,
+                  status: 'done',
+                  terminal: null,
+                  subagent: null,
+                  parentCallId: null
+                },
+                {
+                  kind: 'tool',
+                  callId: 'shot',
+                  toolId: 'screenshot_page',
+                  message: 'Took a screenshot',
+                  detail: null,
+                  links: [],
+                  images: 1,
                   title: null,
                   grouped: false,
                   awaitingConfirmation: false,
@@ -512,6 +540,7 @@ export function initialWindows(now: number): MockWindow[] {
                     },
                     { label: 'App.svelte', uri: 'file:///repo/packages/web/src/App.svelte' }
                   ],
+                  images: 0,
                   title: null,
                   grouped: false,
                   awaitingConfirmation: false,

@@ -57,6 +57,7 @@ function toolParts(event: ToolStart, status: ToolStatus): ActivityPart[] {
       message: toolLabel(event.name, asRecord(args), status),
       detail: event.args && clip(event.args, DETAIL_LENGTH),
       links: [],
+      images: 0,
       title: null,
       grouped: groupedByName(event.name),
       awaitingConfirmation: false,

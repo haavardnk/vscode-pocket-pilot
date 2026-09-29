@@ -219,6 +219,7 @@ describe('SessionStore', () => {
             message: 'grep',
             detail: null,
             links: [],
+            images: 0,
             title: null,
             grouped: true,
             awaitingConfirmation: false,

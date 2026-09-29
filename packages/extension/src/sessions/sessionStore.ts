@@ -6,12 +6,13 @@ import type {
   ImageResult,
   PermissionLevel,
   QueuedRequest,
-  SessionDetail
+  SessionDetail,
+  ToolImageResult
 } from '@pocket-pilot/protocol';
 import type { FSWatcher } from 'chokidar';
 
 import { watchTargets } from '../fsWatch';
-import { asRecord, asString, type JsonRecord } from '../json';
+import { asArray, asRecord, asString, type JsonRecord } from '../json';
 import { type Activity, toolStatuses } from './activityParts';
 import { exportedRequests } from './exportedRequests';
 import { sessionFiles } from './fileLinks';
@@ -41,6 +42,7 @@ import {
   summaryOf,
   syncUnlogged
 } from './sessionEntry';
+import { toolImage } from './toolParts';
 import { matchesRequest } from './transcript';
 import { pendingTurns } from './unloggedTurns';
 
@@ -209,6 +211,26 @@ export class SessionStore {
       .find((item) => item.id === requestId)
       ?.images.find((candidate) => candidate.id === imageId);
     return image ? fileImage(image) : null;
+  }
+
+  async toolImage(
+    sessionId: string,
+    requestId: string,
+    callId: string,
+    index: number
+  ): Promise<ToolImageResult | null> {
+    const entry = await this.loaded(sessionId);
+    if (!entry) return null;
+    const request = requestsOf(rootOf(entry)).find(
+      (candidate) => candidate.requestId === requestId
+    );
+    const part = asArray(request?.response)
+      .map(asRecord)
+      .find(
+        (candidate) =>
+          candidate.kind === 'toolInvocationSerialized' && candidate.toolCallId === callId
+      );
+    return part ? toolImage(part, index) : null;
   }
 
   async files(sessionId: string): Promise<ReadonlySet<string>> {

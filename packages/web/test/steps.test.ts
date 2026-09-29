@@ -15,6 +15,7 @@ const tool = (
   message: 'Read',
   detail: null,
   links: [],
+  images: 0,
   title,
   grouped,
   awaitingConfirmation: !grouped,

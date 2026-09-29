@@ -94,7 +94,7 @@ function uploadType(mimeType: string): UploadType | null {
   return UPLOAD_IMAGE_TYPES.find((type) => type === mimeType) ?? null;
 }
 
-export function reusePhoto(image: ImageResult): Promise<ImageUpload> {
+export function reusePhoto(image: Pick<ImageResult, 'mimeType' | 'data'>): Promise<ImageUpload> {
   const mimeType = uploadType(image.mimeType);
   if (mimeType && image.data.length <= MAX_IMAGE_BASE64) {
     return Promise.resolve({ mimeType, data: image.data });

@@ -30,7 +30,7 @@ interface ImageVariable {
   value: unknown;
 }
 
-function shownType(value: unknown): ShownImageType | null {
+export function shownType(value: unknown): ShownImageType | null {
   return SHOWN_IMAGE_TYPES.find((type) => type === value) ?? null;
 }
 

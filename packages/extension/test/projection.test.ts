@@ -4,6 +4,7 @@ import type { Activity } from '../src/sessions/activityParts';
 import { linkedMessage, sessionFiles } from '../src/sessions/fileLinks';
 import { plainMessage } from '../src/sessions/partText';
 import { editedPaths, projectDetail, projectSummary } from '../src/sessions/projection';
+import { toolImage } from '../src/sessions/toolParts';
 import { request, SESSION_ID, snapshot } from './fixtures';
 
 const quiet: Activity = { statuses: new Map(), events: [], toolsOnly: false, settled: false };
@@ -81,7 +82,7 @@ describe('projection', () => {
     expect(linkedMessage({ value })).toBe(expected);
   });
 
-  it('links tool results', () => {
+  it('links tool results and counts images', () => {
     const response = [
       { value: 'See [b](../b.ts#L2)', baseUri: { scheme: 'file', path: '/repo/src' } },
       {
@@ -96,6 +97,20 @@ describe('projection', () => {
           { $mid: 1, fsPath: '/repo/a.ts', path: '/repo/a.ts', scheme: 'file' }
         ],
         isComplete: true
+      },
+      {
+        kind: 'toolInvocationSerialized',
+        toolCallId: 'c2',
+        toolId: 'screenshot_page',
+        pastTenseMessage: { value: 'Took screenshot' },
+        resultDetails: {
+          output: [
+            { type: 'embed', mimeType: 'image/jpeg', value: '/9j/' },
+            { type: 'embed', mimeType: 'image/svg+xml', value: '<svg/>' },
+            { type: 'embed', isText: true, value: 'done' }
+          ]
+        },
+        isComplete: true
       }
     ];
     const requests = [request('r1', 'go', 1, response)];
@@ -109,9 +124,17 @@ describe('projection', () => {
           { label: 'a.ts', uri: 'file:///repo/a.ts' },
           { label: 'b.ts:4', uri: 'file:///repo/b.ts#L4' },
           { label: 'example.com/docs', uri: 'https://example.com/docs' }
-        ]
-      }
+        ],
+        images: 0
+      },
+      { callId: 'c2', links: [], images: 1 }
     ]);
+    expect(toolImage(response[2] ?? {}, 0)).toEqual({
+      kind: 'toolImage',
+      mimeType: 'image/jpeg',
+      data: '/9j/'
+    });
+    expect(toolImage(response[2] ?? {}, 1)).toBeNull();
     expect([...sessionFiles(requests)].sort()).toEqual(['/repo/a.ts', '/repo/b.ts']);
   });
 
@@ -244,6 +267,7 @@ describe('projection', () => {
         message: 'Running `npm test`',
         detail: 'npm test',
         links: [],
+        images: 0,
         title: null,
         grouped: false,
         awaitingConfirmation: true,
@@ -262,6 +286,7 @@ describe('projection', () => {
         message: 'Searching for text `x`',
         detail: '{"query":"x"}',
         links: [],
+        images: 0,
         title: null,
         grouped: true,
         awaitingConfirmation: false,

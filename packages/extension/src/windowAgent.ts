@@ -316,6 +316,16 @@ export class WindowAgent implements vscode.Disposable {
       if (!image) throw new Error('Photo is no longer available');
       return image;
     }
+    if (query.kind === 'toolImage') {
+      const image = await this.store.toolImage(
+        query.sessionId,
+        query.requestId,
+        query.callId,
+        query.index
+      );
+      if (!image) throw new Error('Image is no longer available');
+      return image;
+    }
     return this.code.query(query);
   }
 

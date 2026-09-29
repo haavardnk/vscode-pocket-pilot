@@ -1,8 +1,9 @@
-import type { ResponsePart, Subagent, ToolStatus } from '@pocket-pilot/protocol';
+import type { ResponsePart, Subagent, ToolImageResult, ToolStatus } from '@pocket-pilot/protocol';
 
 import { asArray, asRecord, asString, type JsonRecord } from '../json';
 import { linkedMessage, resultLinks } from './fileLinks';
 import { clip, DETAIL_LENGTH } from './partText';
+import { MAX_SHOWN_IMAGE_BYTES, shownType } from './requestImages';
 
 type ToolPart = Extract<ResponsePart, { kind: 'tool' }>;
 type Outcome = 'skipped' | 'denied' | null;
@@ -58,6 +59,24 @@ function resultText(result: JsonRecord): string {
     .flatMap((item) => (item.isText === true ? (asString(item.value) ?? []) : []))
     .join('');
   return [asString(result.input), output].filter(Boolean).join('\n\n').slice(0, DETAIL_LENGTH);
+}
+
+function toolImages(part: JsonRecord): ToolImageResult[] {
+  return asArray(asRecord(part.resultDetails).output).flatMap((raw): ToolImageResult[] => {
+    const item = asRecord(raw);
+    const mimeType = shownType(item.mimeType);
+    const data = asString(item.value);
+    return mimeType && data ? [{ kind: 'toolImage', mimeType, data }] : [];
+  });
+}
+
+export function toolImage(part: JsonRecord, index: number): ToolImageResult | null {
+  const image = toolImages(part)[index];
+  if (!image) return null;
+  if (Buffer.byteLength(image.data, 'base64') > MAX_SHOWN_IMAGE_BYTES) {
+    throw new Error('Image is too large to show');
+  }
+  return image;
 }
 
 function toolDetail(part: JsonRecord): string | null {
@@ -152,6 +171,7 @@ export function projectTool(
         linkedMessage(part.invocationMessage),
     detail: toolDetail(part),
     links: resultLinks(part),
+    images: toolImages(part).length,
     title: asString(part.generatedTitle),
     grouped: isGrouped(part, toolId, awaitingConfirmation),
     awaitingConfirmation,

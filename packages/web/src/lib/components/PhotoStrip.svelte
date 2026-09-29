@@ -1,19 +1,18 @@
 <script lang="ts">
   import ImageOff from '@lucide/svelte/icons/image-off';
   import X from '@lucide/svelte/icons/x';
-  import type { RequestImage } from '@pocket-pilot/protocol';
+  import type { ClassValue } from 'svelte/elements';
 
+  import type { ChatPhoto } from '../photos/chatPhotos';
   import { dataUrl } from '../photos/prepare';
-  import { requestPhoto } from '../photos/requestPhotos';
 
   interface Props {
-    windowId: string;
-    sessionId: string;
-    requestId: string;
-    images: RequestImage[];
+    photos: { id: string; name: string }[];
+    load: (id: string) => Promise<ChatPhoto>;
+    class?: ClassValue;
   }
 
-  const { windowId, sessionId, requestId, images }: Props = $props();
+  const { photos, load, class: className }: Props = $props();
 
   let viewing = $state<{ name: string; src: string } | null>(null);
   let dialog = $state<HTMLDialogElement>();
@@ -23,10 +22,10 @@
   });
 </script>
 
-<ul class="flex flex-wrap justify-end gap-2" aria-label="Photos">
-  {#each images as image (image.id)}
+<ul class={['flex flex-wrap gap-2', className]} aria-label="Photos">
+  {#each photos as image (image.id)}
     <li>
-      {#await requestPhoto(windowId, sessionId, requestId, image.id)}
+      {#await load(image.id)}
         <div class="size-20 skeleton rounded-box" aria-label={`Loading ${image.name}`}></div>
       {:then photo}
         <button

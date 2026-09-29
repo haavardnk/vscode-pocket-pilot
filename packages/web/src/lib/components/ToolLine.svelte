@@ -12,7 +12,9 @@
 
   import { chatFileHref, getChatContext } from '../chatContext';
   import { markdown } from '../markdown';
+  import { toolPhoto } from '../photos/chatPhotos';
   import { routeHash } from '../routing';
+  import PhotoStrip from './PhotoStrip.svelte';
 
   interface Props {
     part: Extract<ResponsePart, { kind: 'tool' }>;
@@ -26,7 +28,13 @@
 
   const key = $derived(`${windowId}/${chat.sessionId}/${requestId}/${part.callId}`);
   const open = $derived(expanded.get(key) ?? false);
-  const expandable = $derived(part.detail !== null || part.links.length > 0);
+  const expandable = $derived(part.detail !== null || part.links.length > 0 || part.images > 0);
+  const photos = $derived(
+    Array.from({ length: part.images }, (_, index) => ({
+      id: String(index),
+      name: `Image ${index + 1}`
+    }))
+  );
 </script>
 
 {#snippet line()}
@@ -59,6 +67,12 @@
     >
     {#if open}
       <div class="mt-1 ml-6 flex flex-col gap-2">
+        {#if photos.length > 0}
+          <PhotoStrip
+            {photos}
+            load={(id) => toolPhoto(windowId, chat.sessionId, requestId, part.callId, Number(id))}
+          />
+        {/if}
         {#if part.links.length > 0}
           <ul class="flex flex-col gap-1" aria-label="Results">
             {#each part.links as link (link.uri)}

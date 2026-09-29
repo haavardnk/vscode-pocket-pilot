@@ -112,6 +112,7 @@ export const responsePartSchema = z.discriminatedUnion('kind', [
     message: z.string(),
     detail: z.string().nullable(),
     links: z.array(toolLinkSchema),
+    images: z.number().int().nonnegative(),
     title: z.string().nullable(),
     grouped: z.boolean(),
     awaitingConfirmation: z.boolean(),

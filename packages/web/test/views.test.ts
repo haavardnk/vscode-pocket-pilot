@@ -227,6 +227,7 @@ describe('response parts', () => {
       message: 'Run',
       detail: null,
       links: [],
+      images: 0,
       title: null,
       grouped: !awaitingConfirmation,
       awaitingConfirmation,
