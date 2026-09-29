@@ -165,6 +165,7 @@ export class WindowAgent implements vscode.Disposable {
       expectFlags: (sessionId, flags) => this.flags.expect(sessionId, flags),
       expectQueue: (sessionId, items) => this.store.expectQueue(sessionId, items),
       expectPermission: (sessionId, level) => this.store.expectPermission(sessionId, level),
+      expectMode: (sessionId, modeId) => this.store.expectMode(sessionId, modeId),
       canOrganize: this.paths.stateDatabase !== null,
       settings
     });

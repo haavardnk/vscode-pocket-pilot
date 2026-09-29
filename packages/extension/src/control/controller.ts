@@ -40,6 +40,7 @@ export interface ControllerSources {
   expectFlags: (sessionId: string, flags: Partial<SessionFlags>) => void;
   expectQueue: (sessionId: string, items: QueuedRequest[]) => void;
   expectPermission: (sessionId: string, level: PermissionLevel) => void;
+  expectMode: (sessionId: string, modeId: string) => void;
   canOrganize: boolean;
   settings: ModelSettingsFile;
 }
@@ -90,6 +91,7 @@ export class Controller {
           modeId: command.modeId,
           sessionResource: sessionResource(command.sessionId)
         });
+        this.sources.expectMode(command.sessionId, command.modeId);
         return;
       case 'setModel':
         await this.selectModel(await this.requireModel(command.modelId));

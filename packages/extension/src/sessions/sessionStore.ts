@@ -25,6 +25,7 @@ import {
 } from './projection';
 import { currentQueue } from './queue';
 import {
+  type Expected,
   markOf,
   newEntry,
   rememberRequests,
@@ -42,7 +43,7 @@ import { pendingTurns } from './unloggedTurns';
 const HOT_SESSIONS = 8;
 const DEBOUNCE_MS = 150;
 const MTIME_SLACK_MS = 2000;
-const PERMISSION_OVERLAY_MS = 120_000;
+const INPUT_OVERLAY_MS = 120_000;
 const LOG_SUFFIX = '.jsonl';
 
 export interface SessionFolders {
@@ -54,6 +55,10 @@ type Listener = (sessionId: string | null) => void;
 
 function summaryKey(entry: SessionEntry): string {
   return JSON.stringify(summaryOf(entry));
+}
+
+function expectedOr<T>(expected: Expected<T> | null, logged: T): T {
+  return expected && Date.now() - expected.at < INPUT_OVERLAY_MS ? expected.value : logged;
 }
 
 export class SessionStore {
@@ -116,13 +121,10 @@ export class SessionStore {
       activity,
       pendingTurns(entry.unlogged, summary.modelId, activity.statuses, activity.settled)
     );
-    const expected = entry.permission;
     return {
       ...detail,
-      permission:
-        expected && Date.now() - expected.at < PERMISSION_OVERLAY_MS
-          ? expected.level
-          : detail.permission,
+      modeId: expectedOr(entry.mode, detail.modeId),
+      permission: expectedOr(entry.permission, detail.permission),
       queued: currentQueue(
         detail.queued,
         entry.queue,
@@ -147,7 +149,14 @@ export class SessionStore {
   expectPermission(sessionId: string, level: PermissionLevel): void {
     const entry = this.entries.get(sessionId);
     if (!entry) return;
-    entry.permission = { level, at: Date.now() };
+    entry.permission = { value: level, at: Date.now() };
+    this.emit(sessionId);
+  }
+
+  expectMode(sessionId: string, modeId: string): void {
+    const entry = this.entries.get(sessionId);
+    if (!entry) return;
+    entry.mode = { value: modeId, at: Date.now() };
     this.emit(sessionId);
   }
 
@@ -358,6 +367,7 @@ export class SessionStore {
     rememberRequests(entry, requestsOf(root));
     if (entry.exported && modified >= entry.exported.at) entry.exported = null;
     if (entry.permission && modified >= entry.permission.at) entry.permission = null;
+    if (entry.mode && modified >= entry.mode.at) entry.mode = null;
     syncUnlogged(entry);
   }
 

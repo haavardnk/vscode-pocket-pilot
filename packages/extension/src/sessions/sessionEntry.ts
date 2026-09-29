@@ -13,6 +13,11 @@ interface Exported {
   summary: LogSummary;
 }
 
+export interface Expected<T> {
+  value: T;
+  at: number;
+}
+
 export interface SessionEntry {
   id: string;
   log: LineTailer;
@@ -28,7 +33,8 @@ export interface SessionEntry {
   stoppedAt: number | null;
   exported: Exported | null;
   queue: QueueOverlay | null;
-  permission: { level: PermissionLevel; at: number } | null;
+  permission: Expected<PermissionLevel> | null;
+  mode: Expected<string> | null;
 }
 
 export function newEntry(id: string, logPath: string): SessionEntry {
@@ -47,7 +53,8 @@ export function newEntry(id: string, logPath: string): SessionEntry {
     stoppedAt: null,
     exported: null,
     queue: null,
-    permission: null
+    permission: null,
+    mode: null
   };
 }
 

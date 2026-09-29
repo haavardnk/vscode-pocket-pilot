@@ -2,7 +2,7 @@ import { appendFile, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { HookEvent, QueuedRequest } from '@pocket-pilot/protocol';
+import type { HookEvent, QueuedRequest, SessionDetail } from '@pocket-pilot/protocol';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { SessionStore } from '../src/sessions/sessionStore';
@@ -34,25 +34,39 @@ describe('SessionStore', () => {
     await rm(folder, { recursive: true, force: true });
   });
 
-  it('holds a phone permission change until the log is written', async () => {
+  it.each([
+    {
+      name: 'permission',
+      expect: (): void => store.expectPermission(SESSION_ID, 'autopilot'),
+      read: (detail: SessionDetail | null) => detail?.permission,
+      phone: 'autopilot',
+      mutation: { kind: 1, k: ['inputState', 'permissionLevel'], v: 'autoApprove' },
+      logged: 'autoApprove'
+    },
+    {
+      name: 'mode',
+      expect: (): void => store.expectMode(SESSION_ID, 'agent'),
+      read: (detail: SessionDetail | null) => detail?.modeId,
+      phone: 'agent',
+      mutation: { kind: 1, k: ['inputState', 'mode'], v: { id: 'ask', kind: 'agent' } },
+      logged: 'ask'
+    }
+  ])('holds a phone $name change until the log is written', async (change) => {
     await store.start();
-    const permission = async (): Promise<string | undefined> =>
-      (await store.detail(SESSION_ID, 1))?.permission;
+    const current = async (): Promise<string | null | undefined> =>
+      change.read(await store.detail(SESSION_ID, 1));
 
-    store.expectPermission(SESSION_ID, 'autopilot');
-    expect(await permission()).toBe('autopilot');
+    change.expect();
+    expect(await current()).toBe(change.phone);
 
     const logged = new Promise<void>((resolve) => {
       store.onDidChange((sessionId) => {
         if (sessionId === SESSION_ID) resolve();
       });
     });
-    await appendFile(
-      join(sessions, `${SESSION_ID}.jsonl`),
-      logLines({ kind: 1, k: ['inputState', 'permissionLevel'], v: 'autoApprove' })
-    );
+    await appendFile(join(sessions, `${SESSION_ID}.jsonl`), logLines(change.mutation));
     await logged;
-    expect(await permission()).toBe('autoApprove');
+    expect(await current()).toBe(change.logged);
   });
 
   it('lists non-empty sessions and follows appended mutations', async () => {
