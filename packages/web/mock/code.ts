@@ -245,6 +245,7 @@ export class MockCode {
         diff: { kind: 'text', hunks: stop ?? (undone && !requestId ? [] : edit.hunks) }
       };
     }
+    if (query.kind === 'chatFile') return this.chatFile(query.windowId, query.uri);
     const folder = this.folder(query.windowId, query.folderId);
     if (query.kind === 'tree')
       return { kind: 'tree', entries: this.entries(folder, query.path), truncated: false };
@@ -272,6 +273,24 @@ export class MockCode {
       language: file.language,
       size: file.content.kind === 'text' ? file.content.text.length : 70,
       change: change?.change ?? null,
+      content: file.content
+    };
+  }
+
+  private chatFile(windowId: string, uri: string): CodeResult {
+    const path = decodeURIComponent(new URL(uri).pathname);
+    const folder = this.folders.find(
+      (candidate) => candidate.windowId === windowId && path.startsWith(`${candidate.root}/`)
+    );
+    const relativePath = folder ? path.slice(folder.root.length + 1) : '';
+    const file = folder?.files[relativePath];
+    if (!folder || !file) throw new Error('File is not part of this chat');
+    return {
+      kind: 'chatFile',
+      language: file.language,
+      size: file.content.kind === 'text' ? file.content.text.length : 70,
+      folderId: folder.id,
+      relativePath,
       content: file.content
     };
   }

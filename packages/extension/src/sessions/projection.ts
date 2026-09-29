@@ -20,6 +20,7 @@ import {
 import { asArray, asNumber, asRecord, asString, type JsonRecord, markdownText } from '../json';
 import { type Activity, withActivity } from './activityParts';
 import { withoutEditFences } from './editFences';
+import { markdownBase, referenceHref } from './fileLinks';
 import { basename, clip, plainMessage } from './partText';
 import { requestImages } from './requestImages';
 import { sessionTodos } from './todos';
@@ -196,12 +197,19 @@ function projectPart(part: JsonRecord, context: PartContext): ResponsePart | nul
   switch (part.kind) {
     case undefined:
     case 'markdownContent': {
-      const text = markdownText(part.kind === undefined ? part.value : part.content);
-      return text ? { kind: 'markdown', text } : null;
+      const markdown = part.kind === undefined ? part : asRecord(part.content);
+      const text = markdownText(markdown);
+      return text ? { kind: 'markdown', text, baseUri: markdownBase(markdown) } : null;
     }
     case 'inlineReference': {
       const name = referenceName(part);
-      return name ? { kind: 'markdown', text: `\`${name}\`` } : null;
+      if (!name) return null;
+      const href = referenceHref(part);
+      return {
+        kind: 'markdown',
+        text: href ? `[\`${name}\`](${href})` : `\`${name}\``,
+        baseUri: null
+      };
     }
     case 'thinking': {
       const text = thinkingText(part.value).trim();
@@ -269,7 +277,11 @@ function mergeParts(parts: ResponsePart[]): ResponsePart[] {
   for (const part of parts) {
     const previous = merged.at(-1);
     if (previous?.kind === 'markdown' && part.kind === 'markdown') {
-      merged[merged.length - 1] = { kind: 'markdown', text: previous.text + part.text };
+      merged[merged.length - 1] = {
+        kind: 'markdown',
+        text: previous.text + part.text,
+        baseUri: previous.baseUri ?? part.baseUri
+      };
     } else if (!(
       previous?.kind === 'edit' &&
       part.kind === 'edit' &&

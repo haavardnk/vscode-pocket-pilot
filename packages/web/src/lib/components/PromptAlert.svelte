@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Component, Snippet } from 'svelte';
 
-  import { getChatRepository } from '../chatRepository';
+  import { getChatContext } from '../chatContext';
   import { markdown } from '../markdown';
 
   interface Props {
@@ -14,7 +14,7 @@
 
   const { icon: Icon, title, message, pending, children }: Props = $props();
 
-  const repository = getChatRepository();
+  const chat = getChatContext();
 </script>
 
 <div
@@ -27,6 +27,6 @@
   <p class="flex items-center gap-2 font-medium">
     <Icon class="size-4 shrink-0" />{title}
   </p>
-  {#if message}<div class="markdown" {@attach markdown(message, repository.github)}></div>{/if}
+  {#if message}<div class="markdown" {@attach markdown(message, chat)}></div>{/if}
   {@render children()}
 </div>

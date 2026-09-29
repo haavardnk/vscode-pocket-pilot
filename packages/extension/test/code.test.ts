@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import type { CodeQuery, CodeResult, RequestView, SessionDetail } from '@pocket-pilot/protocol';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -180,6 +181,7 @@ describe('code queries', () => {
     await writeFile(join(workspace, 'app.log'), 'log');
     await writeFile(join(workspace, 'pixel.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0]));
     await symlink(root, join(workspace, 'escape'));
+    await writeFile(join(root, 'outside.md'), '# Notes\n');
     await mkdir(join(editing, 's1', 'contents'), { recursive: true });
     await writeFile(join(editing, 's1', 'contents', 'aaaaaaa'), 'one\ntwo\nthree\n');
     await writeFile(
@@ -282,7 +284,9 @@ describe('code queries', () => {
         live,
         edits,
         home: root
-      })
+      }),
+      referenced: (sessionId) =>
+        Promise.resolve(new Set(sessionId === 's1' ? [join(root, 'outside.md')] : []))
     });
   });
 
@@ -325,6 +329,48 @@ describe('code queries', () => {
       await expect(
         query({ kind: 'file', ...target, folderId: folder().id, path })
       ).rejects.toThrow();
+    }
+  );
+
+  it.each([
+    [['demo', 'src', 'a.ts'], true, 'src/a.ts', 'one\n2\nthree\n'],
+    [['outside.md'], false, null, '# Notes\n']
+  ])('opens chat file %j', async (segments, inFolder, relativePath, text) => {
+    const file = await query({
+      kind: 'chatFile',
+      ...target,
+      sessionId: 's1',
+      uri: pathToFileURL(join(root, ...segments)).href
+    });
+    expect(file).toMatchObject({
+      folderId: inFolder ? folder().id : null,
+      relativePath,
+      content: { kind: 'text', text }
+    });
+  });
+
+  it.each([
+    ['s2', ['outside.md']],
+    ['s1', ['editing', 's1', 'state.json']],
+    ['s1', ['demo', 'escape', 'editing', 's1', 'state.json']],
+    ['s1', ['demo', '.git', 'config']]
+  ])('refuses chat file for %s at %j', async (sessionId, segments) => {
+    await expect(
+      query({
+        kind: 'chatFile',
+        ...target,
+        sessionId,
+        uri: pathToFileURL(join(root, ...segments)).href
+      })
+    ).rejects.toThrow();
+  });
+
+  it.each(['https://example.com/a.ts', 'file://server/share/a.ts', 'not a url'])(
+    'refuses chat link %s',
+    async (uri) => {
+      await expect(query({ kind: 'chatFile', ...target, sessionId: 's1', uri })).rejects.toThrow(
+        'Invalid file link'
+      );
     }
   );
 

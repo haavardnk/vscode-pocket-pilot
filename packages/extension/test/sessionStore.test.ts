@@ -218,6 +218,7 @@ describe('SessionStore', () => {
             toolId: 'grep',
             message: 'grep',
             detail: null,
+            links: [],
             title: null,
             grouped: true,
             awaitingConfirmation: false,
@@ -257,7 +258,7 @@ describe('SessionStore', () => {
     const detail = await store.detail(SESSION_ID, 10);
     expect(detail?.requests.map((item) => [item.id, item.state, item.parts])).toEqual([
       ['r1', 'complete', []],
-      ['r9', 'pending', [{ kind: 'markdown', text: 'Streaming the answer' }]]
+      ['r9', 'pending', [{ kind: 'markdown', text: 'Streaming the answer', baseUri: null }]]
     ]);
 
     store.applyExport({ requests: [request('r1', 'Build it', 1), live] }, at + 10);

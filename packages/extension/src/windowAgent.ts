@@ -165,7 +165,8 @@ export class WindowAgent implements vscode.Disposable {
     this.code = new CodeService({
       folders: () => this.folders,
       language: (path) => languages.resolve(path),
-      sessions: sessionChanges
+      sessions: sessionChanges,
+      referenced: (sessionId) => this.store.files(sessionId)
     });
     this.controller = new Controller({
       models: () => Promise.resolve(this.models),

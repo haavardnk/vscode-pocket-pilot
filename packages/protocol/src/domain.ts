@@ -100,8 +100,10 @@ export const todoItemSchema = z.object({
   status: z.enum(['notStarted', 'inProgress', 'completed'])
 });
 
+export const toolLinkSchema = z.object({ label: z.string(), uri: z.string() });
+
 export const responsePartSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('markdown'), text: z.string() }),
+  z.object({ kind: z.literal('markdown'), text: z.string(), baseUri: z.string().nullable() }),
   z.object({ kind: z.literal('thinking'), text: z.string(), title: z.string().nullable() }),
   z.object({
     kind: z.literal('tool'),
@@ -109,6 +111,7 @@ export const responsePartSchema = z.discriminatedUnion('kind', [
     toolId: z.string(),
     message: z.string(),
     detail: z.string().nullable(),
+    links: z.array(toolLinkSchema),
     title: z.string().nullable(),
     grouped: z.boolean(),
     awaitingConfirmation: z.boolean(),
@@ -263,6 +266,7 @@ export type QuestionAnswers = z.infer<typeof questionAnswersSchema>;
 export type InteractionState = z.infer<typeof interactionStateSchema>;
 export type ToolStatus = z.infer<typeof toolStatusSchema>;
 export type Subagent = z.infer<typeof subagentSchema>;
+export type ToolLink = z.infer<typeof toolLinkSchema>;
 export type TodoItem = z.infer<typeof todoItemSchema>;
 export type ResponsePart = z.infer<typeof responsePartSchema>;
 export type RequestView = z.infer<typeof requestViewSchema>;

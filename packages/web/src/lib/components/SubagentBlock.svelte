@@ -9,7 +9,7 @@
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import CircleX from '@lucide/svelte/icons/circle-x';
 
-  import { getChatRepository } from '../chatRepository';
+  import { getChatContext } from '../chatContext';
   import type { SubagentItem } from '../hub/steps';
   import { markdown } from '../markdown';
   import ToolLine from './ToolLine.svelte';
@@ -18,11 +18,12 @@
     item: SubagentItem;
     windowId: string;
     sessionId: string;
+    requestId: string;
   }
 
-  const { item, windowId, sessionId }: Props = $props();
+  const { item, windowId, sessionId, requestId }: Props = $props();
 
-  const repository = getChatRepository();
+  const chat = getChatContext();
 
   const subagent = $derived(item.part.subagent);
   const key = $derived(`${windowId}/${sessionId}/${item.part.callId}`);
@@ -57,13 +58,10 @@
     <div class="mt-2 ml-2 flex flex-col gap-2 border-l border-base-300 pl-4">
       {#if subagent.model}<p class="text-xs text-base-content/50">{subagent.model}</p>{/if}
       {#each item.steps as step, index (index)}
-        <ToolLine part={step} {windowId} />
+        <ToolLine part={step} {windowId} {requestId} />
       {/each}
       {#if subagent.result}
-        <div
-          class="markdown text-base-content/80"
-          {@attach markdown(subagent.result, repository.github)}
-        ></div>
+        <div class="markdown text-base-content/80" {@attach markdown(subagent.result, chat)}></div>
       {:else if item.steps.length === 0 && item.part.status !== 'running'}
         <p class="text-base-content/50">No details</p>
       {/if}

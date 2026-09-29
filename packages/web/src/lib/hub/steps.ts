@@ -27,7 +27,11 @@ function mergeMarkdown(parts: ResponsePart[]): ResponsePart[] {
   for (const part of parts) {
     const previous = merged.at(-1);
     if (part.kind === 'markdown' && previous?.kind === 'markdown') {
-      merged[merged.length - 1] = { kind: 'markdown', text: previous.text + part.text };
+      merged[merged.length - 1] = {
+        kind: 'markdown',
+        text: previous.text + part.text,
+        baseUri: previous.baseUri ?? part.baseUri
+      };
     } else merged.push(part);
   }
   return merged;

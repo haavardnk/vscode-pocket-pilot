@@ -5,24 +5,28 @@ import { responseItems } from '../src/lib/hub/steps';
 
 const thinking = (text: string, title: string | null = null) =>
   ({ kind: 'thinking', text, title }) as const;
-const tool = (title: string | null = null, grouped = true) =>
-  ({
-    kind: 'tool',
-    callId: 'c',
-    toolId: 'read_file',
-    message: 'Read',
-    detail: null,
-    title,
-    grouped,
-    awaitingConfirmation: !grouped,
-    status: 'done',
-    terminal: null,
-    subagent: null,
-    parentCallId: null
-  }) as const;
+const tool = (
+  title: string | null = null,
+  grouped = true
+): Extract<ResponsePart, { kind: 'tool' }> => ({
+  kind: 'tool',
+  callId: 'c',
+  toolId: 'read_file',
+  message: 'Read',
+  detail: null,
+  links: [],
+  title,
+  grouped,
+  awaitingConfirmation: !grouped,
+  status: 'done',
+  terminal: null,
+  subagent: null,
+  parentCallId: null
+});
 const edit = (additions: number | null, deletions: number | null) =>
   ({ kind: 'edit', path: 'a.ts', stopId: null, callId: null, additions, deletions }) as const;
-const text = (value: string) => ({ kind: 'markdown', text: value }) as const;
+const text = (value: string, baseUri: string | null = null) =>
+  ({ kind: 'markdown', text: value, baseUri }) as const;
 
 function titles(parts: ResponsePart[], state: RequestState = 'complete'): (string | null)[] {
   return responseItems(parts, state).map((item) => (item.kind === 'group' ? item.title : null));
@@ -32,10 +36,10 @@ describe('response steps', () => {
   it('merges adjacent markdown and leaves a lone edit in place', () => {
     expect(
       responseItems(
-        [text('```ts\nconst a'), text(' = 1;\n```'), edit(1, 0), text('done')],
+        [text('```ts\nconst a'), text(' = 1;\n```', 'file:///repo/'), edit(1, 0), text('done')],
         'complete'
       )
-    ).toEqual([text('```ts\nconst a = 1;\n```'), edit(1, 0), text('done')]);
+    ).toEqual([text('```ts\nconst a = 1;\n```', 'file:///repo/'), edit(1, 0), text('done')]);
   });
 
   it('groups a run of steps with its title and summed diff', () => {

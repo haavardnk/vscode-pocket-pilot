@@ -3,6 +3,7 @@
 
   import { type Route, routeHash } from '../lib/routing';
   import BranchesScreen from './BranchesScreen.svelte';
+  import ChatFileScreen from './ChatFileScreen.svelte';
   import FileScreen from './FileScreen.svelte';
   import FolderScreen from './FolderScreen.svelte';
   import GitDiffScreen from './GitDiffScreen.svelte';
@@ -89,6 +90,15 @@
       path={route.path}
       requestId={route.requestId}
       edit={{ stopId: route.stopId, callId: route.callId }}
+    />
+  {/key}
+{:else if route.name === 'chatFile'}
+  {#key hash}
+    <ChatFileScreen
+      windowId={route.windowId}
+      sessionId={route.sessionId}
+      uri={route.uri}
+      line={route.line}
     />
   {/key}
 {:else}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Activity } from '../src/sessions/activityParts';
+import { linkedMessage, sessionFiles } from '../src/sessions/fileLinks';
 import { plainMessage } from '../src/sessions/partText';
 import { editedPaths, projectDetail, projectSummary } from '../src/sessions/projection';
 import { request, SESSION_ID, snapshot } from './fixtures';
@@ -62,25 +63,78 @@ describe('projection', () => {
   });
 
   it.each([
-    [{ path: '/repo/a.ts' }, 'Open `a.ts`'],
+    [
+      'Read [](file:///repo/src/app.ts), lines 1 to 5',
+      'Read [app.ts](file:///repo/src/app.ts), lines 1 to 5'
+    ],
+    [
+      'Read [](file:///repo/TODO.md#33-33), lines 33',
+      'Read [TODO.md](file:///repo/TODO.md#L33), lines 33'
+    ],
+    [
+      'Viewed image [](file:///repo/my%20shot.png)',
+      'Viewed image [my shot.png](file:///repo/my%20shot.png)'
+    ],
+    ['Opened [Browser](vscode-browser:/id?vscodeLinkType=browser)', 'Opened Browser'],
+    ['Fetched [docs](https://example.com/docs)', 'Fetched docs']
+  ])('links tool message %s', (value, expected) => {
+    expect(linkedMessage({ value })).toBe(expected);
+  });
+
+  it('links tool results', () => {
+    const response = [
+      { value: 'See [b](../b.ts#L2)', baseUri: { scheme: 'file', path: '/repo/src' } },
+      {
+        kind: 'toolInvocationSerialized',
+        toolCallId: 'c1',
+        toolId: 'copilot_findTextInFiles',
+        pastTenseMessage: { value: 'Searched text' },
+        resultDetails: [
+          { $mid: 1, fsPath: '/repo/a.ts', path: '/repo/a.ts', scheme: 'file' },
+          { uri: { fsPath: '/repo/b.ts', scheme: 'file' }, range: { startLineNumber: 4 } },
+          { scheme: 'https', authority: 'example.com', path: '/docs' },
+          { $mid: 1, fsPath: '/repo/a.ts', path: '/repo/a.ts', scheme: 'file' }
+        ],
+        isComplete: true
+      }
+    ];
+    const requests = [request('r1', 'go', 1, response)];
+    const root = snapshot(requests);
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []);
+    expect(detail.requests[0]?.parts).toMatchObject([
+      { kind: 'markdown', baseUri: 'file:///repo/src/' },
+      {
+        callId: 'c1',
+        links: [
+          { label: 'a.ts', uri: 'file:///repo/a.ts' },
+          { label: 'b.ts:4', uri: 'file:///repo/b.ts#L4' },
+          { label: 'example.com/docs', uri: 'https://example.com/docs' }
+        ]
+      }
+    ]);
+    expect([...sessionFiles(requests)].sort()).toEqual(['/repo/a.ts', '/repo/b.ts']);
+  });
+
+  it.each([
+    [{ path: '/repo/a.ts' }, 'Open [`a.ts`](file:///repo/a.ts)'],
     [
       { name: 'devices.json', kind: 12, location: { uri: { path: '/x/y' } } },
-      'Open `devices.json`'
+      'Open [`devices.json`](file:///x/y)'
     ],
     [
       { uri: { path: '/repo/a.ts' }, range: { startLineNumber: 3, endLineNumber: 3 } },
-      'Open `a.ts:3`'
+      'Open [`a.ts:3`](file:///repo/a.ts#L3)'
     ],
     [
       { uri: { path: '/repo/a.ts' }, range: { startLineNumber: 3, endLineNumber: 9 } },
-      'Open `a.ts:3-9`'
+      'Open [`a.ts:3-9`](file:///repo/a.ts#L3)'
     ],
     [{}, 'Open ']
   ])('labels inline references like VS Code %#', (inlineReference, text) => {
     const response = [{ value: 'Open ' }, { kind: 'inlineReference', inlineReference }];
     const root = snapshot([request('r1', 'go', 1, response)]);
     const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []);
-    expect(detail.requests[0]?.parts).toEqual([{ kind: 'markdown', text }]);
+    expect(detail.requests[0]?.parts).toEqual([{ kind: 'markdown', text, baseUri: null }]);
   });
 
   it('projects parts, queue and activity', () => {
@@ -181,7 +235,7 @@ describe('projection', () => {
     ]);
     expect(detail.requests).toHaveLength(1);
     expect(detail.requests[0]?.parts).toEqual([
-      { kind: 'markdown', text: 'Looking at `a.ts` now.' },
+      { kind: 'markdown', text: 'Looking at [`a.ts`](file:///repo/a.ts) now.', baseUri: null },
       { kind: 'thinking', text: 'Consider this', title: 'Plan' },
       {
         kind: 'tool',
@@ -189,6 +243,7 @@ describe('projection', () => {
         toolId: 'run_in_terminal',
         message: 'Running `npm test`',
         detail: 'npm test',
+        links: [],
         title: null,
         grouped: false,
         awaitingConfirmation: true,
@@ -199,13 +254,14 @@ describe('projection', () => {
       },
       edit,
       { kind: 'thinking', text: 'Check first', title: null },
-      { kind: 'markdown', text: 'All green' },
+      { kind: 'markdown', text: 'All green', baseUri: null },
       {
         kind: 'tool',
         callId: 'c2',
         toolId: 'grep_search',
         message: 'Searching for text `x`',
         detail: '{"query":"x"}',
+        links: [],
         title: null,
         grouped: true,
         awaitingConfirmation: false,
@@ -222,11 +278,15 @@ describe('projection', () => {
     [[{ value: '\n```\n' }, { kind: 'undoStop' }, block, group, { value: '\n```\n' }], [edit]],
     [
       [{ value: 'Editing:\n```ts\n' }, block, group, { value: '\n```\nDone.' }],
-      [{ kind: 'markdown', text: 'Editing:' }, edit, { kind: 'markdown', text: 'Done.' }]
+      [
+        { kind: 'markdown', text: 'Editing:', baseUri: null },
+        edit,
+        { kind: 'markdown', text: 'Done.', baseUri: null }
+      ]
     ],
     [
       [{ value: '```ts\nx\n```\n\n```\n' }, block, group, { value: '\n```\n' }],
-      [{ kind: 'markdown', text: '```ts\nx\n```' }, edit]
+      [{ kind: 'markdown', text: '```ts\nx\n```', baseUri: null }, edit]
     ],
     [
       [

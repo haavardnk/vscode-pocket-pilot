@@ -1,8 +1,10 @@
+import { fileURLToPath } from 'node:url';
+
 import type { CodeQuery, CodeResult, FileChange, TreeEntry } from '@pocket-pilot/protocol';
 
 import { diffBlobs, type DiffCounts, diffCounts } from './diff';
 import { fileContent, readBlob } from './files';
-import type { CodeFolder } from './folders';
+import { type CodeFolder, locate } from './folders';
 import {
   gitStatus,
   headBlob,
@@ -24,6 +26,7 @@ export interface CodeSources {
   folders: () => readonly CodeFolder[];
   language: (path: string) => string | null;
   sessions: SessionChanges;
+  referenced: (sessionId: string) => Promise<ReadonlySet<string>>;
 }
 
 function childChanges(
@@ -55,6 +58,12 @@ async function untrackedCounts(root: string, path: string): Promise<DiffCounts> 
   return diffCounts(diffBlobs('missing', read.blob));
 }
 
+function linkedPath(uri: string): string {
+  const url = URL.parse(uri);
+  if (url?.protocol !== 'file:' || url.host !== '') throw new Error('Invalid file link');
+  return fileURLToPath(url);
+}
+
 export class CodeService {
   constructor(private readonly sources: CodeSources) {}
 
@@ -64,6 +73,8 @@ export class CodeService {
         return this.tree(this.folder(query.folderId), query.path);
       case 'file':
         return this.file(this.folder(query.folderId), query.path);
+      case 'chatFile':
+        return this.chatFile(query.sessionId, query.uri);
       case 'gitChanges':
         return this.gitChanges(this.folder(query.folderId));
       case 'gitDiff':
@@ -136,6 +147,24 @@ export class CodeService {
       language: this.sources.language(target),
       size,
       change: statuses.find((status) => status.path === relative)?.change ?? null,
+      content: fileContent(blob, target)
+    };
+  }
+
+  private async chatFile(sessionId: string, uri: string): Promise<CodeResult> {
+    const path = linkedPath(uri);
+    const location = locate(this.sources.folders(), path);
+    if (!location && !(await this.sources.referenced(sessionId)).has(path)) {
+      throw new Error('File is not part of this chat');
+    }
+    const target = location ? await resolveInFolder(location.folder.root, location.relative) : path;
+    const { size, blob } = await readBlob(target);
+    return {
+      kind: 'chatFile',
+      language: this.sources.language(target),
+      size,
+      folderId: location?.folder.id ?? null,
+      relativePath: location?.relative ?? null,
       content: fileContent(blob, target)
     };
   }

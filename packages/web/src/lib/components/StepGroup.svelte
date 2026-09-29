@@ -8,7 +8,7 @@
   import Check from '@lucide/svelte/icons/check';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
 
-  import { getChatRepository } from '../chatRepository';
+  import { getChatContext } from '../chatContext';
   import type { StepGroup } from '../hub/steps';
   import { markdown } from '../markdown';
   import DiffStat from './code/DiffStat.svelte';
@@ -25,7 +25,7 @@
 
   const { group, index, windowId, sessionId, requestId }: Props = $props();
 
-  const repository = getChatRepository();
+  const chat = getChatContext();
 
   const key = $derived(`${windowId}/${sessionId}/${requestId}/${index}`);
   const open = $derived(expanded.get(key) ?? group.active);
@@ -51,12 +51,9 @@
   <div class="mt-2 ml-2 flex flex-col gap-2 border-l border-base-300 pl-4">
     {#each group.steps as step, position (position)}
       {#if step.kind === 'thinking'}
-        <div
-          class="markdown text-base-content/60"
-          {@attach markdown(step.text, repository.github)}
-        ></div>
+        <div class="markdown text-base-content/60" {@attach markdown(step.text, chat)}></div>
       {:else if step.kind === 'tool'}
-        <ToolLine part={step} {windowId} />
+        <ToolLine part={step} {windowId} {requestId} />
       {:else}
         <EditLink part={step} {windowId} {sessionId} {requestId} />
       {/if}

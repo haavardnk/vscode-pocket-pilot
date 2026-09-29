@@ -1,7 +1,8 @@
 import type { ResponsePart, Subagent, ToolStatus } from '@pocket-pilot/protocol';
 
 import { asArray, asRecord, asString, type JsonRecord } from '../json';
-import { clip, DETAIL_LENGTH, plainMessage } from './partText';
+import { linkedMessage, resultLinks } from './fileLinks';
+import { clip, DETAIL_LENGTH } from './partText';
 
 type ToolPart = Extract<ResponsePart, { kind: 'tool' }>;
 type Outcome = 'skipped' | 'denied' | null;
@@ -147,9 +148,10 @@ export function projectTool(
     toolId,
     message: command
       ? terminalMessage(command, status, outcome)
-      : plainMessage(status === 'running' ? part.invocationMessage : part.pastTenseMessage) ||
-        plainMessage(part.invocationMessage),
+      : linkedMessage(status === 'running' ? part.invocationMessage : part.pastTenseMessage) ||
+        linkedMessage(part.invocationMessage),
     detail: toolDetail(part),
+    links: resultLinks(part),
     title: asString(part.generatedTitle),
     grouped: isGrouped(part, toolId, awaitingConfirmation),
     awaitingConfirmation,

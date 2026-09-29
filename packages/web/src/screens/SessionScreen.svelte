@@ -25,7 +25,7 @@
   } from '@pocket-pilot/protocol';
   import { tick, untrack } from 'svelte';
 
-  import { setChatRepository } from '../lib/chatRepository';
+  import { setChatContext } from '../lib/chatContext';
   import CheckpointBar from '../lib/components/CheckpointBar.svelte';
   import Composer, { type Draft } from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
@@ -63,9 +63,15 @@
 
   const pane = getPane();
 
-  setChatRepository({
+  setChatContext({
     get github() {
       return github;
+    },
+    get windowId() {
+      return windowId;
+    },
+    get sessionId() {
+      return sessionId;
     }
   });
 

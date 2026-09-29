@@ -379,7 +379,8 @@ export function initialWindows(now: number): MockWindow[] {
                 { kind: 'thinking', text: 'Plan the screens first.', title: 'Planning' },
                 {
                   kind: 'markdown',
-                  text: 'Starting with the **session list**.\n\n```ts\nconst sessions = [];\n```'
+                  text: 'Starting with the **session list**.\n\n```ts\nconst sessions = [];\n```',
+                  baseUri: null
                 },
                 {
                   kind: 'tool',
@@ -387,6 +388,7 @@ export function initialWindows(now: number): MockWindow[] {
                   toolId: 'read_file',
                   message: 'Read `App.svelte`',
                   detail: null,
+                  links: [],
                   title: 'Updated the app shell',
                   grouped: true,
                   awaitingConfirmation: false,
@@ -409,6 +411,7 @@ export function initialWindows(now: number): MockWindow[] {
                   toolId: 'run_in_terminal',
                   message: 'Run `npm test`',
                   detail: 'npm test -- --run',
+                  links: [],
                   title: null,
                   grouped: false,
                   awaitingConfirmation: true,
@@ -452,6 +455,7 @@ export function initialWindows(now: number): MockWindow[] {
                   toolId: 'runSubagent',
                   message: 'Find the election timeout',
                   detail: null,
+                  links: [],
                   title: null,
                   grouped: false,
                   awaitingConfirmation: false,
@@ -471,6 +475,7 @@ export function initialWindows(now: number): MockWindow[] {
                   toolId: 'read_file',
                   message: 'Read `cluster.ts`',
                   detail: null,
+                  links: [],
                   title: null,
                   grouped: false,
                   awaitingConfirmation: false,
@@ -480,8 +485,45 @@ export function initialWindows(now: number): MockWindow[] {
                   parentCallId: 'sub1'
                 },
                 {
+                  kind: 'tool',
+                  callId: 'view',
+                  toolId: 'copilot_viewImage',
+                  message: 'Viewed image [icon.png](file:///repo/docs/icon.png)',
+                  detail: null,
+                  links: [],
+                  title: null,
+                  grouped: false,
+                  awaitingConfirmation: false,
+                  status: 'done',
+                  terminal: null,
+                  subagent: null,
+                  parentCallId: null
+                },
+                {
+                  kind: 'tool',
+                  callId: 'search',
+                  toolId: 'copilot_findTextInFiles',
+                  message: 'Searched for text `parseRoute`, 2 results',
+                  detail: null,
+                  links: [
+                    {
+                      label: 'routing.ts:3',
+                      uri: 'file:///repo/packages/web/src/lib/routing.ts#L3'
+                    },
+                    { label: 'App.svelte', uri: 'file:///repo/packages/web/src/App.svelte' }
+                  ],
+                  title: null,
+                  grouped: false,
+                  awaitingConfirmation: false,
+                  status: 'done',
+                  terminal: null,
+                  subagent: null,
+                  parentCallId: null
+                },
+                {
                   kind: 'markdown',
-                  text: 'The follower retried before the leader was listening. Regressed in 3b7d0a2, fixed in `4f2c9e1`, see #12.'
+                  text: 'The follower retried before the leader was listening. Regressed in 3b7d0a2, fixed in `4f2c9e1`, see #12. Routes live in [routing.ts](packages/web/src/lib/routing.ts#L3).',
+                  baseUri: 'file:///repo/'
                 }
               ]
             }
@@ -512,7 +554,7 @@ export function initialWindows(now: number): MockWindow[] {
               editedPaths: [],
               images: [],
               parts: [
-                { kind: 'markdown', text: 'A few choices before I start.' },
+                { kind: 'markdown', text: 'A few choices before I start.', baseUri: null },
                 {
                   kind: 'questions',
                   resolveId: 'carousel-1',
@@ -620,7 +662,8 @@ export function initialWindows(now: number): MockWindow[] {
               parts: [
                 {
                   kind: 'markdown',
-                  text: '## Plan: Offline mode\n\n1. Cache the last snapshot.\n2. Queue commands while offline.'
+                  text: '## Plan: Offline mode\n\n1. Cache the last snapshot.\n2. Queue commands while offline.',
+                  baseUri: null
                 }
               ]
             }
@@ -650,7 +693,7 @@ export function initialWindows(now: number): MockWindow[] {
               disabled: false,
               editedPaths: [],
               images: [],
-              parts: [{ kind: 'markdown', text: 'Bumped Svelte and Vite.' }]
+              parts: [{ kind: 'markdown', text: 'Bumped Svelte and Vite.', baseUri: null }]
             }
           ],
           queued: []
@@ -714,7 +757,7 @@ export function initialWindows(now: number): MockWindow[] {
               editedPaths: [],
               images: [],
               parts: [
-                { kind: 'markdown', text: 'Demosaic is now 2x faster.' },
+                { kind: 'markdown', text: 'Demosaic is now 2x faster.', baseUri: null },
                 {
                   kind: 'confirmation',
                   title: 'Continue to iterate?',
@@ -759,7 +802,11 @@ export function initialWindows(now: number): MockWindow[] {
                   additions: 40,
                   deletions: 2
                 },
-                { kind: 'markdown', text: 'Moved the JPEG encoder into its own module.' }
+                {
+                  kind: 'markdown',
+                  text: 'Moved the JPEG encoder into its own module.',
+                  baseUri: null
+                }
               ]
             },
             {
@@ -783,7 +830,7 @@ export function initialWindows(now: number): MockWindow[] {
                   additions: 35,
                   deletions: 0
                 },
-                { kind: 'markdown', text: 'Added a PNG encoder.' }
+                { kind: 'markdown', text: 'Added a PNG encoder.', baseUri: null }
               ]
             },
             {
@@ -798,7 +845,7 @@ export function initialWindows(now: number): MockWindow[] {
               disabled: false,
               editedPaths: [],
               images: [],
-              parts: [{ kind: 'markdown', text: 'There are two encoders now.' }]
+              parts: [{ kind: 'markdown', text: 'There are two encoders now.', baseUri: null }]
             }
           ],
           queued: []

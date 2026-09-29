@@ -1,6 +1,12 @@
-import type { SessionDetail, SessionSummary, WindowState } from '@pocket-pilot/protocol';
+import type {
+  ResponsePart,
+  SessionDetail,
+  SessionSummary,
+  WindowState
+} from '@pocket-pilot/protocol';
 import { describe, expect, it } from 'vitest';
 
+import { chatFileHref } from '../src/lib/chatContext';
 import {
   agentLabel,
   ALL_REPOSITORIES,
@@ -211,21 +217,24 @@ describe('labels', () => {
 
 describe('response parts', () => {
   it('finds the tool waiting in the latest request only', () => {
-    const tool = (callId: string, awaitingConfirmation: boolean) =>
-      ({
-        kind: 'tool',
-        callId,
-        toolId: 'run',
-        message: 'Run',
-        detail: null,
-        title: null,
-        grouped: !awaitingConfirmation,
-        awaitingConfirmation,
-        status: 'running',
-        terminal: null,
-        subagent: null,
-        parentCallId: null
-      }) as const;
+    const tool = (
+      callId: string,
+      awaitingConfirmation: boolean
+    ): Extract<ResponsePart, { kind: 'tool' }> => ({
+      kind: 'tool',
+      callId,
+      toolId: 'run',
+      message: 'Run',
+      detail: null,
+      links: [],
+      title: null,
+      grouped: !awaitingConfirmation,
+      awaitingConfirmation,
+      status: 'running',
+      terminal: null,
+      subagent: null,
+      parentCallId: null
+    });
     const request = (parts: SessionDetail['requests'][number]['parts']) => ({
       id: 'r',
       timestamp: 0,
@@ -273,7 +282,12 @@ describe('routing', () => {
     ['#/session/w%2F1/s%201', { name: 'session', windowId: 'w/1', sessionId: 's 1' }],
     ['#/session/w1', { name: 'chats' }],
     ['#/tree/w/f', { name: 'folder', windowId: 'w', folderId: 'f', tab: 'files', path: '' }],
-    ['#/changes/w/f', { name: 'folder', windowId: 'w', folderId: 'f', tab: 'changes', path: '' }]
+    ['#/changes/w/f', { name: 'folder', windowId: 'w', folderId: 'f', tab: 'changes', path: '' }],
+    ['#/ref/w/s', { name: 'session', windowId: 'w', sessionId: 's' }],
+    [
+      '#/ref/w/s/file%3A%2F%2F%2Fa.ts/0',
+      { name: 'chatFile', windowId: 'w', sessionId: 's', uri: 'file:///a.ts', line: null }
+    ]
   ])('parses %s', (hash, route) => {
     expect(parseRoute(hash)).toEqual(route);
   });
@@ -296,7 +310,9 @@ describe('routing', () => {
     },
     { name: 'sessionDiff', windowId: 'w', sessionId: 's', path: '/a b.ts', requestId: 'r1' },
     { name: 'terminal', windowId: 'w/1', terminalId: 't 1', executionId: null },
-    { name: 'terminal', windowId: 'w', terminalId: 't', executionId: 'e#1' }
+    { name: 'terminal', windowId: 'w', terminalId: 't', executionId: 'e#1' },
+    { name: 'chatFile', windowId: 'w', sessionId: 's', uri: 'file:///a%20b/c#d.ts', line: null },
+    { name: 'chatFile', windowId: 'w', sessionId: 's', uri: 'file:///a.ts', line: 40 }
   ])('round-trips $name routes', (route) => {
     expect(parseRoute(routeHash(route))).toEqual(route);
   });
@@ -317,12 +333,30 @@ describe('routing', () => {
       },
       true
     ],
+    [{ name: 'chatFile', windowId: 'w', sessionId: 's', uri: 'file:///a.ts', line: null }, true],
     [{ name: 'sessionChanges', windowId: 'w', sessionId: 'other', requestId: null }, false],
     [{ name: 'session', windowId: 'other', sessionId: 's' }, false],
     [{ name: 'chats' }, false],
     [{ name: 'terminal', windowId: 'w', terminalId: 's', executionId: null }, false]
   ])('keeps %o inside chat w/s: %s', (route, expected) => {
     expect(inChat(route, 'w', 's')).toBe(expected);
+  });
+
+  it.each([
+    ['file:///a%20b.ts', null],
+    ['file:///a%20b.ts#L40', 40],
+    ['file:///a%20b.ts#L40-L52', 40],
+    ['file:///a%20b.ts#12', 12],
+    ['file:///a%20b.ts#top', null]
+  ])('links chat file %s at line %s', (href, line) => {
+    const chat = { github: null, windowId: 'w', sessionId: 's' };
+    expect(parseRoute(chatFileHref(chat, new URL(href)))).toEqual({
+      name: 'chatFile',
+      windowId: 'w',
+      sessionId: 's',
+      uri: 'file:///a%20b.ts',
+      line
+    });
   });
 
   it.each([

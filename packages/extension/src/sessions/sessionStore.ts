@@ -14,6 +14,7 @@ import { watchTargets } from '../fsWatch';
 import { asRecord, asString, type JsonRecord } from '../json';
 import { type Activity, toolStatuses } from './activityParts';
 import { exportedRequests } from './exportedRequests';
+import { sessionFiles } from './fileLinks';
 import { LineTailer } from './lineTailer';
 import { applyLogEntry, parseLogEntry } from './mutationLog';
 import {
@@ -208,6 +209,11 @@ export class SessionStore {
       .find((item) => item.id === requestId)
       ?.images.find((candidate) => candidate.id === imageId);
     return image ? fileImage(image) : null;
+  }
+
+  async files(sessionId: string): Promise<ReadonlySet<string>> {
+    const entry = await this.loaded(sessionId);
+    return entry ? sessionFiles(requestsOf(rootOf(entry))) : new Set();
   }
 
   async hook(event: HookEvent): Promise<void> {

@@ -81,7 +81,7 @@ const window: WindowState = {
   models: []
 };
 
-const markdown = (text: string): ResponsePart => ({ kind: 'markdown', text });
+const markdown = (text: string): ResponsePart => ({ kind: 'markdown', text, baseUri: null });
 
 const turn = (id: string, parts: ResponsePart[]): RequestView => ({
   id,

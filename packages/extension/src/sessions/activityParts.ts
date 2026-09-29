@@ -56,6 +56,7 @@ function toolParts(event: ToolStart, status: ToolStatus): ActivityPart[] {
       toolId: event.name,
       message: toolLabel(event.name, asRecord(args), status),
       detail: event.args && clip(event.args, DETAIL_LENGTH),
+      links: [],
       title: null,
       grouped: groupedByName(event.name),
       awaitingConfirmation: false,
@@ -83,7 +84,7 @@ export function activityParts(
     } else if (event.type === 'message' && running.size === 0 && !toolsOnly) {
       const reasoning = event.reasoning?.trim();
       if (reasoning) parts.push({ kind: 'thinking', text: reasoning, title: null });
-      if (event.text) parts.push({ kind: 'markdown', text: event.text });
+      if (event.text) parts.push({ kind: 'markdown', text: event.text, baseUri: null });
     }
   }
   return parts;

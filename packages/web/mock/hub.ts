@@ -279,7 +279,8 @@ export class MockHub {
       if (command.decision === 'accept') this.runTool(window, detail.id, tool);
       last.parts.push({
         kind: 'markdown',
-        text: command.decision === 'accept' ? 'Tests passed.' : 'Skipped the tool.'
+        text: command.decision === 'accept' ? 'Tests passed.' : 'Skipped the tool.',
+        baseUri: null
       });
       this.changed(window, detail.id);
       this.later(() => this.finish(window, detail.id, 'All done.'));
@@ -413,6 +414,7 @@ export class MockHub {
           toolId: 'read_file',
           message: 'Read `README.md`',
           detail: null,
+          links: [],
           title: null,
           grouped: true,
           awaitingConfirmation: false,
@@ -436,7 +438,7 @@ export class MockHub {
     last.parts.forEach((part) => {
       if (part.kind === 'tool' && part.status === 'running') part.status = 'done';
     });
-    last.parts.push({ kind: 'markdown', text: reply });
+    last.parts.push({ kind: 'markdown', text: reply, baseUri: null });
     last.state = 'complete';
     detail.status = 'idle';
     this.changed(window, sessionId);

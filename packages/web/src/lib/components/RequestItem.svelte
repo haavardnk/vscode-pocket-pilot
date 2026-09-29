@@ -4,7 +4,7 @@
   import ShieldAlert from '@lucide/svelte/icons/shield-alert';
   import type { QuestionAnswers, RequestView } from '@pocket-pilot/protocol';
 
-  import { getChatRepository } from '../chatRepository';
+  import { getChatContext } from '../chatContext';
   import { responseItems } from '../hub/steps';
   import { markdown } from '../markdown';
   import { routeHash } from '../routing';
@@ -41,7 +41,7 @@
     onelicit
   }: Props = $props();
 
-  const repository = getChatRepository();
+  const chat = getChatContext();
 
   let acting = $state(false);
 
@@ -82,11 +82,11 @@
     {#if part.kind === 'group'}
       <StepGroup group={part} {index} {windowId} {sessionId} requestId={request.id} />
     {:else if part.kind === 'subagent'}
-      <SubagentBlock item={part} {windowId} {sessionId} />
+      <SubagentBlock item={part} {windowId} {sessionId} requestId={request.id} />
     {:else if part.kind === 'markdown'}
-      <div class="markdown" {@attach markdown(part.text, repository.github)}></div>
+      <div class="markdown" {@attach markdown(part.text, chat, part.baseUri)}></div>
     {:else if part.kind === 'tool'}
-      <ToolLine {part} {windowId} />
+      <ToolLine {part} {windowId} requestId={request.id} />
     {:else if part.kind === 'edit'}
       <EditLink {part} {windowId} {sessionId} requestId={request.id} />
     {:else if part.kind === 'progress'}

@@ -84,7 +84,7 @@ describe('pending overlay', () => {
     const statuses = toolStatuses(turns.flatMap((turn) => turn.events));
     const pending = pendingTurns(turns, 'copilot/gpt-5', statuses, false);
     expect(pending.map((request) => [request.message, request.state, request.parts])).toEqual([
-      ['phone task', 'complete', [{ kind: 'markdown', text: 'phone reply' }]],
+      ['phone task', 'complete', [{ kind: 'markdown', text: 'phone reply', baseUri: null }]],
       [
         'follow up',
         'pending',
@@ -95,6 +95,7 @@ describe('pending overlay', () => {
             toolId: 'grep',
             message: 'grep',
             detail: null,
+            links: [],
             title: null,
             grouped: true,
             awaitingConfirmation: false,

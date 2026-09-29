@@ -19,6 +19,7 @@ export type Route =
   | { name: 'file'; windowId: string; folderId: string; path: string }
   | { name: 'gitDiff'; windowId: string; folderId: string; path: string }
   | { name: 'sessionChanges'; windowId: string; sessionId: string; requestId: string | null }
+  | { name: 'chatFile'; windowId: string; sessionId: string; uri: string; line: number | null }
   | {
       name: 'sessionDiff';
       windowId: string;
@@ -91,6 +92,16 @@ export function parseRoute(hash: string): Route {
             callId: sixth || null
           }
         : { name: 'session', windowId: first, sessionId: second };
+    case 'ref':
+      return third
+        ? {
+            name: 'chatFile',
+            windowId: first,
+            sessionId: second,
+            uri: third,
+            line: fourth && /^[1-9]\d*$/.test(fourth) ? Number(fourth) : null
+          }
+        : { name: 'session', windowId: first, sessionId: second };
     default:
       return { name: 'chats' };
   }
@@ -145,6 +156,10 @@ export function routeHash(route: Route): string {
         route.stopId ?? '',
         route.callId ?? ''
       );
+    case 'chatFile':
+      return route.line === null
+        ? hashOf('ref', route.windowId, route.sessionId, route.uri)
+        : hashOf('ref', route.windowId, route.sessionId, route.uri, String(route.line));
   }
 }
 
@@ -165,6 +180,7 @@ export function tabOf(route: Route): Tab {
     case 'sessionChanges':
     case 'sessionDiff':
     case 'editDiff':
+    case 'chatFile':
       return 'chats';
     case 'folder':
     case 'branches':
@@ -180,6 +196,7 @@ export function inChat(route: Route, windowId: string, sessionId: string): boole
     case 'sessionChanges':
     case 'sessionDiff':
     case 'editDiff':
+    case 'chatFile':
       return route.windowId === windowId && route.sessionId === sessionId;
     default:
       return false;

@@ -1,21 +1,32 @@
+<script lang="ts" module>
+  import { SvelteMap } from 'svelte/reactivity';
+
+  const expanded = new SvelteMap<string, boolean>();
+</script>
+
 <script lang="ts">
   import CircleCheck from '@lucide/svelte/icons/circle-check';
   import CircleX from '@lucide/svelte/icons/circle-x';
   import SquareTerminal from '@lucide/svelte/icons/square-terminal';
   import type { ResponsePart } from '@pocket-pilot/protocol';
 
-  import { getChatRepository } from '../chatRepository';
+  import { chatFileHref, getChatContext } from '../chatContext';
   import { markdown } from '../markdown';
   import { routeHash } from '../routing';
 
   interface Props {
     part: Extract<ResponsePart, { kind: 'tool' }>;
     windowId: string;
+    requestId: string;
   }
 
-  const { part, windowId }: Props = $props();
+  const { part, windowId, requestId }: Props = $props();
 
-  const repository = getChatRepository();
+  const chat = getChatContext();
+
+  const key = $derived(`${windowId}/${chat.sessionId}/${requestId}/${part.callId}`);
+  const open = $derived(expanded.get(key) ?? false);
+  const expandable = $derived(part.detail !== null || part.links.length > 0);
 </script>
 
 {#snippet line()}
@@ -31,21 +42,51 @@
       <CircleCheck class="size-4" />
     </span>
   {/if}
-  <div
-    class="markdown min-w-0 flex-1"
-    {@attach markdown(part.message || part.toolId, repository.github)}
-  ></div>
+  <div class="markdown min-w-0 flex-1" {@attach markdown(part.message || part.toolId, chat)}></div>
   {#if part.awaitingConfirmation}<span class="badge shrink-0 badge-sm badge-warning">Waiting</span
     >{/if}
 {/snippet}
 
-{#if part.detail}
-  <details class="text-sm text-base-content/70">
-    <summary class="flex cursor-pointer list-none items-start gap-2">{@render line()}</summary>
-    <pre
-      class="mt-1 ml-6 max-h-48 overflow-auto rounded-field bg-base-200 px-2 py-1 text-xs whitespace-pre-wrap"><code
-        >{part.detail}</code
-      ></pre>
+{#if expandable}
+  <details class="text-sm text-base-content/70" {open}>
+    <summary
+      class="flex cursor-pointer list-none items-start gap-2"
+      onclick={(event) => {
+        if (event.target instanceof Element && event.target.closest('a')) return;
+        event.preventDefault();
+        expanded.set(key, !open);
+      }}>{@render line()}</summary
+    >
+    {#if open}
+      <div class="mt-1 ml-6 flex flex-col gap-2">
+        {#if part.links.length > 0}
+          <ul class="flex flex-col gap-1" aria-label="Results">
+            {#each part.links as link (link.uri)}
+              <li class="truncate">
+                {#if link.uri.startsWith('file:')}
+                  <a class="link link-hover" href={chatFileHref(chat, new URL(link.uri))}
+                    >{link.label}</a
+                  >
+                {:else}
+                  <a
+                    class="link link-hover"
+                    href={link.uri}
+                    target="_blank"
+                    rel="noopener noreferrer">{link.label}</a
+                  >
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        {#if part.detail}
+          <pre
+            class="max-h-48 overflow-auto rounded-field bg-base-200 px-2 py-1 text-xs whitespace-pre-wrap"><code
+              >{part.detail}</code
+            ></pre>
+        {/if}
+      </div>
+    {/if}
   </details>
 {:else}
   <div class="flex items-start gap-2 text-sm text-base-content/70">{@render line()}</div>

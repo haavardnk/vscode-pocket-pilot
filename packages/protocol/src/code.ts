@@ -68,6 +68,7 @@ export const sessionChangeSchema = z.object({
 export const codeQuerySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('tree'), ...folderTarget, path: pathField }),
   z.object({ kind: z.literal('file'), ...folderTarget, path: pathField }),
+  z.object({ kind: z.literal('chatFile'), ...sessionTarget, uri: z.string().max(8192) }),
   z.object({ kind: z.literal('gitChanges'), ...folderTarget }),
   z.object({ kind: z.literal('gitDiff'), ...folderTarget, path: pathField }),
   z.object({ kind: z.literal('sessionChanges'), ...sessionTarget }),
@@ -94,6 +95,14 @@ export const codeResultSchema = z.discriminatedUnion('kind', [
     language: z.string().nullable(),
     size: z.number(),
     change: fileChangeSchema.nullable(),
+    content: fileContentSchema
+  }),
+  z.object({
+    kind: z.literal('chatFile'),
+    language: z.string().nullable(),
+    size: z.number(),
+    folderId: z.string().nullable(),
+    relativePath: z.string().nullable(),
     content: fileContentSchema
   }),
   z.object({
