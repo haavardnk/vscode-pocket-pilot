@@ -12,17 +12,16 @@ import type {
 import type { FSWatcher } from 'chokidar';
 
 import { watchTargets } from '../fsWatch';
-import { asArray, asRecord, asString, type JsonRecord } from '../json';
+import { asRecord, asString, type JsonRecord } from '../json';
 import { type Activity, toolStatuses } from './activityParts';
 import { exportedRequests } from './exportedRequests';
 import { sessionFiles } from './fileLinks';
+import { clearLoggedInputs, expectedOr, withoutRemoved } from './inputOverlay';
 import { LineTailer } from './lineTailer';
 import { applyLogEntry, parseLogEntry } from './mutationLog';
-import { editedPaths, pendingRequest, projectDetail } from './projection';
+import { editedPaths, projectDetail } from './projection';
 import { currentQueue } from './queue';
-import { fileImage, requestImage } from './requestImages';
 import {
-  type Expected,
   markOf,
   newEntry,
   rememberRequests,
@@ -33,6 +32,7 @@ import {
   summaryOf,
   syncUnlogged
 } from './sessionEntry';
+import { sessionRequestImage, sessionToolImage } from './sessionImages';
 import {
   lastRequestAt,
   type LogSummary,
@@ -40,14 +40,12 @@ import {
   requestsOf,
   requestText
 } from './sessionSummary';
-import { toolImage } from './toolParts';
 import { matchesRequest } from './transcript';
 import { pendingTurns } from './unloggedTurns';
 
 const HOT_SESSIONS = 8;
 const DEBOUNCE_MS = 150;
 const MTIME_SLACK_MS = 2000;
-const INPUT_OVERLAY_MS = 120_000;
 const LOG_SUFFIX = '.jsonl';
 
 export interface SessionFolders {
@@ -59,18 +57,6 @@ type Listener = (sessionId: string | null) => void;
 
 function summaryKey(entry: SessionEntry): string {
   return JSON.stringify(summaryOf(entry));
-}
-
-function expectedOr<T>(expected: Expected<T> | null, logged: T): T {
-  return expected && Date.now() - expected.at < INPUT_OVERLAY_MS ? expected.value : logged;
-}
-
-function withoutRemoved(root: unknown, removed: Expected<string> | null): unknown {
-  const requestId = expectedOr<string | null>(removed, null);
-  if (requestId === null) return root;
-  const requests = requestsOf(root);
-  const index = requests.findIndex((request) => asString(request.requestId) === requestId);
-  return index < 0 ? root : { ...asRecord(root), requests: requests.slice(0, index) };
 }
 
 export class SessionStore {
@@ -200,15 +186,7 @@ export class SessionStore {
   ): Promise<ImageResult | null> {
     const entry = await this.loaded(sessionId);
     if (!entry) return null;
-    const root = rootOf(entry);
-    const request =
-      requestsOf(root).find((candidate) => candidate.requestId === requestId) ??
-      pendingRequest(root, requestId);
-    if (request) return requestImage(request, imageId);
-    const image = entry.queue?.items
-      .find((item) => item.id === requestId)
-      ?.images.find((candidate) => candidate.id === imageId);
-    return image ? fileImage(image) : null;
+    return sessionRequestImage(rootOf(entry), entry.queue?.items ?? [], requestId, imageId);
   }
 
   async toolImage(
@@ -218,17 +196,7 @@ export class SessionStore {
     index: number
   ): Promise<ToolImageResult | null> {
     const entry = await this.loaded(sessionId);
-    if (!entry) return null;
-    const request = requestsOf(rootOf(entry)).find(
-      (candidate) => candidate.requestId === requestId
-    );
-    const part = asArray(request?.response)
-      .map(asRecord)
-      .find(
-        (candidate) =>
-          candidate.kind === 'toolInvocationSerialized' && candidate.toolCallId === callId
-      );
-    return part ? toolImage(part, index) : null;
+    return entry ? sessionToolImage(rootOf(entry), requestId, callId, index) : null;
   }
 
   async files(sessionId: string): Promise<ReadonlySet<string>> {
@@ -437,10 +405,7 @@ export class SessionStore {
     entry.mark = { writtenAt: modified, lastRequestAt: lastRequestAt(root) };
     rememberRequests(entry, requestsOf(root));
     if (entry.exported && modified >= entry.exported.at) entry.exported = null;
-    if (entry.permission && modified >= entry.permission.at) entry.permission = null;
-    if (entry.mode && modified >= entry.mode.at) entry.mode = null;
-    if (entry.model && modified >= entry.model.at) entry.model = null;
-    if (entry.removed && modified >= entry.removed.at) entry.removed = null;
+    clearLoggedInputs(entry, modified);
     syncUnlogged(entry);
   }
 
