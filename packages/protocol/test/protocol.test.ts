@@ -94,6 +94,7 @@ const turn = (id: string, parts: ResponsePart[]): RequestView => ({
   editable: true,
   disabled: false,
   editedPaths: [],
+  images: [],
   parts
 });
 
@@ -159,7 +160,14 @@ describe('protocol', () => {
       {
         type: 'command',
         requestId: 'r1',
-        command: { kind: 'send', windowId: 'w1', sessionId: 's1', text: 'go', delivery: 'steering' }
+        command: {
+          kind: 'send',
+          windowId: 'w1',
+          sessionId: 's1',
+          text: 'go',
+          images: [{ mimeType: 'image/jpeg', data: '/9j/4AAQ' }],
+          delivery: 'steering'
+        }
       }
     ],
     [
@@ -173,6 +181,7 @@ describe('protocol', () => {
           sessionId: 's1',
           requestId: 'q1',
           text: 'again',
+          images: [],
           modeId: null,
           modelId: 'copilot/gpt-5',
           permission: 'autopilot'
@@ -245,6 +254,29 @@ describe('protocol', () => {
         },
         error: null
       }
+    ],
+    [
+      clientMessageSchema,
+      {
+        type: 'query',
+        requestId: 'q',
+        query: {
+          kind: 'requestImage',
+          windowId: 'w1',
+          sessionId: 's1',
+          requestId: 'r1',
+          imageId: 'i1'
+        }
+      }
+    ],
+    [
+      serverMessageSchema,
+      {
+        type: 'queryResult',
+        requestId: 'q',
+        result: { kind: 'requestImage', mimeType: 'image/webp', data: 'UklGRg==' },
+        error: null
+      }
     ]
   ])('round trips %#', (schema, message) => {
     expect(parseMessage(schema, JSON.stringify(message))).toEqual(message);
@@ -269,6 +301,21 @@ describe('protocol', () => {
     }),
     JSON.stringify({ type: 'unknown' })
   ])('rejects %s', (raw) => {
+    expect(parseMessage(clientMessageSchema, raw)).toBeNull();
+  });
+
+  it.each([
+    ['svg', [{ mimeType: 'image/svg+xml', data: 'PHN2Zz4=' }]],
+    ['non-base64 data', [{ mimeType: 'image/png', data: 'not base64!' }]],
+    ['empty data', [{ mimeType: 'image/png', data: '' }]],
+    ['too many photos', Array.from({ length: 6 }, () => ({ mimeType: 'image/png', data: 'iVBO' }))]
+  ])('rejects photos with %s', (_, images) => {
+    const command = { kind: 'send', windowId: 'w1', sessionId: 's1', text: 'go', images };
+    const raw = JSON.stringify({
+      type: 'command',
+      requestId: 'r',
+      command: { ...command, delivery: null }
+    });
     expect(parseMessage(clientMessageSchema, raw)).toBeNull();
   });
 

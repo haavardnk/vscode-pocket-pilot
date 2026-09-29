@@ -2,18 +2,21 @@ import { z } from 'zod';
 
 import { branchQuerySchema, branchResultSchema } from './branches.ts';
 import { codeQuerySchema, codeResultSchema } from './code.ts';
+import { imageQuerySchema, imageResultSchema } from './images.ts';
 import { windowQuerySchema, windowResultSchema } from './windows.ts';
 
 export const querySchema = z.discriminatedUnion('kind', [
   ...codeQuerySchema.options,
   windowQuerySchema,
-  branchQuerySchema
+  branchQuerySchema,
+  imageQuerySchema
 ]);
 
 export const queryResultSchema = z.discriminatedUnion('kind', [
   ...codeResultSchema.options,
   windowResultSchema,
-  branchResultSchema
+  branchResultSchema,
+  imageResultSchema
 ]);
 
 export type Query = z.infer<typeof querySchema>;

@@ -2,6 +2,8 @@ import {
   type Command,
   type CopilotUsage,
   diffDetail,
+  type ImageResult,
+  type ImageUpload,
   type Query,
   type QueryResult,
   queuePlan,
@@ -27,7 +29,8 @@ import {
   OPEN_TARGETS,
   openedWindow,
   ownedTerminal,
-  refreshSummary
+  refreshSummary,
+  samplePhotos
 } from './fixtures.ts';
 
 const REPLY_DELAY_MS = 800;
@@ -62,6 +65,7 @@ export class MockHub {
   private readonly sent = new Map<MockClient, SessionDetail>();
   private readonly code = new MockCode();
   private readonly branches = new MockBranches();
+  private photos = new Map<string, ImageResult>();
   private timers: ReturnType<typeof setTimeout>[] = [];
   private nextId = 1;
 
@@ -82,6 +86,7 @@ export class MockHub {
     this.usage = copilotUsage(now);
     this.code.reset();
     this.branches.reset();
+    this.photos = samplePhotos();
     this.sent.clear();
     for (const client of this.clients) {
       client.subscription = null;
@@ -128,6 +133,11 @@ export class MockHub {
     if (query.kind === 'openTargets') return { kind: 'openTargets', ...OPEN_TARGETS };
     if (query.kind === 'branches') {
       return this.branches.list(query.windowId, folderOf(window, query.folderId));
+    }
+    if (query.kind === 'requestImage') {
+      const photo = this.photos.get(`${query.requestId}/${query.imageId}`);
+      if (!photo) throw new Error('Photo is no longer available');
+      return photo;
     }
     return this.code.query(query);
   }
@@ -184,7 +194,7 @@ export class MockHub {
         requests: [],
         queued: []
       });
-      this.later(() => this.ask(window, id, command.text));
+      this.later(() => this.ask(window, id, command.text, command.images));
       return;
     }
     const detail = window.details.get(command.sessionId);
@@ -205,13 +215,13 @@ export class MockHub {
       if (detail.status === 'idle' || detail.status === 'failed') {
         dropDisabled(detail);
         this.changed(window, detail.id);
-        this.later(() => this.ask(window, detail.id, command.text));
+        this.later(() => this.ask(window, detail.id, command.text, command.images));
       } else {
         detail.queued.push({
           id: this.id('queued'),
           delivery: command.delivery ?? 'queued',
           text: command.text,
-          attachments: 0
+          attachments: command.images.length
         });
         this.changed(window, detail.id);
       }
@@ -334,7 +344,7 @@ export class MockHub {
       if (command.modelId) detail.modelId = command.modelId;
       detail.permission = command.permission;
       this.changed(window, detail.id);
-      this.later(() => this.ask(window, detail.id, command.text));
+      this.later(() => this.ask(window, detail.id, command.text, command.images));
       return;
     }
     if (command.kind === 'setPermission') {
@@ -346,11 +356,20 @@ export class MockHub {
     this.changed(window, detail.id);
   }
 
-  private ask(window: MockWindow, sessionId: string, text: string): void {
+  private ask(
+    window: MockWindow,
+    sessionId: string,
+    text: string,
+    images: ImageUpload[] = []
+  ): void {
     const detail = window.details.get(sessionId);
     if (!detail) return;
+    const requestId = this.id('request');
+    images.forEach((image, index) =>
+      this.photos.set(`${requestId}/photo-${index + 1}`, { kind: 'requestImage', ...image })
+    );
     detail.requests.push({
-      id: this.id('request'),
+      id: requestId,
       timestamp: Date.now(),
       message: text,
       modelId: detail.modelId,
@@ -362,6 +381,11 @@ export class MockHub {
       editable: true,
       disabled: false,
       editedPaths: [],
+      images: images.map((image, index) => ({
+        id: `photo-${index + 1}`,
+        name: `Photo ${index + 1}`,
+        mimeType: image.mimeType
+      })),
       parts: [
         {
           kind: 'tool',

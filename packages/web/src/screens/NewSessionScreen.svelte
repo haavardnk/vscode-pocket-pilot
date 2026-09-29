@@ -2,7 +2,14 @@
   import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import MessageSquarePlus from '@lucide/svelte/icons/message-square-plus';
   import MonitorOff from '@lucide/svelte/icons/monitor-off';
-  import type { Agent, ConfigValue, Model, ModelConfigOption } from '@pocket-pilot/protocol';
+  import type {
+    Agent,
+    ConfigValue,
+    Delivery,
+    ImageUpload,
+    Model,
+    ModelConfigOption
+  } from '@pocket-pilot/protocol';
   import { onDestroy } from 'svelte';
 
   import Composer from '../lib/components/Composer.svelte';
@@ -32,6 +39,7 @@
   const target = $derived(
     candidates.find((window) => window.windowId === chosenWindowId) ?? candidates[0]
   );
+  const photos = $derived(target?.models.find((model) => model.id === modelId)?.vision !== false);
 
   $effect(() => {
     if (!pending) return;
@@ -52,12 +60,16 @@
     modelId = null;
   }
 
-  async function start(text: string): Promise<boolean> {
+  async function start(
+    text: string,
+    _delivery: Delivery | null,
+    images: ImageUpload[]
+  ): Promise<boolean> {
     if (!target) return false;
     const windowId = target.windowId;
     const known = new Set(target.sessions.map((session) => session.id));
     try {
-      await hub.command({ kind: 'newSession', windowId, text, modeId, modelId });
+      await hub.command({ kind: 'newSession', windowId, text, images, modeId, modelId });
     } catch (error) {
       toasts.error(error);
       return false;
@@ -153,6 +165,7 @@
           disabled={hub.connection !== 'open'}
           agentLabel={agentLabel(target.agents, modeId)}
           modelLabel={modelLabel(target.models, modelId)}
+          {photos}
           permission={null}
           placeholder="What should the agent do?"
           onmode={() => (sheet = 'mode')}

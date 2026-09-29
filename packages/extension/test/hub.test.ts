@@ -45,6 +45,7 @@ function detail(count: number): SessionDetail {
       editable: true,
       disabled: false,
       editedPaths: [],
+      images: [],
       parts: []
     })),
     queued: []

@@ -1,5 +1,6 @@
 import {
   type CopilotUsage,
+  type ImageResult,
   type Model,
   type OpenTarget,
   SEGMENT_BOLD,
@@ -25,6 +26,12 @@ export interface MockWindow {
 const MINUTE = 60_000;
 const RED = 1;
 export const GREEN = 2;
+const SAMPLE_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+
+export function samplePhotos(): Map<string, ImageResult> {
+  return new Map([['r2/shot', { kind: 'requestImage', mimeType: 'image/png', data: SAMPLE_PNG }]]);
+}
 
 const PLAN_AGENT =
   'vscode-userdata:/User/globalStorage/github.copilot-chat/plan-agent/Plan.agent.md';
@@ -76,6 +83,7 @@ function models(): Model[] {
       family: 'claude-opus',
       name: 'Claude Opus',
       maxInputTokens: 200_000,
+      vision: true,
       options: [
         {
           key: 'reasoningEffort',
@@ -106,6 +114,7 @@ function models(): Model[] {
       family: 'gpt-5',
       name: 'GPT-5',
       maxInputTokens: 128_000,
+      vision: false,
       options: []
     }
   ];
@@ -361,6 +370,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: ['/repo/packages/web/src/App.svelte'],
+              images: [],
               parts: [
                 { kind: 'thinking', text: 'Plan the screens first.', title: 'Planning' },
                 {
@@ -430,6 +440,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: [],
+              images: [{ id: 'shot', name: 'Pasted Image', mimeType: 'image/png' }],
               parts: [
                 {
                   kind: 'tool',
@@ -495,6 +506,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: [],
+              images: [],
               parts: [
                 { kind: 'markdown', text: 'A few choices before I start.' },
                 {
@@ -573,6 +585,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: [],
+              images: [],
               parts: [
                 {
                   kind: 'markdown',
@@ -605,6 +618,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: [],
+              images: [],
               parts: [{ kind: 'markdown', text: 'Bumped Svelte and Vite.' }]
             }
           ],
@@ -667,6 +681,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: [],
+              images: [],
               parts: [
                 { kind: 'markdown', text: 'Demosaic is now 2x faster.' },
                 {
@@ -703,6 +718,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: ['/Users/me/Git/immich-edit/src/export/jpeg.rs'],
+              images: [],
               parts: [
                 {
                   kind: 'edit',
@@ -726,6 +742,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: ['/Users/me/Git/immich-edit/src/export/png.rs'],
+              images: [],
               parts: [
                 {
                   kind: 'edit',
@@ -749,6 +766,7 @@ export function initialWindows(now: number): MockWindow[] {
               editable: true,
               disabled: false,
               editedPaths: [],
+              images: [],
               parts: [{ kind: 'markdown', text: 'There are two encoders now.' }]
             }
           ],

@@ -3,6 +3,7 @@ import { basename, join } from 'node:path';
 
 import type {
   HookEvent,
+  ImageResult,
   PermissionLevel,
   QueuedRequest,
   SessionDetail
@@ -24,6 +25,7 @@ import {
   requestText
 } from './projection';
 import { currentQueue } from './queue';
+import { requestImage } from './requestImages';
 import {
   type Expected,
   markOf,
@@ -178,6 +180,18 @@ export class SessionStore {
   async editedPaths(sessionId: string): Promise<string[] | null> {
     const entry = await this.loaded(sessionId);
     return entry ? editedPaths(rootOf(entry)) : null;
+  }
+
+  async requestImage(
+    sessionId: string,
+    requestId: string,
+    imageId: string
+  ): Promise<ImageResult | null> {
+    const entry = await this.loaded(sessionId);
+    const request = entry
+      ? requestsOf(rootOf(entry)).find((candidate) => candidate.requestId === requestId)
+      : undefined;
+    return request ? requestImage(request, imageId) : null;
   }
 
   async hook(event: HookEvent): Promise<void> {

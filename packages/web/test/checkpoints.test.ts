@@ -14,6 +14,7 @@ const request = (id: string, paths: string[]): RequestView => ({
   editable: true,
   disabled: false,
   editedPaths: paths,
+  images: [],
   parts: []
 });
 

@@ -127,6 +127,7 @@ describe('code queries', () => {
     editable: true,
     disabled: false,
     editedPaths: [],
+    images: [],
     parts: paths.map((path) => ({
       kind: 'edit',
       path,

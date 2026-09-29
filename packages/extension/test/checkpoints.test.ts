@@ -54,6 +54,7 @@ const detail = (ids: string[]): SessionDetail => ({
     editable: true,
     disabled: false,
     editedPaths: [],
+    images: [],
     parts: []
   })),
   queued: []

@@ -35,6 +35,7 @@ export function buildModels(
           family: chat.family,
           name: chat.name,
           maxInputTokens: chat.maxInputTokens > 0 ? chat.maxInputTokens : null,
+          vision: info?.vision ?? null,
           options: (info?.options ?? []).map((option) => ({
             ...option,
             value: values[option.key] ?? null

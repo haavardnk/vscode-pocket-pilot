@@ -5,6 +5,7 @@ import { asArray, asNumber, asRecord, asString } from '../json';
 export interface CopilotModelInfo {
   id: string;
   pickerEnabled: boolean;
+  vision: boolean;
   options: ModelConfigOption[];
 }
 
@@ -105,6 +106,13 @@ export function parseCopilotModels(raw: unknown): CopilotModelInfo[] {
     const options = [effortOption(capabilities, family), contextOption(model, maxPrompt)].filter(
       (option): option is ModelConfigOption => option !== null
     );
-    return [{ id, pickerEnabled: model.model_picker_enabled === true, options }];
+    return [
+      {
+        id,
+        pickerEnabled: model.model_picker_enabled === true,
+        vision: asRecord(capabilities.supports).vision === true,
+        options
+      }
+    ];
   });
 }

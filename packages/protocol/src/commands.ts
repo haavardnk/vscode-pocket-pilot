@@ -8,6 +8,7 @@ import {
   permissionLevelSchema,
   questionAnswersSchema
 } from './domain.ts';
+import { imageUploadsSchema } from './images.ts';
 
 const sessionTarget = { windowId: z.string(), sessionId: z.string() };
 const terminalTarget = { windowId: z.string(), terminalId: z.string() };
@@ -17,6 +18,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('send'),
     ...sessionTarget,
     text: z.string().min(1).max(100_000),
+    images: imageUploadsSchema,
     delivery: deliverySchema.nullable()
   }),
   z.object({
@@ -72,6 +74,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
     ...sessionTarget,
     requestId: z.string().min(1),
     text: z.string().min(1).max(100_000),
+    images: imageUploadsSchema,
     modeId: z.string().min(1).nullable(),
     modelId: z.string().min(1).nullable(),
     permission: permissionLevelSchema
@@ -92,6 +95,7 @@ export const commandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('newSession'),
     windowId: z.string(),
     text: z.string().min(1).max(100_000),
+    images: imageUploadsSchema,
     modeId: z.string().nullable(),
     modelId: z.string().nullable()
   }),

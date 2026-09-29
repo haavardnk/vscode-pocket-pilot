@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { requestImageSchema } from './images.ts';
 import { terminalRefSchema, terminalSummarySchema } from './terminal.ts';
 
 export const repositorySchema = z.object({
@@ -159,6 +160,7 @@ export const requestViewSchema = z.object({
   editable: z.boolean(),
   disabled: z.boolean(),
   editedPaths: z.array(z.string()),
+  images: z.array(requestImageSchema),
   parts: z.array(responsePartSchema)
 });
 
@@ -225,6 +227,7 @@ export const modelSchema = z.object({
   family: z.string(),
   name: z.string(),
   maxInputTokens: z.number().nullable(),
+  vision: z.boolean().nullable(),
   options: z.array(modelConfigOptionSchema)
 });
 

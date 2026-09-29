@@ -10,6 +10,7 @@ interface CatalogEntry {
   recommended?: number;
   longContext?: boolean;
   type?: string;
+  vision?: boolean;
 }
 
 function entry(id: string, spec: CatalogEntry): unknown {
@@ -24,7 +25,7 @@ function entry(id: string, spec: CatalogEntry): unknown {
       family: spec.family ?? id,
       type: spec.type ?? 'chat',
       limits: { max_prompt_tokens: spec.maxPrompt },
-      supports: { reasoning_effort: spec.efforts }
+      supports: { reasoning_effort: spec.efforts, vision: spec.vision }
     },
     billing: { token_prices: prices }
   };
@@ -79,7 +80,21 @@ describe('copilot models', () => {
       entry('embed', { type: 'embeddings' }),
       entry('m', { efforts: ['medium'] })
     ]);
-    expect(models).toEqual([{ id: 'm', pickerEnabled: true, options: [] }]);
+    expect(models).toEqual([{ id: 'm', pickerEnabled: true, vision: false, options: [] }]);
+  });
+
+  it('reports vision only for Copilot catalog models', () => {
+    const copilot = parseCopilotModels([entry('eye', { vision: true }), entry('text', {})]);
+    const models = buildModels(
+      [chat('eye'), chat('text'), chat('byok', 'other')],
+      copilot,
+      new Map()
+    );
+    expect(models.map((model) => [model.id, model.vision])).toEqual([
+      ['other/byok', null],
+      ['copilot/eye', true],
+      ['copilot/text', false]
+    ]);
   });
 
   it('merges saved values and drops hidden and Copilot CLI models', () => {

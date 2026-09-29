@@ -16,7 +16,8 @@ import * as vscode from 'vscode';
 import type { ModelSettingsFile } from '../models/modelSettings';
 import { withQueued } from '../sessions/queue';
 import type { SessionFlags } from '../sessions/sessionFlags';
-import { focusChat, selectModel, sessionResource, submitChat } from './chatSession';
+import type { ChatImages } from './chatImages';
+import { attachImages, focusChat, selectModel, sessionResource, submitChat } from './chatSession';
 import type { CheckpointCommands } from './checkpointCommands';
 import {
   answersError,
@@ -39,6 +40,7 @@ export interface ControllerSources {
   expectPermission: (sessionId: string, level: PermissionLevel) => void;
   expectMode: (sessionId: string, modeId: string) => void;
   checkpoints: CheckpointCommands;
+  images: ChatImages;
   canOrganize: boolean;
   settings: ModelSettingsFile;
 }
@@ -55,13 +57,10 @@ export class Controller {
     switch (command.kind) {
       case 'send': {
         const before = command.delivery ? await this.sources.detail(command.sessionId) : null;
-        await this.sources.checkpoints.submitting(command.sessionId, async () => {
-          await focusChat(command.sessionId);
-          await vscode.commands.executeCommand('workbench.action.chat.submit', {
-            inputValue: command.text,
-            ...(command.delivery ? { acceptInputOptions: { queue: command.delivery } } : {})
-          });
-        });
+        const images = await this.sources.images.write(command.images);
+        await this.sources.checkpoints.submitting(command.sessionId, () =>
+          submitChat(command.sessionId, command.text, images, command.delivery)
+        );
         if (command.delivery && (before?.status === 'running' || before?.status === 'needsInput')) {
           this.sources.expectQueue(
             command.sessionId,
@@ -69,7 +68,7 @@ export class Controller {
               id: PHONE_QUEUE_PREFIX + randomUUID(),
               delivery: command.delivery,
               text: command.text,
-              attachments: 0
+              attachments: images.length
             })
           );
         }
@@ -160,6 +159,7 @@ export class Controller {
       case 'newSession': {
         if (command.modeId) await this.requireAgent(command.modeId);
         const model = command.modelId ? await this.requireModel(command.modelId) : null;
+        const images = await this.sources.images.write(command.images);
         await vscode.commands.executeCommand('workbench.action.openChat');
         if (command.modeId) {
           await vscode.commands.executeCommand('workbench.action.chat.toggleAgentMode', {
@@ -167,6 +167,7 @@ export class Controller {
           });
         }
         if (model) await selectModel(model);
+        await attachImages(images);
         await vscode.commands.executeCommand('workbench.action.chat.submit', {
           inputValue: command.text
         });
@@ -297,6 +298,7 @@ export class Controller {
     const model = command.modelId ? await this.requireModel(command.modelId) : null;
     const detail = await this.sources.detail(command.sessionId);
     if (!detail) throw new Error('Chat not found');
+    const images = await this.sources.images.write(command.images);
     await this.sources.checkpoints.restore(command.sessionId, command.requestId, false);
     await this.sources.checkpoints.submitting(command.sessionId, async () => {
       if (command.modeId && command.modeId !== detail.modeId) {
@@ -306,7 +308,7 @@ export class Controller {
       if (command.permission !== detail.permission) {
         await this.setPermission(command.sessionId, command.permission);
       }
-      await submitChat(command.sessionId, command.text);
+      await submitChat(command.sessionId, command.text, images);
     });
   }
 

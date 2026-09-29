@@ -12,6 +12,7 @@
     ConfigValue,
     Delivery,
     Handoff,
+    ImageUpload,
     Model,
     ModelConfigOption,
     PermissionLevel,
@@ -23,7 +24,7 @@
 
   import { setChatRepository } from '../lib/chatRepository';
   import CheckpointBar from '../lib/components/CheckpointBar.svelte';
-  import Composer from '../lib/components/Composer.svelte';
+  import Composer, { type Draft } from '../lib/components/Composer.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
   import EditingBar from '../lib/components/EditingBar.svelte';
   import HandoffBar from '../lib/components/HandoffBar.svelte';
@@ -43,6 +44,8 @@
   import { handoffSource } from '../lib/hub/handoffs';
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { getPane } from '../lib/pane';
+  import { dataUrl, reusePhoto } from '../lib/photos/prepare';
+  import { requestPhoto } from '../lib/photos/requestPhotos';
   import { inChat, parseRoute, routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
@@ -67,12 +70,12 @@
   let deciding = $state(false);
   let stopping = $state(false);
   let handingOff = $state(false);
-  let echo = $state<{ text: string; after: string | null } | null>(null);
+  let echo = $state<{ text: string; images: ImageUpload[]; after: string | null } | null>(null);
   let acting = $state<RequestView | null>(null);
   let editing = $state<MessageEdit | null>(null);
   let root = $state<HTMLElement>();
   let composer = $state<ReturnType<typeof Composer>>();
-  let draft = '';
+  let draft: Draft = { text: '', images: [] };
   let followBottom = true;
   let scrolled = 0;
 
@@ -93,7 +96,7 @@
   );
   const connected = $derived(hub.connection === 'open' && hostWindow !== undefined);
   const echoing = $derived(
-    echo && detail && (detail.requests.at(-1)?.id ?? null) === echo.after ? echo.text : null
+    echo && detail && (detail.requests.at(-1)?.id ?? null) === echo.after ? echo : null
   );
   const handoffAgent = $derived(
     detail && hostWindow && !echoing && !editing
@@ -101,6 +104,9 @@
       : null
   );
   const picked = $derived(editing ?? { modeId, modelId, permission: detail?.permission ?? null });
+  const photos = $derived(
+    hostWindow?.models.find((model) => model.id === picked.modelId)?.vision !== false
+  );
   const editIndex = $derived(indexOf(editing?.request ?? null));
   const actionTarget = $derived.by(() => {
     const index = indexOf(acting);
@@ -167,12 +173,16 @@
     }
   }
 
-  async function send(text: string, delivery: Delivery | null): Promise<boolean> {
-    if (editing) return sendEdit(editing, text);
+  async function send(
+    text: string,
+    delivery: Delivery | null,
+    images: ImageUpload[]
+  ): Promise<boolean> {
+    if (editing) return sendEdit(editing, text, images);
     followBottom = true;
-    if (delivery === null) echo = { text, after: detail?.requests.at(-1)?.id ?? null };
+    if (delivery === null) echo = { text, images, after: detail?.requests.at(-1)?.id ?? null };
     const sent = await run(() =>
-      hub.command({ kind: 'send', windowId, sessionId, text, delivery })
+      hub.command({ kind: 'send', windowId, sessionId, text, images, delivery })
     );
     if (!sent) echo = null;
     return sent;
@@ -187,16 +197,27 @@
     return detail.requests.findIndex((candidate) => candidate.id === request.id);
   }
 
+  function photosOf(request: RequestView): Promise<ImageUpload>[] {
+    return request.images.map((image) =>
+      requestPhoto(windowId, sessionId, request.id, image.id).then(reusePhoto)
+    );
+  }
+
+  function fillFrom(request: RequestView, focus: boolean): void {
+    composer?.fill({ text: request.message, images: [] }, focus);
+    void composer?.attach(photosOf(request));
+  }
+
   function startEdit(request: RequestView): void {
     if (!detail) return;
-    draft = composer?.current() ?? '';
+    draft = composer?.current() ?? { text: '', images: [] };
     editing = {
       request,
       modeId,
       modelId: request.modelId ?? modelId,
       permission: detail.permission
     };
-    composer?.fill(request.message);
+    fillFrom(request, true);
   }
 
   function cancelEdit(): void {
@@ -204,9 +225,13 @@
     composer?.fill(draft, false);
   }
 
-  async function sendEdit(edit: MessageEdit, text: string): Promise<boolean> {
+  async function sendEdit(
+    edit: MessageEdit,
+    text: string,
+    images: ImageUpload[]
+  ): Promise<boolean> {
     followBottom = true;
-    echo = { text, after: detail?.requests[editIndex - 1]?.id ?? null };
+    echo = { text, images, after: detail?.requests[editIndex - 1]?.id ?? null };
     const sent = await run(() =>
       hub.command({
         kind: 'editRequest',
@@ -214,6 +239,7 @@
         sessionId,
         requestId: edit.request.id,
         text,
+        images,
         modeId: edit.modeId,
         modelId: edit.modelId,
         permission: edit.permission
@@ -229,13 +255,17 @@
   }
 
   function restored(request: RequestView): void {
-    if (!composer?.current().trim()) composer?.fill(request.message, false);
+    const current = composer?.current();
+    if (!current || current.text.trim() || current.images.length > 0) return;
+    fillFrom(request, false);
   }
 
   async function handoff(agent: Agent, item: Handoff, autopilot: boolean): Promise<void> {
     followBottom = true;
     handingOff = true;
-    if (item.send) echo = { text: item.prompt, after: detail?.requests.at(-1)?.id ?? null };
+    if (item.send) {
+      echo = { text: item.prompt, images: [], after: detail?.requests.at(-1)?.id ?? null };
+    }
     const done = await run(() =>
       hub.command({
         kind: 'handoff',
@@ -248,7 +278,7 @@
     );
     handingOff = false;
     if (!done) echo = null;
-    else if (!item.send) composer?.fill(item.prompt);
+    else if (!item.send && composer) composer.fill({ ...composer.current(), text: item.prompt });
   }
 
   async function stop(): Promise<void> {
@@ -402,8 +432,21 @@
         />
       {/each}
       {#if echoing}
-        <div class="chat-end chat opacity-60" aria-label="Sending">
-          <div class="chat-bubble chat-bubble-primary whitespace-pre-wrap">{echoing}</div>
+        <div class="flex flex-col items-end gap-2 opacity-60" aria-label="Sending">
+          <div class="chat-end chat w-full">
+            <div class="chat-bubble chat-bubble-primary whitespace-pre-wrap">{echoing.text}</div>
+          </div>
+          {#if echoing.images.length > 0}
+            <div class="flex flex-wrap justify-end gap-2">
+              {#each echoing.images as image, index (index)}
+                <img
+                  class="size-20 rounded-box object-cover"
+                  src={dataUrl(image)}
+                  alt={`Photo ${index + 1}`}
+                />
+              {/each}
+            </div>
+          {/if}
         </div>
       {/if}
       {#if status === 'running' || echoing}
@@ -476,6 +519,7 @@
           disabled={!connected}
           agentLabel={agentLabel(hostWindow.agents, picked.modeId)}
           modelLabel={modelLabel(hostWindow.models, picked.modelId)}
+          {photos}
           permission={picked.permission}
           placeholder={editing ? 'Edit message' : busy ? 'Steer or queue a message' : 'Message'}
           onmode={() => (sheet = 'mode')}

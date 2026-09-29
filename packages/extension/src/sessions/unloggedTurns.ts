@@ -52,6 +52,7 @@ export function pendingTurns(
     editable: false,
     disabled: false,
     editedPaths: [],
+    images: [],
     parts: activityParts(turn.events, statuses, false)
   }));
 }

@@ -20,6 +20,7 @@ import { asArray, asNumber, asRecord, asString, type JsonRecord, markdownText } 
 import { type Activity, withActivity } from './activityParts';
 import { withoutEditFences } from './editFences';
 import { basename, clip, plainMessage } from './partText';
+import { requestImages } from './requestImages';
 import { sessionTodos } from './todos';
 import { projectTool, writtenPaths } from './toolParts';
 import { toolCallId } from './transcript';
@@ -316,6 +317,7 @@ function projectRequest(request: JsonRecord, latest: boolean, activity: Activity
     editable: id !== '',
     disabled: false,
     editedPaths: [],
+    images: requestImages(request),
     parts: mergeParts(parts)
   };
 }

@@ -55,6 +55,7 @@ const detail = (parts: ResponsePart[]): SessionDetail => ({
       editable: true,
       disabled: false,
       editedPaths: [],
+      images: [],
       parts
     }
   ],

@@ -185,6 +185,7 @@ describe('labels', () => {
       family: 'gpt',
       name: 'GPT-5',
       maxInputTokens: null,
+      vision: null,
       options: []
     }
   ];
@@ -236,6 +237,7 @@ describe('response parts', () => {
       editable: true,
       disabled: false,
       editedPaths: [],
+      images: [],
       parts
     });
     const detail = (requests: SessionDetail['requests']): SessionDetail => ({

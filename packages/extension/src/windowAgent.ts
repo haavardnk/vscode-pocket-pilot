@@ -26,6 +26,7 @@ import { type Blob, MAX_FILE_BYTES, readBlob } from './code/files';
 import { type CodeFolder, codeFolder } from './code/folders';
 import { LanguageIndex } from './code/languageIndex';
 import { SessionChanges } from './code/sessionChanges';
+import { ChatImages } from './control/chatImages';
 import { CheckpointCommands } from './control/checkpointCommands';
 import { Controller } from './control/controller';
 import { RemovalPrompt } from './control/removalPrompt';
@@ -88,6 +89,7 @@ export class WindowAgent implements vscode.Disposable {
   private readonly editChanges: EditChanges;
   private readonly checkpoints: Checkpoints;
   private readonly removalPrompt: RemovalPrompt;
+  private readonly images: ChatImages;
   private readonly mirror: LiveMirror;
   private readonly terminals: TerminalService;
   private readonly git: GitStatusSource;
@@ -148,6 +150,7 @@ export class WindowAgent implements vscode.Disposable {
     this.editChanges = new EditChanges(editing, this.edits);
     this.checkpoints = new Checkpoints(this.paths.editingSessions, editing, report);
     this.removalPrompt = new RemovalPrompt(context.globalState);
+    this.images = new ChatImages(join(context.globalStorageUri.fsPath, 'chat-images'));
     const sessionChanges = new SessionChanges({
       folders: () => this.folders,
       language: (path) => languages.resolve(path),
@@ -183,6 +186,7 @@ export class WindowAgent implements vscode.Disposable {
         expectRemoved: (sessionId, requestId) => this.store.expectRemoved(sessionId, requestId),
         prompt: this.removalPrompt
       }),
+      images: this.images,
       canOrganize: this.paths.stateDatabase !== null,
       settings
     });
@@ -235,6 +239,9 @@ export class WindowAgent implements vscode.Disposable {
       this.removalPrompt
         .recover()
         .catch((error: unknown) => this.report(`Cannot restore chat setting: ${String(error)}`)),
+      this.images
+        .prune()
+        .catch((error: unknown) => this.report(`Cannot clean up photos: ${String(error)}`)),
       this.refreshAgents(),
       this.refreshModels(),
       this.refreshRepositories(),
@@ -297,9 +304,14 @@ export class WindowAgent implements vscode.Disposable {
     this.mirror.poke();
   }
 
-  query(query: Query): Promise<QueryResult> {
+  async query(query: Query): Promise<QueryResult> {
     if (query.kind === 'openTargets') return listOpenTargets(this.report);
     if (query.kind === 'branches') return this.branches.list(query);
+    if (query.kind === 'requestImage') {
+      const image = await this.store.requestImage(query.sessionId, query.requestId, query.imageId);
+      if (!image) throw new Error('Photo is no longer available');
+      return image;
+    }
     return this.code.query(query);
   }
 
