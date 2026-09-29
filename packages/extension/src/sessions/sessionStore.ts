@@ -18,15 +18,7 @@ import { exportedRequests } from './exportedRequests';
 import { sessionFiles } from './fileLinks';
 import { LineTailer } from './lineTailer';
 import { applyLogEntry, parseLogEntry } from './mutationLog';
-import {
-  editedPaths,
-  lastRequestAt,
-  type LogSummary,
-  pendingRequest,
-  projectDetail,
-  projectSummary,
-  requestText
-} from './projection';
+import { editedPaths, pendingRequest, projectDetail } from './projection';
 import { currentQueue } from './queue';
 import { fileImage, requestImage } from './requestImages';
 import {
@@ -34,7 +26,6 @@ import {
   markOf,
   newEntry,
   rememberRequests,
-  requestsOf,
   rootOf,
   type SessionEntry,
   settledOf,
@@ -42,6 +33,13 @@ import {
   summaryOf,
   syncUnlogged
 } from './sessionEntry';
+import {
+  lastRequestAt,
+  type LogSummary,
+  projectSummary,
+  requestsOf,
+  requestText
+} from './sessionSummary';
 import { toolImage } from './toolParts';
 import { matchesRequest } from './transcript';
 import { pendingTurns } from './unloggedTurns';

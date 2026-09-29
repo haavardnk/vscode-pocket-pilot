@@ -6,8 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ChatImages } from '../src/control/chatImages';
 import type { Activity } from '../src/sessions/activityParts';
-import { projectDetail, projectSummary } from '../src/sessions/projection';
+import { projectDetail } from '../src/sessions/projection';
 import { MAX_SHOWN_IMAGE_BYTES, requestImage } from '../src/sessions/requestImages';
+import { projectSummary } from '../src/sessions/sessionSummary';
 import { request, snapshot } from './fixtures';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2]);

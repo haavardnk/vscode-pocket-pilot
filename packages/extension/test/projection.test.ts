@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import type { Activity } from '../src/sessions/activityParts';
 import { linkedMessage, sessionFiles } from '../src/sessions/fileLinks';
 import { plainMessage } from '../src/sessions/partText';
-import { editedPaths, projectDetail, projectSummary } from '../src/sessions/projection';
+import { editedPaths, projectDetail } from '../src/sessions/projection';
+import { projectSummary } from '../src/sessions/sessionSummary';
 import { toolImage } from '../src/sessions/toolParts';
 import { request, SESSION_ID, snapshot } from './fixtures';
 

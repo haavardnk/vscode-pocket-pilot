@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { toolStatuses } from '../src/sessions/activityParts';
-import type { LogSummary } from '../src/sessions/projection';
+import type { LogSummary } from '../src/sessions/sessionSummary';
 import { TranscriptBuffer } from '../src/sessions/transcript';
 import {
   type LogMark,

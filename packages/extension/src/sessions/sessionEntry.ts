@@ -1,9 +1,9 @@
 import type { PermissionLevel } from '@pocket-pilot/protocol';
 
-import { asArray, asRecord, asString, type JsonRecord } from '../json';
+import { asRecord, asString, type JsonRecord } from '../json';
 import { LineTailer } from './lineTailer';
-import { lastRequestAt, type LogSummary, requestText } from './projection';
 import type { QueueOverlay, StartedTurn } from './queue';
+import { lastRequestAt, type LogSummary, requestsOf, requestText } from './sessionSummary';
 import { TranscriptBuffer, type TranscriptTurn } from './transcript';
 import { type LogMark, unloggedTurns, withUnlogged } from './unloggedTurns';
 
@@ -60,10 +60,6 @@ export function newEntry(id: string, logPath: string): SessionEntry {
     model: null,
     removed: null
   };
-}
-
-export function requestsOf(root: unknown): JsonRecord[] {
-  return asArray(asRecord(root).requests).map(asRecord);
 }
 
 export function rememberRequests(entry: SessionEntry, requests: JsonRecord[]): void {

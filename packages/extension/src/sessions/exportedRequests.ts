@@ -1,6 +1,5 @@
 import { asArray, asNumber, asRecord, asString, type JsonRecord } from '../json';
-import { requestState } from './projection';
-import { requestsOf } from './sessionEntry';
+import { requestsOf, requestState } from './sessionSummary';
 
 function asksQuestions(request: JsonRecord): boolean {
   return asArray(request.response).some((part) => {
