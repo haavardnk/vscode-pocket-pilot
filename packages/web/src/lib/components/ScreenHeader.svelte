@@ -10,11 +10,12 @@
     title: string;
     subtitle?: string | null;
     back: Route;
+    meta?: Snippet;
     actions?: Snippet;
     children?: Snippet;
   }
 
-  const { title, subtitle = null, back, actions, children }: Props = $props();
+  const { title, subtitle = null, back, meta, actions, children }: Props = $props();
 </script>
 
 <header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">
@@ -24,7 +25,11 @@
     </button>
     <div class="min-w-0 flex-1">
       <h1 class="truncate font-semibold">{title}</h1>
-      {#if subtitle}<p class="truncate text-xs text-base-content/60">{subtitle}</p>{/if}
+      {#if meta}
+        {@render meta()}
+      {:else if subtitle}
+        <p class="truncate text-xs text-base-content/60">{subtitle}</p>
+      {/if}
     </div>
     {@render actions?.()}
   </div>

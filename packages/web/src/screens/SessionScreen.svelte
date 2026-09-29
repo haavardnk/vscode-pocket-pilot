@@ -3,10 +3,6 @@
 </script>
 
 <script lang="ts">
-  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
-  import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
-  import FileDiff from '@lucide/svelte/icons/file-diff';
-  import Square from '@lucide/svelte/icons/square';
   import {
     type Agent,
     type ConfigValue,
@@ -28,7 +24,6 @@
   import { setChatContext } from '../lib/chatContext';
   import CheckpointBar from '../lib/components/CheckpointBar.svelte';
   import Composer, { type Draft } from '../lib/components/Composer.svelte';
-  import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
   import EditingBar from '../lib/components/EditingBar.svelte';
   import HandoffBar from '../lib/components/HandoffBar.svelte';
   import Loading from '../lib/components/Loading.svelte';
@@ -38,9 +33,11 @@
   import PermissionSheet from '../lib/components/PermissionSheet.svelte';
   import QueuedMessages from '../lib/components/QueuedMessages.svelte';
   import RequestItem from '../lib/components/RequestItem.svelte';
+  import SendingEcho from '../lib/components/SendingEcho.svelte';
   import SessionActionsSheet from '../lib/components/SessionActionsSheet.svelte';
-  import StatusBadge from '../lib/components/StatusBadge.svelte';
+  import SessionHeader from '../lib/components/SessionHeader.svelte';
   import TodoList from '../lib/components/TodoList.svelte';
+  import ToolApproval from '../lib/components/ToolApproval.svelte';
   import { windowRef } from '../lib/git';
   import { windowGitHub } from '../lib/github';
   import { type MessageEdit, restoreImpact } from '../lib/hub/checkpoints';
@@ -48,8 +45,8 @@
   import { agentLabel, modelLabel, pendingTool } from '../lib/hub/views';
   import { getPane } from '../lib/pane';
   import { requestPhoto } from '../lib/photos/chatPhotos';
-  import { dataUrl, reusePhoto } from '../lib/photos/prepare';
-  import { inChat, parseRoute, routeHash } from '../lib/routing';
+  import { reusePhoto } from '../lib/photos/prepare';
+  import { inChat, parseRoute } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -76,8 +73,6 @@
   });
 
   let sheet = $state<'mode' | 'model' | 'permission' | 'actions' | null>(null);
-  let deciding = $state(false);
-  let stopping = $state(false);
   let handingOff = $state(false);
   let echo = $state<{ text: string; images: ImageUpload[]; after: string | null } | null>(null);
   let acting = $state<RequestView | null>(null);
@@ -344,18 +339,6 @@
     else if (!item.send && composer) composer.fill({ ...composer.current(), text: item.prompt });
   }
 
-  async function stop(): Promise<void> {
-    stopping = true;
-    await run(() => hub.command({ kind: 'stop', windowId, sessionId }));
-    stopping = false;
-  }
-
-  async function decide(decision: 'accept' | 'skip'): Promise<void> {
-    deciding = true;
-    await run(() => hub.command({ kind: 'toolDecision', windowId, sessionId, decision }));
-    deciding = false;
-  }
-
   function answer(resolveId: string, answers: QuestionAnswers | null): Promise<boolean> {
     followBottom = true;
     return run(() =>
@@ -407,57 +390,17 @@
 </script>
 
 <div class="flex flex-1 flex-col" bind:this={root}>
-  <header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">
-    <div class="flex h-14 items-center gap-1 px-2">
-      <button
-        class="btn btn-square btn-ghost"
-        aria-label="Back"
-        onclick={() => router.go({ name: 'chats' })}
-      >
-        <ChevronLeft class="size-6" />
-      </button>
-      <div class="min-w-0 flex-1">
-        <h1 class="truncate font-semibold">{detail?.title ?? summary?.title ?? 'Chat'}</h1>
-        {#if hostWindow || status !== 'idle'}
-          <div class="flex min-w-0 items-center gap-1.5">
-            <StatusBadge {status} />
-            {#if hostWindow}<p class="truncate text-xs text-base-content/60">
-                {branch ? `${hostWindow.name} · ${branch}` : hostWindow.name}
-              </p>{/if}
-          </div>
-        {/if}
-      </div>
-      {#if detail && detail.editedFiles > 0}
-        <a
-          class="btn gap-1 btn-ghost btn-sm"
-          aria-label={`Changes (${detail.editedFiles})`}
-          href={routeHash({ name: 'sessionChanges', windowId, sessionId, requestId: null })}
-        >
-          <FileDiff class="size-4" />{detail.editedFiles}
-        </a>
-      {/if}
-      {#if busy}
-        <button
-          class="btn btn-square btn-soft btn-error btn-sm"
-          aria-label="Stop"
-          disabled={!connected || stopping}
-          onclick={() => void stop()}
-        >
-          <Square class="size-3.5 fill-current" />
-        </button>
-      {/if}
-      {#if summary && hostWindow?.canOrganize}
-        <button
-          class="btn btn-square btn-ghost btn-sm"
-          aria-label="Chat actions"
-          onclick={() => (sheet = 'actions')}
-        >
-          <EllipsisVertical class="size-4" />
-        </button>
-      {/if}
-    </div>
-    <ConnectionBanner />
-  </header>
+  <SessionHeader
+    {windowId}
+    {sessionId}
+    title={detail?.title ?? summary?.title ?? 'Chat'}
+    {status}
+    place={hostWindow ? (branch ? `${hostWindow.name} · ${branch}` : hostWindow.name) : null}
+    editedFiles={detail?.editedFiles ?? 0}
+    {busy}
+    disabled={!connected}
+    onactions={summary && hostWindow?.canOrganize ? () => (sheet = 'actions') : null}
+  />
 
   <main class="flex flex-1 flex-col gap-6 px-4 py-4">
     {#if hub.detailMissing || (hub.loaded && !hostWindow)}
@@ -495,22 +438,7 @@
         />
       {/each}
       {#if echoing}
-        <div class="flex flex-col items-end gap-2 opacity-60" aria-label="Sending">
-          <div class="chat-end chat w-full">
-            <div class="chat-bubble chat-bubble-primary whitespace-pre-wrap">{echoing.text}</div>
-          </div>
-          {#if echoing.images.length > 0}
-            <div class="flex flex-wrap justify-end gap-2">
-              {#each echoing.images as image, index (index)}
-                <img
-                  class="size-20 rounded-box object-cover"
-                  src={dataUrl(image)}
-                  alt={`Photo ${index + 1}`}
-                />
-              {/each}
-            </div>
-          {/if}
-        </div>
+        <SendingEcho text={echoing.text} images={echoing.images} />
       {/if}
       {#if status === 'running' || echoing}
         <p class="flex items-center gap-2 text-sm text-base-content/60" role="status">
@@ -537,37 +465,7 @@
           />
         {/if}
         {#if tool}
-          <div
-            role="alert"
-            class="alert flex flex-col items-stretch gap-2 alert-soft alert-warning"
-          >
-            <p class="text-sm">
-              <span class="font-medium">Allow tool?</span>
-              {tool.message || tool.toolId}
-            </p>
-            {#if tool.detail}
-              <pre
-                class="max-h-32 overflow-auto rounded-field bg-base-100/60 px-2 py-1 text-xs whitespace-pre-wrap"><code
-                  >{tool.detail}</code
-                ></pre>
-            {/if}
-            <div class="flex gap-2">
-              <button
-                class="btn flex-1 btn-primary btn-sm"
-                disabled={deciding || !connected}
-                onclick={() => void decide('accept')}
-              >
-                Allow
-              </button>
-              <button
-                class="btn flex-1 btn-sm"
-                disabled={deciding || !connected}
-                onclick={() => void decide('skip')}
-              >
-                Skip
-              </button>
-            </div>
-          </div>
+          <ToolApproval {windowId} {sessionId} {tool} disabled={!connected} />
         {/if}
         {#if handoffAgent}
           {@const agent = handoffAgent}
