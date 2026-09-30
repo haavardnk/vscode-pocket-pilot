@@ -17,7 +17,7 @@ test('orders the tabs', async ({ page }) => {
 
 test('never scrolls a tab sideways', async ({ page }) => {
   await openSession(page, 'Fix flaky cluster test');
-  await page.getByRole('button', { name: 'Code' }).click();
+  await page.getByRole('button', { name: 'Code', exact: true }).click();
   await page.getByRole('button', { name: 'Terminals', exact: true }).click();
   await page.getByRole('button', { name: 'Settings' }).click();
   for (const tab of ['chats', 'code', 'terminals', 'settings']) {

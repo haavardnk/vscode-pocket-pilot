@@ -14,6 +14,7 @@
   import { markdown } from '../markdown';
   import { toolPhoto } from '../photos/chatPhotos';
   import { routeHash } from '../routing';
+  import CopyButton from './CopyButton.svelte';
   import PhotoStrip from './PhotoStrip.svelte';
 
   interface Props {
@@ -94,10 +95,17 @@
           </ul>
         {/if}
         {#if part.detail}
-          <pre
-            class="max-h-48 overflow-auto rounded-field bg-base-200 px-2 py-1 text-xs whitespace-pre-wrap"><code
-              >{part.detail}</code
-            ></pre>
+          <div class="relative">
+            <pre
+              class="max-h-48 overflow-auto rounded-field bg-base-200 py-1 pr-8 pl-2 text-xs whitespace-pre-wrap"><code
+                >{part.detail}</code
+              ></pre>
+            <CopyButton
+              class="absolute top-0.5 right-0.5"
+              text={part.detail}
+              label="Copy details"
+            />
+          </div>
         {/if}
       </div>
     {/if}

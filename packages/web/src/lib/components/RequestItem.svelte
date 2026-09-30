@@ -10,6 +10,7 @@
   import { requestPhoto } from '../photos/chatPhotos';
   import { routeHash } from '../routing';
   import { chatView } from '../stores/chatView.svelte';
+  import CopyButton from './CopyButton.svelte';
   import EditLink from './EditLink.svelte';
   import PhotoStrip from './PhotoStrip.svelte';
   import PromptAlert from './PromptAlert.svelte';
@@ -49,6 +50,11 @@
   const items = $derived(responseItems(request.parts, request.state, chatView.compact));
   const edited = $derived(
     new Set(request.parts.flatMap((part) => (part.kind === 'edit' ? [part.path] : []))).size
+  );
+  const response = $derived(
+    request.state === 'pending' || request.state === 'needsInput'
+      ? ''
+      : items.flatMap((item) => (item.kind === 'markdown' ? [item.text.trim()] : [])).join('\n\n')
   );
 
   async function act(action: () => Promise<boolean>): Promise<void> {
@@ -160,7 +166,16 @@
     <div role="alert" class="alert alert-soft text-sm alert-error">
       {request.error ?? 'The request failed.'}
     </div>
-  {:else if request.state === 'cancelled'}
-    <p class="text-xs text-base-content/50">Stopped</p>
+  {/if}
+
+  {#if response || request.state === 'cancelled'}
+    <div class="flex items-center gap-2">
+      {#if response}
+        <CopyButton class="-ml-1 text-base-content/60" text={response} label="Copy response" />
+      {/if}
+      {#if request.state === 'cancelled'}
+        <p class="text-xs text-base-content/50">Stopped</p>
+      {/if}
+    </div>
   {/if}
 </article>

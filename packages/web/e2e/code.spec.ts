@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('shows the branch and sync status of each folder', async ({ page }) => {
-  await page.getByRole('button', { name: 'Code' }).click();
+  await page.getByRole('button', { name: 'Code', exact: true }).click();
   await expect(
     page.getByRole('link', { name: 'vscode-pocket-pilot', exact: true })
   ).toHaveAccessibleDescription('feat/web ↑2 ↓1 · 3 changed');

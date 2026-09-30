@@ -14,7 +14,7 @@ test('asks to sign in again when the sign-in page expires in an open app', async
   await expect(page.getByRole('heading', { name: 'Sign in with GitHub' })).toBeVisible();
   await page.getByRole('link', { name: 'Continue' }).click();
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('button', { name: 'Code' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Code', exact: true })).toBeVisible();
 });
 
 test('opens on the sign-in prompt instead of the sign-in page', async ({ page, context }) => {
@@ -28,5 +28,5 @@ test('opens on the sign-in prompt instead of the sign-in page', async ({ page, c
   await expect(launched.getByText('Sign in again', { exact: true })).toBeVisible();
   await launched.request.get('/__access/done');
   await launched.getByRole('button', { name: 'Try again' }).click();
-  await expect(launched.getByRole('button', { name: 'Code' })).toBeVisible();
+  await expect(launched.getByRole('button', { name: 'Code', exact: true })).toBeVisible();
 });

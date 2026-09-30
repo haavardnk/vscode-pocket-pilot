@@ -1,8 +1,10 @@
 import DOMPurify from 'dompurify';
 import { Marked } from 'marked';
+import { mount, unmount } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
 
 import { type ChatContext, chatFileHref } from './chatContext';
+import CopyButton from './components/CopyButton.svelte';
 import { linkifyGitHub } from './github';
 
 const marked = new Marked({ gfm: true, async: false });
@@ -47,6 +49,26 @@ function linkFiles(node: HTMLElement, chat: ChatContext, baseUri: string | null)
   }
 }
 
+function copyCode(node: HTMLElement): () => void {
+  const buttons = [...node.querySelectorAll('pre')].map((pre) => {
+    const block = document.createElement('div');
+    block.className = 'relative';
+    pre.replaceWith(block);
+    block.append(pre);
+    return mount(CopyButton, {
+      target: block,
+      props: {
+        text: (pre.textContent ?? '').replace(/\n$/, ''),
+        label: 'Copy code',
+        class: 'absolute top-1.5 right-1.5 bg-base-300'
+      }
+    });
+  });
+  return () => {
+    for (const button of buttons) void unmount(button);
+  };
+}
+
 export function markdown(
   text: string,
   chat: ChatContext,
@@ -56,5 +78,6 @@ export function markdown(
     node.innerHTML = renderMarkdown(text);
     linkFiles(node, chat, baseUri);
     if (chat.github) linkifyGitHub(node, chat.github);
+    return copyCode(node);
   };
 }

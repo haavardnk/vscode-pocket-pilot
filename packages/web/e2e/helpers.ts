@@ -15,7 +15,7 @@ export async function signInWithWorker(page: Page): Promise<void> {
   await expect
     .poll(() => page.evaluate(() => navigator.serviceWorker.controller !== null))
     .toBe(true);
-  await expect(page.getByRole('button', { name: 'Code' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Code', exact: true })).toBeVisible();
 }
 
 export async function openSession(page: Page, title: string): Promise<void> {
@@ -24,7 +24,7 @@ export async function openSession(page: Page, title: string): Promise<void> {
 }
 
 export async function openFolder(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Code' }).click();
+  await page.getByRole('button', { name: 'Code', exact: true }).click();
   await page.getByRole('link', { name: 'vscode-pocket-pilot', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'vscode-pocket-pilot' })).toBeVisible();
 }

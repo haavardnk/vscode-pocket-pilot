@@ -9,6 +9,7 @@ tunnel. It works with GitHub Copilot Chat in VS Code; other agents and editors a
 
 - All Copilot chats across every open VS Code window, grouped by repository
 - Live replies, thinking and tool calls as they stream
+- Copy replies, code blocks and commands with one tap
 - Send, queue, steer and stop requests; approve tools and answer the agent's questions
 - Attach photos to messages
 - Open files, search results and screenshots linked from chats

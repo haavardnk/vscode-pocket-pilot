@@ -2,6 +2,7 @@
   import type { PendingTool } from '../hub/views';
   import { hub } from '../stores/hub.svelte';
   import { toasts } from '../stores/toasts.svelte';
+  import CopyButton from './CopyButton.svelte';
 
   interface Props {
     windowId: string;
@@ -31,10 +32,13 @@
     {tool.message || tool.toolId}
   </p>
   {#if tool.detail}
-    <pre
-      class="max-h-32 overflow-auto rounded-field bg-base-100/60 px-2 py-1 text-xs whitespace-pre-wrap"><code
-        >{tool.detail}</code
-      ></pre>
+    <div class="relative">
+      <pre
+        class="max-h-32 overflow-auto rounded-field bg-base-100/60 py-1 pr-8 pl-2 text-xs whitespace-pre-wrap"><code
+          >{tool.detail}</code
+        ></pre>
+      <CopyButton class="absolute top-0.5 right-0.5" text={tool.detail} label="Copy details" />
+    </div>
   {/if}
   <div class="flex gap-2">
     <button

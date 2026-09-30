@@ -57,6 +57,28 @@ test('approves a waiting tool', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Stop' })).toHaveCount(0);
 });
 
+test('copies code blocks, commands and responses', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const clipboard = (): Promise<string> => page.evaluate(() => navigator.clipboard.readText());
+  await openSession(page, 'Build the phone app');
+  const main = page.getByRole('main');
+  await main.getByRole('button', { name: 'Copy code' }).click();
+  await expect(main.getByRole('button', { name: 'Copied' })).toBeVisible();
+  expect(await clipboard()).toBe('const sessions = [];');
+  await expect(main.getByRole('button', { name: 'Copy code' })).toBeVisible();
+  await page.getByRole('alert').getByRole('button', { name: 'Copy details' }).click();
+  await expect.poll(clipboard).toBe('npm test -- --run');
+  await expect(main.getByRole('button', { name: 'Copy response' })).toHaveCount(0);
+  await page.goBack();
+  await openSession(page, 'Fix flaky cluster test');
+  await main.getByRole('button', { name: 'Copy response' }).click();
+  await expect
+    .poll(clipboard)
+    .toBe(
+      'The follower retried before the leader was listening. Regressed in 3b7d0a2, fixed in `4f2c9e1`, see #12. Routes live in [routing.ts](packages/web/src/lib/routing.ts#L3).'
+    );
+});
+
 test('answers the questions the agent asks', async ({ page }) => {
   await openSession(page, 'Plan the release');
   const card = page.getByRole('region', { name: 'Questions from the agent' });
