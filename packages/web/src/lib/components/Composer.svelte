@@ -169,7 +169,7 @@
           type="button"
           role="radio"
           aria-checked={delivery === 'queued'}
-          class={['btn join-item btn-xs', delivery === 'queued' && 'btn-active']}
+          class={['btn join-item btn-xs', delivery === 'queued' && 'btn-primary']}
           onclick={() => (delivery = 'queued')}
         >
           Queue
@@ -178,7 +178,7 @@
           type="button"
           role="radio"
           aria-checked={delivery === 'steering'}
-          class={['btn join-item btn-xs', delivery === 'steering' && 'btn-active']}
+          class={['btn join-item btn-xs', delivery === 'steering' && 'btn-primary']}
           onclick={() => (delivery = 'steering')}
         >
           Steer
