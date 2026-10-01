@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-import { openFolder, openSession, signIn } from './helpers';
+import { MIDDAY_ZONE, openFolder, openSession, signIn } from './helpers';
+
+test.use({ timezoneId: MIDDAY_ZONE });
 
 test.beforeEach(async ({ page }) => {
   await signIn(page);

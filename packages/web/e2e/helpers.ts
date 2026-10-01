@@ -1,5 +1,12 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+const middayOffset = 12 - new Date().getUTCHours();
+
+export const MIDDAY_ZONE =
+  middayOffset === 0
+    ? 'Etc/GMT'
+    : `Etc/GMT${middayOffset > 0 ? '-' : '+'}${Math.abs(middayOffset)}`;
+
 export async function signIn(page: Page): Promise<void> {
   await page.request.post('/__reset');
   await page.request.post('/api/pair', { data: { code: '123456', deviceName: 'Test phone' } });
