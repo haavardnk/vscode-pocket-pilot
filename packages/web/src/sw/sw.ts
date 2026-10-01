@@ -9,6 +9,8 @@ import {
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 import { CacheFirst } from 'workbox-strategies';
 
+import { rememberTarget } from '../lib/notificationTarget';
+
 declare const self: ServiceWorkerGlobalScope;
 
 interface SubscriptionChangeEvent extends ExtendableEvent {
@@ -38,13 +40,14 @@ function targetOf(data: unknown): URL {
 }
 
 async function openApp(target: URL): Promise<void> {
+  await rememberTarget(target.hash).catch(() => undefined);
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   const client = windows[0];
   if (!client) {
     await self.clients.openWindow(target.href);
     return;
   }
-  client.postMessage({ type: 'navigate', hash: target.hash });
+  for (const open of windows) open.postMessage({ type: 'navigate', hash: target.hash });
   await client.focus().catch(() => undefined);
 }
 

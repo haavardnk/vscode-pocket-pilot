@@ -1,3 +1,4 @@
+import { takeTarget } from '../notificationTarget';
 import { parseRoute, type Route, routeHash, type Tab, tabOf } from '../routing';
 
 class RouterStore {
@@ -12,8 +13,12 @@ class RouterStore {
     if (!('serviceWorker' in navigator)) return;
     navigator.serviceWorker.addEventListener('message', (event: MessageEvent<unknown>) => {
       const data = event.data as { type?: unknown; hash?: unknown } | null;
-      if (data?.type === 'navigate' && typeof data.hash === 'string') location.hash = data.hash;
+      if (data?.type !== 'navigate' || typeof data.hash !== 'string') return;
+      void takeTarget();
+      location.hash = data.hash;
     });
+    document.addEventListener('visibilitychange', () => this.claimTarget());
+    this.claimTarget();
   }
 
   go(route: Route): void {
@@ -43,6 +48,13 @@ class RouterStore {
     }
     this.route = route;
     this.routes = { ...this.routes, [tab]: route };
+  }
+
+  private claimTarget(): void {
+    if (document.visibilityState !== 'visible') return;
+    void takeTarget().then((hash) => {
+      if (hash !== null) location.hash = hash;
+    });
   }
 }
 
