@@ -1,18 +1,26 @@
+import { ACCENTS, DEFAULT_ACCENT } from '../../themes/accents';
+
 export const THEMES = [
   { id: 'system', label: 'System', color: null },
-  { id: 'latte', label: 'Latte', color: '#eff1f5' },
-  { id: 'frappe', label: 'Frappé', color: '#303446' },
-  { id: 'macchiato', label: 'Macchiato', color: '#24273a' },
-  { id: 'mocha', label: 'Mocha', color: '#1e1e2e' }
+  { id: 'latte', label: 'Catppuccin Latte', color: '#eff1f5' },
+  { id: 'frappe', label: 'Catppuccin Frappé', color: '#303446' },
+  { id: 'macchiato', label: 'Catppuccin Macchiato', color: '#24273a' },
+  { id: 'mocha', label: 'Catppuccin Mocha', color: '#1e1e2e' }
 ] as const;
 
 type ThemeChoice = (typeof THEMES)[number]['id'];
+type AccentChoice = (typeof ACCENTS)[number]['id'];
 
 const STORAGE_KEY = 'pocket-pilot-theme';
+const ACCENT_KEY = 'pocket-pilot-accent';
 const SYSTEM_COLORS = { light: '#eff1f5', dark: '#1e1e2e' };
 
 function isTheme(value: string | null): value is ThemeChoice {
   return THEMES.some((theme) => theme.id === value);
+}
+
+function isAccent(value: string | null): value is AccentChoice {
+  return ACCENTS.some((accent) => accent.id === value);
 }
 
 function apply(choice: ThemeChoice): void {
@@ -29,10 +37,25 @@ function apply(choice: ThemeChoice): void {
 
 class ThemeStore {
   choice = $state<ThemeChoice>('system');
+  accent = $state<AccentChoice>(DEFAULT_ACCENT);
 
   constructor() {
     const stored = localStorage.getItem(STORAGE_KEY);
+    const accent = localStorage.getItem(ACCENT_KEY);
     this.choice = isTheme(stored) ? stored : 'system';
+    this.accent = isAccent(accent) ? accent : DEFAULT_ACCENT;
+  }
+
+  setAccent(accent: AccentChoice): void {
+    this.accent = accent;
+    const root = document.documentElement;
+    if (accent === DEFAULT_ACCENT) {
+      localStorage.removeItem(ACCENT_KEY);
+      root.removeAttribute('data-accent');
+      return;
+    }
+    localStorage.setItem(ACCENT_KEY, accent);
+    root.setAttribute('data-accent', accent);
   }
 
   set(choice: ThemeChoice): void {

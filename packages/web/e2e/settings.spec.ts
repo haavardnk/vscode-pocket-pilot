@@ -7,6 +7,11 @@ const BASES: Record<string, string> = {
   mocha: 'rgb(30, 30, 46)'
 };
 
+const BLUES: Record<string, string> = {
+  latte: 'rgb(30, 102, 245)',
+  mocha: 'rgb(137, 180, 250)'
+};
+
 test.beforeEach(async ({ page }) => {
   await signIn(page);
 });
@@ -18,7 +23,7 @@ test('uses the Catppuccin theme for the color scheme', async ({ page }, testInfo
 
 test('persists the chosen theme', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings' }).click();
-  await page.getByRole('combobox', { name: 'Theme' }).selectOption({ label: 'Frappé' });
+  await page.getByRole('combobox', { name: 'Theme' }).selectOption({ label: 'Catppuccin Frappé' });
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'frappe');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'frappe');
@@ -27,6 +32,28 @@ test('persists the chosen theme', async ({ page }) => {
     '#303446'
   );
   await expect(page.getByRole('combobox', { name: 'Theme' })).toHaveValue('frappe');
+});
+
+test('persists the chosen accent', async ({ page }, testInfo) => {
+  const primary = (): Promise<string> =>
+    page.evaluate(() => {
+      const probe = document.body.appendChild(document.createElement('span'));
+      probe.style.color = 'var(--color-primary)';
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('combobox', { name: 'Accent' }).selectOption({ label: 'Blue' });
+  await expect.poll(primary).toBe(BLUES[testInfo.project.name]);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-accent', 'blue');
+  expect(await primary()).toBe(BLUES[testInfo.project.name]);
+  await page.getByRole('combobox', { name: 'Theme' }).selectOption({ label: 'Catppuccin Frappé' });
+  await expect.poll(primary).toBe('rgb(140, 170, 238)');
+  await page.getByRole('combobox', { name: 'Accent' }).selectOption({ label: 'Lavender' });
+  await expect(page.locator('html')).not.toHaveAttribute('data-accent');
+  await expect.poll(primary).toBe('rgb(186, 187, 241)');
 });
 
 test('shows compact chats without thinking', async ({ page }) => {

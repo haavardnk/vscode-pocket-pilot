@@ -21,6 +21,7 @@
   import { theme, THEMES } from '../lib/stores/theme.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
   import { ago } from '../lib/time';
+  import { ACCENTS } from '../themes/accents';
 
   interface Props {
     device: Device;
@@ -69,7 +70,7 @@
       <Palette class="size-5 text-base-content/70" />
       <span class="list-col-grow">Theme</span>
       <select
-        class="select w-36 select-sm"
+        class="select w-48 select-sm"
         value={theme.choice}
         onchange={(event) => {
           const choice = THEMES.find((option) => option.id === event.currentTarget.value);
@@ -78,6 +79,23 @@
         aria-label="Theme"
       >
         {#each THEMES as option (option.id)}
+          <option value={option.id}>{option.label}</option>
+        {/each}
+      </select>
+    </li>
+    <li class="list-row items-center py-2.5">
+      <span class="m-0.5 size-4 rounded-full bg-primary" aria-hidden="true"></span>
+      <span class="list-col-grow">Accent</span>
+      <select
+        class="select w-48 select-sm"
+        value={theme.accent}
+        onchange={(event) => {
+          const accent = ACCENTS.find((option) => option.id === event.currentTarget.value);
+          if (accent) theme.setAccent(accent.id);
+        }}
+        aria-label="Accent"
+      >
+        {#each ACCENTS as option (option.id)}
           <option value={option.id}>{option.label}</option>
         {/each}
       </select>
