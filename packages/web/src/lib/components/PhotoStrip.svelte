@@ -29,7 +29,7 @@
         <div class="size-20 skeleton rounded-box" aria-label={`Loading ${image.name}`}></div>
       {:then photo}
         <button
-          class="block cursor-zoom-in overflow-hidden rounded-box"
+          class="block cursor-zoom-in overflow-hidden rounded-box border border-base-content/20"
           aria-label={`View ${image.name}`}
           onclick={() => {
             viewing = { name: image.name, src: dataUrl(photo) };

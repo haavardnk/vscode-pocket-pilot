@@ -191,7 +191,7 @@
       {#each images as image, index (image)}
         <li class="relative shrink-0">
           <img
-            class="size-16 rounded-box object-cover"
+            class="size-16 rounded-box border border-base-content/20 object-cover"
             src={dataUrl(image)}
             alt={`Photo ${index + 1}`}
           />
