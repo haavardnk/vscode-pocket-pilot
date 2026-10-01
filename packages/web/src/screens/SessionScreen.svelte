@@ -103,6 +103,16 @@
   const echoing = $derived(
     echo && detail && (detail.requests.at(-1)?.id ?? null) === echo.after ? echo : null
   );
+  const sentPhotos = $derived.by(() => {
+    if (!echo || echo.images.length === 0 || !detail) return null;
+    const after = echo.after;
+    const index =
+      after === null ? 0 : detail.requests.findIndex((request) => request.id === after) + 1;
+    const request = index > 0 || after === null ? detail.requests[index] : undefined;
+    return request?.message.includes(echo.text)
+      ? { requestId: request.id, images: echo.images }
+      : null;
+  });
   const handoffAgent = $derived(
     detail && hostWindow && !echoing && !editing
       ? handoffSource(hostWindow.agents, detail, modeId)
@@ -443,6 +453,7 @@
           {request}
           {windowId}
           {sessionId}
+          sent={sentPhotos?.requestId === request.id ? sentPhotos.images : null}
           disabled={!connected}
           dimmed={editIndex >= 0 && index >= editIndex}
           onmessage={editing ? null : () => (acting = request)}

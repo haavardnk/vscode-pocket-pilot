@@ -2,16 +2,17 @@
   import CircleHelp from '@lucide/svelte/icons/circle-help';
   import FileDiff from '@lucide/svelte/icons/file-diff';
   import ShieldAlert from '@lucide/svelte/icons/shield-alert';
-  import type { QuestionAnswers, RequestView } from '@pocket-pilot/protocol';
+  import type { ImageUpload, QuestionAnswers, RequestView } from '@pocket-pilot/protocol';
 
   import { getChatContext } from '../chatContext';
   import { responseItems } from '../hub/steps';
   import { markdown } from '../markdown';
-  import { requestPhoto } from '../photos/chatPhotos';
+  import { type ChatPhoto, requestPhoto } from '../photos/chatPhotos';
   import { routeHash } from '../routing';
   import { chatView } from '../stores/chatView.svelte';
   import CopyButton from './CopyButton.svelte';
   import EditLink from './EditLink.svelte';
+  import PendingPhotos from './PendingPhotos.svelte';
   import PhotoStrip from './PhotoStrip.svelte';
   import PromptAlert from './PromptAlert.svelte';
   import QuestionCard from './QuestionCard.svelte';
@@ -23,6 +24,7 @@
     request: RequestView;
     windowId: string;
     sessionId: string;
+    sent: ImageUpload[] | null;
     disabled: boolean;
     dimmed: boolean;
     onmessage: (() => void) | null;
@@ -35,6 +37,7 @@
     request,
     windowId,
     sessionId,
+    sent,
     disabled,
     dimmed,
     onmessage,
@@ -56,6 +59,15 @@
       ? ''
       : items.flatMap((item) => (item.kind === 'markdown' ? [item.text.trim()] : [])).join('\n\n')
   );
+  const unconfirmed = $derived(
+    request.images.length === 0 && !request.editable && sent ? sent : []
+  );
+
+  function loadPhoto(imageId: string): Promise<ChatPhoto> {
+    const index = request.images.findIndex((image) => image.id === imageId);
+    const local = sent?.length === request.images.length ? sent[index] : undefined;
+    return requestPhoto(windowId, sessionId, request.id, imageId, local);
+  }
 
   async function act(action: () => Promise<boolean>): Promise<void> {
     acting = true;
@@ -82,11 +94,9 @@
     </div>
   {/if}
   {#if request.images.length > 0}
-    <PhotoStrip
-      class="justify-end"
-      photos={request.images}
-      load={(imageId) => requestPhoto(windowId, sessionId, request.id, imageId)}
-    />
+    <PhotoStrip class="justify-end" photos={request.images} load={loadPhoto} />
+  {:else if unconfirmed.length > 0}
+    <PendingPhotos class="opacity-60" images={unconfirmed} />
   {/if}
 
   {#each items as part, index (index)}

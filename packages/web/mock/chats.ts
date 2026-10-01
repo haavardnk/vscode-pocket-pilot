@@ -4,6 +4,7 @@ import {
   type ImageUpload,
   queuePlan,
   type RequestImage,
+  type RequestView,
   sendNowSplit,
   type SessionDetail
 } from '@pocket-pilot/protocol';
@@ -257,9 +258,8 @@ export class MockChats {
   ): void {
     const detail = window.details.get(sessionId);
     if (!detail) return;
-    const requestId = this.host.id('request');
-    detail.requests.push({
-      id: requestId,
+    const request: RequestView = {
+      id: this.host.id(images.length > 0 ? 'turn' : 'request'),
       timestamp: Date.now(),
       message: text,
       modelId: detail.modelId,
@@ -268,10 +268,10 @@ export class MockChats {
           ?.name ?? null,
       state: 'pending',
       error: null,
-      editable: true,
+      editable: images.length === 0,
       disabled: false,
       editedPaths: [],
-      images: this.keepPhotos(requestId, images),
+      images: [],
       parts: [
         {
           kind: 'tool',
@@ -290,11 +290,22 @@ export class MockChats {
           parentCallId: null
         }
       ]
-    });
+    };
+    detail.requests.push(request);
     detail.totalRequests += 1;
     detail.status = 'running';
     this.host.changed(window, sessionId);
-    this.host.later(() => this.finish(window, sessionId, `Done: ${text}`));
+    if (images.length === 0) {
+      this.host.later(() => this.finish(window, sessionId, `Done: ${text}`));
+      return;
+    }
+    this.host.later(() => {
+      request.id = this.host.id('request');
+      request.editable = true;
+      request.images = this.keepPhotos(request.id, images);
+      this.host.changed(window, sessionId);
+      this.host.later(() => this.finish(window, sessionId, `Done: ${text}`));
+    });
   }
 
   private finish(window: MockWindow, sessionId: string, reply: string): void {

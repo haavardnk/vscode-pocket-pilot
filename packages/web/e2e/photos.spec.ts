@@ -16,6 +16,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('sends photos with a message and shows them in the chat', async ({ page }) => {
+  const sent: string[] = [];
+  page.on('websocket', (socket) => {
+    socket.on('framesent', (frame) => sent.push(String(frame.payload)));
+  });
+  await page.reload();
   await openSession(page, 'Plan offline mode');
   await page.getByLabel('Photo files').setInputFiles([photo('a.png'), photo('b.png')]);
   const attached = page.getByRole('list', { name: 'Attached photos' });
@@ -25,8 +30,14 @@ test('sends photos with a message and shows them in the chat', async ({ page }) 
 
   await page.getByRole('textbox', { name: 'Message' }).fill('What is on this screen?');
   await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.getByLabel('Sending')).toHaveCount(0);
+  const attaching = page.getByRole('list', { name: 'Attaching photos' });
+  await expect(attaching.getByRole('img', { name: 'Photo 1' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'View Photo 1' })).toBeVisible();
+  await expect(attaching).toHaveCount(0);
   await expect(page.getByText('Done: What is on this screen?')).toBeVisible();
   await expect(attached).toHaveCount(0);
+  expect(sent.filter((frame) => frame.includes('"requestImage"'))).toEqual([]);
 
   await page.getByRole('button', { name: 'View Photo 1' }).click();
   const viewer = page.getByRole('dialog', { name: 'Photo 1' });

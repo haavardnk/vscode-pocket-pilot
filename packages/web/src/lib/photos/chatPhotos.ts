@@ -30,10 +30,13 @@ export function requestPhoto(
   windowId: string,
   sessionId: string,
   requestId: string,
-  imageId: string
+  imageId: string,
+  sent?: ChatPhoto
 ): Promise<ChatPhoto> {
   return cached(JSON.stringify(['request', windowId, sessionId, requestId, imageId]), () =>
-    hub.query({ kind: 'requestImage', windowId, sessionId, requestId, imageId })
+    sent
+      ? Promise.resolve(sent)
+      : hub.query({ kind: 'requestImage', windowId, sessionId, requestId, imageId })
   );
 }
 
