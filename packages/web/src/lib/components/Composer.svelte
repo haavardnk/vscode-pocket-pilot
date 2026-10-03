@@ -21,6 +21,7 @@
 
   import { PERMISSIONS } from '../hub/permissions';
   import { dataUrl, preparePhoto } from '../photos/prepare';
+  import { chatView } from '../stores/chatView.svelte';
   import { toasts } from '../stores/toasts.svelte';
 
   interface Props {
@@ -54,7 +55,7 @@
   let text = $state('');
   let images = $state<ImageUpload[]>([]);
   let preparing = $state(0);
-  let delivery = $state<Delivery>('queued');
+  let delivery = $state<Delivery>(chatView.delivery);
   let sending = $state(false);
   let input = $state<HTMLTextAreaElement>();
   let picker = $state<HTMLInputElement>();

@@ -262,6 +262,23 @@ test('switches queued messages between steer and queue while editing', async ({ 
   ]);
 });
 
+test('remembers steer for the next message', async ({ page }) => {
+  await openSession(page, 'Plan the release');
+  const delivery = page.getByRole('radiogroup', { name: 'Delivery' });
+  const steer = delivery.getByRole('radio', { name: 'Steer' });
+
+  await page.getByRole('textbox', { name: 'Message' }).fill('Mention the fix');
+  await steer.click();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(
+    page.getByRole('list', { name: 'Queued messages' }).getByText('Mention the fix')
+  ).toBeVisible();
+  await expect(steer).toBeChecked();
+
+  await page.reload();
+  await expect(steer).toBeChecked();
+});
+
 test('removes and collapses queued messages', async ({ page }) => {
   await openSession(page, 'Plan the release');
   const queue = page.getByRole('list', { name: 'Queued messages' });

@@ -47,6 +47,7 @@
   import { requestPhoto } from '../lib/photos/chatPhotos';
   import { reusePhoto } from '../lib/photos/prepare';
   import { inChat, parseRoute } from '../lib/routing';
+  import { chatView } from '../lib/stores/chatView.svelte';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
   import { toasts } from '../lib/stores/toasts.svelte';
@@ -80,7 +81,7 @@
   let root = $state<HTMLElement>();
   let composer = $state<ReturnType<typeof Composer>>();
   let queuedMessages = $state<ReturnType<typeof QueuedMessages>>();
-  let draft: Draft = { text: '', images: [], delivery: 'queued' };
+  let draft: Draft = { text: '', images: [], delivery: chatView.delivery };
   let followBottom = true;
   let scrolled = 0;
 
@@ -203,6 +204,7 @@
         : sendEdit(edit, edit.target.request, text, images);
     }
     followBottom = true;
+    if (delivery !== null) chatView.setDelivery(delivery);
     if (delivery === null) echo = { text, images, after: detail?.requests.at(-1)?.id ?? null };
     const sent = await run(() =>
       hub.command({ kind: 'send', windowId, sessionId, text, images, delivery })
@@ -244,7 +246,7 @@
 
   function startEdit(request: RequestView): void {
     if (!detail) return;
-    draft = composer?.current() ?? { text: '', images: [], delivery: 'queued' };
+    draft = composer?.current() ?? { text: '', images: [], delivery: chatView.delivery };
     editing = {
       target: { kind: 'request', request },
       modeId,
@@ -256,7 +258,7 @@
 
   function editQueued(item: QueuedRequest): void {
     if (!detail) return;
-    draft = composer?.current() ?? { text: '', images: [], delivery: 'queued' };
+    draft = composer?.current() ?? { text: '', images: [], delivery: chatView.delivery };
     editing = {
       target: { kind: 'queued', item: $state.snapshot(item) },
       modeId: item.modeId ?? modeId,
