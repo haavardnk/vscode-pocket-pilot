@@ -97,3 +97,24 @@ for (const { screen, tab, heading, open, input, follows, latest } of KEYBOARD_SC
     await expect(page.getByRole('navigation')).toBeHidden();
   });
 }
+
+test('fills the screen when a stale keyboard height outlives the focus', async ({ page }) => {
+  await fakeKeyboard(page);
+  await page.setViewportSize({ width: 412, height: 600 });
+  await openSession(page, 'Build the phone app');
+  const message = page.getByRole('textbox', { name: 'Message' });
+  await message.focus();
+  await openKeyboard(page, 300, 120);
+  await message.blur();
+  await openKeyboard(page, 300, 120);
+  const shell = page.locator('[data-tab="chats"]').locator('..');
+  await expect
+    .poll(() =>
+      shell.evaluate((element) => [
+        element.getBoundingClientRect().top,
+        element.getBoundingClientRect().height
+      ])
+    )
+    .toEqual([0, 600]);
+  await expect(page.getByRole('navigation')).toBeVisible();
+});
