@@ -46,15 +46,14 @@ export class MockTerminals {
   run(window: MockWindow, command: TerminalCommand): void {
     if (command.kind === 'createTerminal') {
       if (window.terminals.has(command.terminalId)) throw new Error('Terminal already exists');
-      const folders = window.state.folders;
       const folder =
         command.folderId === null
-          ? folders[0]
-          : folders.find((candidate) => candidate.id === command.folderId);
+          ? undefined
+          : window.state.folders.find((candidate) => candidate.id === command.folderId);
       if (command.folderId !== null && !folder) throw new Error('Folder is no longer open');
       const { summary, detail } = ownedTerminal(
         command.terminalId,
-        folder ? `~/Git/${folder.name}` : null
+        folder ? `~/Git/${folder.name}` : '~'
       );
       window.state.terminals.push(summary);
       window.terminals.set(detail.id, detail);

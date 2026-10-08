@@ -163,7 +163,7 @@ describe('repositoryGroups', () => {
 });
 
 describe('terminalTargets', () => {
-  it('offers each folder, or the window itself when it has none', () => {
+  it('offers each folder and the home folder of every window', () => {
     const windows = [
       {
         ...window('w1', [], []),
@@ -177,7 +177,8 @@ describe('terminalTargets', () => {
     expect(terminalTargets(windows)).toEqual([
       { windowId: 'w1', windowName: 'w1', folderId: 'f1', name: 'app' },
       { windowId: 'w1', windowName: 'w1', folderId: 'f2', name: 'lib' },
-      { windowId: 'w2', windowName: 'w2', folderId: null, name: 'w2' }
+      { windowId: 'w1', windowName: 'w1', folderId: null, name: 'Home folder' },
+      { windowId: 'w2', windowName: 'w2', folderId: null, name: 'Home folder' }
     ]);
   });
 });

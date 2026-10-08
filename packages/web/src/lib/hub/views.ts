@@ -177,11 +177,10 @@ export function windowsForRepository(
 }
 
 export function terminalTargets(windows: WindowState[]): TerminalTarget[] {
-  return windows.flatMap(({ windowId, name: windowName, folders }): TerminalTarget[] =>
-    folders.length === 0
-      ? [{ windowId, windowName, folderId: null, name: windowName }]
-      : folders.map((folder) => ({ windowId, windowName, folderId: folder.id, name: folder.name }))
-  );
+  return windows.flatMap(({ windowId, name: windowName, folders }): TerminalTarget[] => [
+    ...folders.map((folder) => ({ windowId, windowName, folderId: folder.id, name: folder.name })),
+    { windowId, windowName, folderId: null, name: 'Home folder' }
+  ]);
 }
 
 function basename(value: string): string {

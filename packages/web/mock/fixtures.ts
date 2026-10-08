@@ -190,12 +190,12 @@ function newTerminal(
   };
 }
 
-export function ownedTerminal(id: string, cwd: string | null): MockTerminal {
+export function ownedTerminal(id: string, cwd: string): MockTerminal {
   const terminal = newTerminal(id, cwd, { owned: true });
   terminal.detail.stream = {
     dropped: 0,
     lines: [],
-    tail: [line(`${cwd ?? '~'} $`)],
+    tail: [line(`${cwd} $`)],
     alternate: false
   };
   return terminal;

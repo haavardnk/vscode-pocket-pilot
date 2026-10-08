@@ -1,6 +1,6 @@
 <script lang="ts">
   import FolderGit from '@lucide/svelte/icons/folder-git-2';
-  import SquareTerminal from '@lucide/svelte/icons/square-terminal';
+  import House from '@lucide/svelte/icons/house';
 
   import { type TerminalTarget, terminalTargets, windowsForRepository } from '../../hub/views';
   import { hub } from '../../stores/hub.svelte';
@@ -38,11 +38,11 @@
           {#if target.folderId}
             <FolderGit class="size-4 shrink-0" />
           {:else}
-            <SquareTerminal class="size-4 shrink-0" />
+            <House class="size-4 shrink-0" />
           {/if}
           <span class="flex min-w-0 flex-col items-start">
             <span class="truncate">{target.name}</span>
-            {#if showWindow && target.folderId}
+            {#if showWindow}
               <span class="truncate text-xs text-base-content/60">{target.windowName}</span>
             {/if}
           </span>
