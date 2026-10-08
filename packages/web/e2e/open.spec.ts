@@ -29,6 +29,22 @@ test('filters folders by name and path', async ({ page }) => {
   await expect(page.getByRole('combobox', { name: 'Repository' })).toHaveValue('*');
 });
 
+test('opens a typed path', async ({ page }) => {
+  const field = page.getByRole('searchbox', { name: 'Search folders or type a path' });
+  await field.fill('~/Git/missing');
+  await page.getByRole('button', { name: 'Open path' }).click();
+  await expect(page.getByText('There is nothing at ~/Git/missing')).toBeVisible();
+  await field.fill('~/Git/vscode-pocket-pilot/');
+  await field.press('Enter');
+  await expect(page.getByText('vscode-pocket-pilot is already open')).toBeVisible();
+  await field.fill('~/Downloads/scratch');
+  await expect(page.getByText('No matching folders')).toBeHidden();
+  await page.getByRole('button', { name: 'Open path' }).click();
+  await expect(page.getByText('Opened scratch')).toBeVisible();
+  const picker = page.getByRole('combobox', { name: 'Repository' });
+  await expect(picker.locator('option:checked')).toHaveText('scratch');
+});
+
 test('opens the folder list from the windows screen', async ({ page }) => {
   await page.getByRole('button', { name: 'Back' }).click();
   await page.getByRole('button', { name: 'Settings' }).click();

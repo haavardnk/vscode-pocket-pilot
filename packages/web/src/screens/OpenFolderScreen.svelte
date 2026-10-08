@@ -1,5 +1,6 @@
 <script lang="ts">
   import FolderGit from '@lucide/svelte/icons/folder-git-2';
+  import FolderInput from '@lucide/svelte/icons/folder-input';
   import FolderOpen from '@lucide/svelte/icons/folder-open';
   import Layers from '@lucide/svelte/icons/layers';
   import MonitorOff from '@lucide/svelte/icons/monitor-off';
@@ -27,9 +28,11 @@
 
   let search = $state('');
   let pending = $state<Pending | null>(null);
+  let resolving = $state(false);
 
   const hostId = $derived(hub.windows[0]?.windowId);
   const openIds = $derived(new Set(hub.windows.map((window) => window.workspace)));
+  const typedPath = $derived(/^\s*[~/]/.test(search) ? search.trim() : null);
   const targets = new QueryResource<QueryResultFor<'openTargets'>>(() => {
     if (!hostId) return Promise.reject(new Error('No VS Code window is connected'));
     return hub.query({ kind: 'openTargets', windowId: hostId });
@@ -86,6 +89,25 @@
     }, SLOW_OPEN_MS);
     pending = { target, slow: false, timer };
   }
+
+  async function openPath(path: string): Promise<void> {
+    if (!hostId || resolving) return;
+    resolving = true;
+    try {
+      const { target } = await hub.query({ kind: 'pathTarget', windowId: hostId, path });
+      if (openIds.has(target.id)) toasts.show(`${target.name} is already open`);
+      else await open(target);
+    } catch (error) {
+      toasts.error(error);
+    } finally {
+      resolving = false;
+    }
+  }
+
+  function submit(event: SubmitEvent): void {
+    event.preventDefault();
+    if (typedPath) void openPath(typedPath);
+  }
 </script>
 
 <div class="flex flex-1 flex-col">
@@ -120,27 +142,53 @@
         hint="Pocket Pilot opens folders through a running VS Code window."
       />
     {:else}
+      <form class="px-4 pt-3 pb-1" onsubmit={submit}>
+        <label class="input w-full">
+          <Search class="size-4 opacity-50" />
+          <input
+            type="search"
+            class="grow"
+            placeholder="Search, or type a path like ~/Git"
+            aria-label="Search folders or type a path"
+            autocapitalize="off"
+            autocomplete="off"
+            spellcheck="false"
+            enterkeyhint="go"
+            bind:value={search}
+          />
+        </label>
+      </form>
+      {#if typedPath}
+        <ul class="list" aria-label="Path">
+          <li>
+            <button
+              class="list-row w-full items-center text-left active:bg-base-200 disabled:opacity-60"
+              aria-label="Open path"
+              disabled={resolving || hub.connection !== 'open'}
+              onclick={() => void openPath(typedPath)}
+            >
+              {#if resolving}
+                <span class="loading loading-sm loading-spinner text-primary"></span>
+              {:else}
+                <FolderInput class="size-5 text-primary" />
+              {/if}
+              <span class="flex min-w-0 flex-col list-col-grow">
+                <span class="truncate font-medium">Open this path</span>
+                <span class="truncate text-xs text-base-content/60">{typedPath}</span>
+              </span>
+            </button>
+          </li>
+        </ul>
+      {/if}
       <QueryView resource={targets}>
         {#snippet children(result)}
           {#if result.recent.length + result.projects.length === 0}
             <EmptyState
               icon={FolderOpen}
               title="No folders to open"
-              hint="Open folders in VS Code once, or list your project folders in the pocketPilot.projectRoots setting."
+              hint="Type a path above, open folders in VS Code once, or list your project folders in the pocketPilot.projectRoots setting."
             />
           {:else}
-            <div class="px-4 pt-3 pb-1">
-              <label class="input w-full">
-                <Search class="size-4 opacity-50" />
-                <input
-                  type="search"
-                  class="grow"
-                  placeholder="Search folders"
-                  aria-label="Search folders"
-                  bind:value={search}
-                />
-              </label>
-            </div>
             {#each sections(result) as section (section.title)}
               <section>
                 <h2 class="px-4 pt-4 pb-1 text-xs font-semibold text-base-content/60 uppercase">
@@ -174,7 +222,13 @@
                 </ul>
               </section>
             {:else}
-              <EmptyState icon={Search} title="No matching folders" hint="Try a different word." />
+              {#if !typedPath}
+                <EmptyState
+                  icon={Search}
+                  title="No matching folders"
+                  hint="Try a different word, or type a full path."
+                />
+              {/if}
             {/each}
           {/if}
         {/snippet}

@@ -12,7 +12,7 @@ import { windowQuerySchema, windowResultSchema } from './windows.ts';
 
 export const querySchema = z.discriminatedUnion('kind', [
   ...codeQuerySchema.options,
-  windowQuerySchema,
+  ...windowQuerySchema.options,
   branchQuerySchema,
   imageQuerySchema,
   toolImageQuerySchema
@@ -20,7 +20,7 @@ export const querySchema = z.discriminatedUnion('kind', [
 
 export const queryResultSchema = z.discriminatedUnion('kind', [
   ...codeResultSchema.options,
-  windowResultSchema,
+  ...windowResultSchema.options,
   branchResultSchema,
   imageResultSchema,
   toolImageResultSchema

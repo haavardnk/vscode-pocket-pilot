@@ -7,16 +7,23 @@ export const openTargetSchema = z.object({
   kind: z.enum(['folder', 'workspace'])
 });
 
-export const windowQuerySchema = z.object({
-  kind: z.literal('openTargets'),
-  windowId: z.string()
-});
+export const windowQuerySchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('openTargets'), windowId: z.string() }),
+  z.object({
+    kind: z.literal('pathTarget'),
+    windowId: z.string(),
+    path: z.string().trim().min(1).max(4096)
+  })
+]);
 
-export const windowResultSchema = z.object({
-  kind: z.literal('openTargets'),
-  recent: z.array(openTargetSchema),
-  projects: z.array(openTargetSchema)
-});
+export const windowResultSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('openTargets'),
+    recent: z.array(openTargetSchema),
+    projects: z.array(openTargetSchema)
+  }),
+  z.object({ kind: z.literal('pathTarget'), target: openTargetSchema })
+]);
 
 export type OpenTarget = z.infer<typeof openTargetSchema>;
 export type WindowQuery = z.infer<typeof windowQuerySchema>;

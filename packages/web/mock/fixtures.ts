@@ -183,6 +183,7 @@ function newTerminal(
       command: null,
       lastExitCode: null,
       owned: false,
+      home: false,
       exited: false,
       ...fields
     },
@@ -190,12 +191,12 @@ function newTerminal(
   };
 }
 
-export function ownedTerminal(id: string, cwd: string | null): MockTerminal {
-  const terminal = newTerminal(id, cwd, { owned: true });
+export function ownedTerminal(id: string, cwd: string, home: boolean): MockTerminal {
+  const terminal = newTerminal(id, cwd, { owned: true, home });
   terminal.detail.stream = {
     dropped: 0,
     lines: [],
-    tail: [line(`${cwd ?? '~'} $`)],
+    tail: [line(`${cwd} $`)],
     alternate: false
   };
   return terminal;
@@ -287,19 +288,25 @@ export const OPEN_TARGETS = {
   projects: [target('dotfiles'), target('raw-pipeline')]
 };
 
-export function openedWindow(windowId: string, opened: OpenTarget): MockWindow {
-  const key = `github.com/haavardnk/${opened.name}`;
+export function typedTarget(input: string): OpenTarget {
+  const path = input.trim().replace(/(.)\/+$/, '$1');
+  if (!/^(~|\/)/.test(path)) throw new Error('Enter a full path starting with / or ~');
+  if (path.includes('missing')) throw new Error(`There is nothing at ${path}`);
+  const full = path.replace(/^~/, '/Users/me');
+  return { id: `file://${full}`, name: full.split('/').at(-1) || '/', path, kind: 'folder' };
+}
+
+export function openedWindow(windowId: string, workspace: string, name: string): MockWindow {
+  const key = `github.com/haavardnk/${name}`;
   return buildWindow(
     {
       windowId,
-      name: opened.name,
-      workspace: opened.id,
-      repositories: [
-        { key, label: opened.name, github: { owner: 'haavardnk', name: opened.name } }
-      ],
+      name,
+      workspace,
+      repositories: [{ key, label: name, github: { owner: 'haavardnk', name } }],
       agents: AGENTS,
       models: models(),
-      folders: [{ id: `${windowId}-f`, name: opened.name, repositoryKey: key, git: null }],
+      folders: [{ id: `${windowId}-f`, name, repositoryKey: key, git: null }],
       canOrganize: true
     },
     [],

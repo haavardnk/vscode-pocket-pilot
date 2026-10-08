@@ -1,6 +1,9 @@
-import { basename, sep } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { basename, resolve, sep } from 'node:path';
 
-import type { OpenTarget, WindowResult } from '@pocket-pilot/protocol';
+import type { OpenTarget, QueryResultFor } from '@pocket-pilot/protocol';
+
+import { expandRoot } from './projectRoots';
 
 const WORKSPACE_EXTENSION = '.code-workspace';
 
@@ -16,7 +19,7 @@ function shortPath(fsPath: string, home: string): string {
     : fsPath;
 }
 
-function openTarget(candidate: OpenCandidate, home: string): OpenTarget {
+export function openTarget(candidate: OpenCandidate, home: string): OpenTarget {
   const name = basename(candidate.fsPath);
   return {
     id: candidate.id,
@@ -38,11 +41,29 @@ function unique(candidates: readonly OpenCandidate[], skip: ReadonlySet<string>)
   });
 }
 
+export function typedPath(input: string, home: string): string {
+  const expanded = expandRoot(input, home);
+  if (!expanded) throw new Error('Enter a full path starting with / or ~');
+  return resolve(expanded);
+}
+
+export async function targetKind(fsPath: string, home: string): Promise<OpenTarget['kind']> {
+  const stats = await stat(fsPath).catch(() => null);
+  if (stats?.isDirectory()) return 'folder';
+  if (stats?.isFile() && fsPath.endsWith(WORKSPACE_EXTENSION)) return 'workspace';
+  const shown = shortPath(fsPath, home);
+  throw new Error(
+    stats
+      ? `${shown} is not a folder or a ${WORKSPACE_EXTENSION} file`
+      : `There is nothing at ${shown}`
+  );
+}
+
 export function openTargets(
   recent: readonly OpenCandidate[],
   projects: readonly OpenCandidate[],
   home: string
-): WindowResult {
+): QueryResultFor<'openTargets'> {
   const recentTargets = unique(recent, new Set()).map((candidate) => openTarget(candidate, home));
   const recentIds = new Set(recentTargets.map((target) => target.id));
   return {
