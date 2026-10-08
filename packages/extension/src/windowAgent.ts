@@ -46,6 +46,7 @@ import {
   currentWorkspace,
   isWindowCommand,
   listOpenTargets,
+  pathTarget,
   runWindowCommand
 } from './windows/windowService';
 
@@ -300,6 +301,7 @@ export class WindowAgent implements vscode.Disposable {
 
   async query(query: Query): Promise<QueryResult> {
     if (query.kind === 'openTargets') return listOpenTargets(this.report);
+    if (query.kind === 'pathTarget') return pathTarget(query.path);
     if (query.kind === 'branches') return this.branches.list(query);
     if (query.kind === 'requestImage') {
       const image = await this.store.requestImage(query.sessionId, query.requestId, query.imageId);

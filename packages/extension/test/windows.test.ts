@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { openTargets } from '../src/windows/openTargets';
+import { openTargets, targetKind, typedPath } from '../src/windows/openTargets';
 import { expandRoot, scanRoots } from '../src/windows/projectRoots';
 import { MAX_RECENT, parseRecents } from '../src/windows/recentFolders';
 
@@ -85,6 +85,48 @@ describe('project roots', () => {
     expect(found.sort()).toEqual(
       ['app', 'group/lib', 'group/worktree'].map((path) => join(root, path))
     );
+  });
+});
+
+describe('typed paths', () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'pp-typed-'));
+    await mkdir(join(root, 'app'));
+    await writeFile(join(root, 'all.code-workspace'), '{}');
+    await writeFile(join(root, 'notes.txt'), '');
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['~', '/home/me'],
+    [' ~/Git/app/ ', '/home/me/Git/app'],
+    ['/srv/a/../b', '/srv/b'],
+    ['/', '/']
+  ])('resolves %s', (input, expected) => {
+    expect(typedPath(input, '/home/me')).toBe(expected);
+  });
+
+  it('refuses a relative path', () => {
+    expect(() => typedPath('Git/app', '/home/me')).toThrow('Enter a full path');
+  });
+
+  it.each([
+    ['app', 'folder'],
+    ['all.code-workspace', 'workspace']
+  ])('opens %s as a %s', async (name, kind) => {
+    await expect(targetKind(join(root, name), root)).resolves.toBe(kind);
+  });
+
+  it.each([
+    ['notes.txt', '~/notes.txt is not a folder'],
+    ['missing', 'There is nothing at ~/missing']
+  ])('refuses %s', async (name, message) => {
+    await expect(targetKind(join(root, name), root)).rejects.toThrow(message);
   });
 });
 
