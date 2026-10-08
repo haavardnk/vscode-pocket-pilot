@@ -201,23 +201,23 @@ export class TerminalService implements vscode.Disposable {
 
   private create(terminalId: string, folderId: string | null): void {
     if (this.find(terminalId)) throw new Error('Terminal already exists');
-    const folders = this.folders();
     const folder =
-      folderId === null ? folders[0] : folders.find((candidate) => candidate.id === folderId);
+      folderId === null ? undefined : this.folders().find((candidate) => candidate.id === folderId);
     if (folderId !== null && !folder) throw new Error('Folder is no longer open');
+    const cwd = folder?.root ?? homedir();
     const spawn = this.ptySpawn();
     const launch = spawn && this.defaultShell();
     if (!spawn || !launch) {
-      this.add(vscode.window.createTerminal({ cwd: folder?.root }), terminalId);
+      this.add(vscode.window.createTerminal({ cwd }), terminalId);
       return;
     }
-    const pty = new OwnedTerminal(spawn, launch, folder?.root, {
+    const pty = new OwnedTerminal(spawn, launch, cwd, {
       data: (data) => void this.find(terminalId)?.log.writeStream(data),
       resize: (cols, rows) => this.find(terminalId)?.log.resizeStream(cols, rows),
       failed: (message) => this.report(message)
     });
     this.add(vscode.window.createTerminal({ name: launch.name, pty }), terminalId, {
-      cwd: displayPath(folder?.root),
+      cwd: displayPath(cwd),
       shell: launch.name
     });
   }

@@ -65,7 +65,7 @@ test('kills a terminal and opens a new one', async ({ page }) => {
   await page.getByRole('button', { name: 'New terminal' }).click();
   await page
     .getByRole('dialog', { name: 'New terminal' })
-    .getByRole('button', { name: /vscode-pocket-pilot/ })
+    .getByRole('button', { name: /^vscode-pocket-pilot/ })
     .click();
   await expect(page.getByRole('heading', { name: 'zsh' })).toBeVisible();
   const output = page.getByRole('log', { name: 'Terminal output' });
@@ -76,6 +76,16 @@ test('kills a terminal and opens a new one', async ({ page }) => {
   await expect(page.getByText('Output appears once shell integration')).toHaveCount(0);
   await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByRole('link', { name: /^zsh/ })).toBeVisible();
+});
+
+test('opens a terminal in the home folder', async ({ page }) => {
+  await page.getByRole('button', { name: 'Terminals', exact: true }).click();
+  await page.getByRole('button', { name: 'New terminal' }).click();
+  await page
+    .getByRole('dialog', { name: 'New terminal' })
+    .getByRole('button', { name: /^Home folder.*immich-edit/ })
+    .click();
+  await expect(page.getByRole('log', { name: 'Terminal output' })).toHaveText('~ $');
 });
 
 test('kills all terminals', async ({ page }) => {
