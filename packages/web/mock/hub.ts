@@ -20,7 +20,8 @@ import {
   OPEN_TARGETS,
   openedWindow,
   refreshSummary,
-  SCREENSHOT
+  SCREENSHOT,
+  typedTarget
 } from './fixtures.ts';
 import { isTerminalCommand, MockTerminals } from './terminals.ts';
 
@@ -127,6 +128,7 @@ export class MockHub {
     const window = this.windows.find((candidate) => candidate.state.windowId === query.windowId);
     if (!window) throw new Error('Window is no longer open');
     if (query.kind === 'openTargets') return { kind: 'openTargets', ...OPEN_TARGETS };
+    if (query.kind === 'pathTarget') return { kind: 'pathTarget', target: typedTarget(query.path) };
     if (query.kind === 'branches') {
       return this.branches.list(query.windowId, folderOf(window, query.folderId));
     }
@@ -194,12 +196,13 @@ export class MockHub {
   }
 
   private open(targetId: string): void {
-    const opened = [...OPEN_TARGETS.recent, ...OPEN_TARGETS.projects].find(
-      (candidate) => candidate.id === targetId
-    );
-    if (!opened) throw new Error('This folder is no longer in the list');
+    if (!targetId.startsWith('file:///')) throw new Error('Only local folders can be opened');
     if (this.windows.some((window) => window.state.workspace === targetId)) return;
-    const window = openedWindow(this.id('window'), opened);
+    const name = decodeURIComponent(targetId.split('/').at(-1) ?? '').replace(
+      /\.code-workspace$/,
+      ''
+    );
+    const window = openedWindow(this.id('window'), targetId, name);
     this.later(() => {
       this.windows.push(window);
       this.broadcast({ type: 'window', window: window.state });

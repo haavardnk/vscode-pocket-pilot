@@ -1,11 +1,11 @@
 import { homedir } from 'node:os';
 
-import type { Command, OpenTarget, WindowResult } from '@pocket-pilot/protocol';
+import type { Command, OpenTarget, QueryResultFor } from '@pocket-pilot/protocol';
 import * as vscode from 'vscode';
 
 import { errorMessage } from '../errors';
 import { SECTION } from '../settings';
-import { type OpenCandidate, openTargets } from './openTargets';
+import { type OpenCandidate, openTarget, openTargets, targetKind, typedPath } from './openTargets';
 import { scanRoots } from './projectRoots';
 import { parseRecents, type RecentEntry } from './recentFolders';
 
@@ -48,7 +48,7 @@ async function recentEntries(report: Report): Promise<RecentEntry[]> {
   }
 }
 
-export async function listOpenTargets(report: Report): Promise<WindowResult> {
+export async function listOpenTargets(report: Report): Promise<QueryResultFor<'openTargets'>> {
   const home = homedir();
   const [recent, projects] = await Promise.all([
     recentEntries(report),
@@ -66,18 +66,23 @@ export async function listOpenTargets(report: Report): Promise<WindowResult> {
   );
 }
 
-async function openWindow(target: string, report: Report): Promise<void> {
-  const { recent, projects } = await listOpenTargets(report);
-  const listed = [...recent, ...projects].find((candidate) => candidate.id === target);
-  if (!listed) throw new Error('This folder is no longer in the list');
-  await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.parse(listed.id), {
-    forceNewWindow: true
-  });
+export async function pathTarget(input: string): Promise<QueryResultFor<'pathTarget'>> {
+  const home = homedir();
+  const fsPath = typedPath(input, home);
+  const kind = await targetKind(fsPath, home);
+  return { kind: 'pathTarget', target: openTarget(candidate(vscode.Uri.file(fsPath), kind), home) };
+}
+
+async function openWindow(target: string): Promise<void> {
+  const uri = vscode.Uri.parse(target, true);
+  if (uri.scheme !== 'file') throw new Error('Only local folders can be opened');
+  await targetKind(uri.fsPath, homedir());
+  await vscode.commands.executeCommand('vscode.openFolder', uri, { forceNewWindow: true });
 }
 
 export async function runWindowCommand(command: WindowCommand, report: Report): Promise<void> {
   if (command.kind === 'openWindow') {
-    await openWindow(command.target, report);
+    await openWindow(command.target);
     return;
   }
   setTimeout(() => {
