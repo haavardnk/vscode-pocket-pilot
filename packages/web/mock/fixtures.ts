@@ -183,6 +183,7 @@ function newTerminal(
       command: null,
       lastExitCode: null,
       owned: false,
+      home: false,
       exited: false,
       ...fields
     },
@@ -190,8 +191,8 @@ function newTerminal(
   };
 }
 
-export function ownedTerminal(id: string, cwd: string): MockTerminal {
-  const terminal = newTerminal(id, cwd, { owned: true });
+export function ownedTerminal(id: string, cwd: string, home: boolean): MockTerminal {
+  const terminal = newTerminal(id, cwd, { owned: true, home });
   terminal.detail.stream = {
     dropped: 0,
     lines: [],

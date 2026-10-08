@@ -2,7 +2,7 @@
   import Trash from '@lucide/svelte/icons/trash';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 
-  import { windowsForRepository } from '../../hub/views';
+  import { homeTerminals, windowsForRepository } from '../../hub/views';
   import { hub } from '../../stores/hub.svelte';
   import { toasts } from '../../stores/toasts.svelte';
   import Sheet from '../Sheet.svelte';
@@ -14,15 +14,26 @@
       (window) => window.terminals.length > 0
     )
   );
-  const terminals = $derived(windows.flatMap((window) => window.terminals));
+  const strayHome = $derived(
+    homeTerminals(hub.windows).filter(
+      ({ windowId }) => !windows.some((window) => window.windowId === windowId)
+    )
+  );
+  const terminals = $derived([
+    ...windows.flatMap((window) => window.terminals),
+    ...strayHome.map(({ terminal }) => terminal)
+  ]);
   const running = $derived(terminals.filter((terminal) => terminal.command).length);
   const closes = $derived(`closes ${terminals.length === 1 ? 'it' : 'them'} in VS Code.`);
 
   function kill(): void {
     open = false;
-    void Promise.allSettled(
-      windows.map((window) => hub.command({ kind: 'killTerminals', windowId: window.windowId }))
-    ).then((results) => {
+    void Promise.allSettled([
+      ...windows.map((window) => hub.command({ kind: 'killTerminals', windowId: window.windowId })),
+      ...strayHome.map(({ windowId, terminal }) =>
+        hub.command({ kind: 'killTerminal', windowId, terminalId: terminal.id })
+      )
+    ]).then((results) => {
       const failed = results.find((result) => result.status === 'rejected');
       if (failed) toasts.error(failed.reason);
     });
