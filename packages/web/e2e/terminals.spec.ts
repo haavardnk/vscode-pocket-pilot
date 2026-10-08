@@ -78,14 +78,26 @@ test('kills a terminal and opens a new one', async ({ page }) => {
   await expect(page.getByRole('link', { name: /^zsh/ })).toBeVisible();
 });
 
-test('opens a terminal in the home folder', async ({ page }) => {
+test('keeps home folder terminals outside every repository', async ({ page }) => {
   await page.getByRole('button', { name: 'Terminals', exact: true }).click();
   await page.getByRole('button', { name: 'New terminal' }).click();
-  await page
-    .getByRole('dialog', { name: 'New terminal' })
-    .getByRole('button', { name: /^Home folder.*immich-edit/ })
-    .click();
+  const sheet = page.getByRole('dialog', { name: 'New terminal' });
+  await expect(sheet.getByRole('button', { name: /Home folder/ })).toHaveCount(1);
+  await sheet.getByRole('button', { name: 'Home folder', exact: true }).click();
   await expect(page.getByRole('log', { name: 'Terminal output' })).toHaveText('~ $');
+  await page.getByRole('button', { name: 'Back' }).click();
+
+  const home = page.getByRole('region', { name: 'Home folder' });
+  await expect(home.getByRole('link', { name: /^zsh/ })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Repository' }).selectOption({ label: 'immich-edit' });
+  await expect(home.getByRole('link', { name: /^zsh/ })).toBeVisible();
+  await expect(page.getByText('No terminals are open in this window.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Kill all terminals' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Kill all terminals' });
+  await expect(dialog).toContainText('Kill 1 terminal?');
+  await dialog.getByRole('button', { name: 'Kill all', exact: true }).click();
+  await expect(home).toHaveCount(0);
 });
 
 test('kills all terminals', async ({ page }) => {

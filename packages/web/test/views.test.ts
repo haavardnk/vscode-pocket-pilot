@@ -2,6 +2,7 @@ import type {
   ResponsePart,
   SessionDetail,
   SessionSummary,
+  TerminalSummary,
   WindowState
 } from '@pocket-pilot/protocol';
 import { describe, expect, it } from 'vitest';
@@ -10,6 +11,7 @@ import { chatFileHref } from '../src/lib/chatContext';
 import {
   agentLabel,
   ALL_REPOSITORIES,
+  homeTerminals,
   modelLabel,
   NO_REPOSITORY,
   pendingTool,
@@ -162,24 +164,46 @@ describe('repositoryGroups', () => {
   });
 });
 
-describe('terminalTargets', () => {
-  it('offers each folder and the home folder of every window', () => {
-    const windows = [
-      {
-        ...window('w1', [], []),
-        folders: [
-          { id: 'f1', name: 'app', repositoryKey: null, git: null },
-          { id: 'f2', name: 'lib', repositoryKey: null, git: null }
-        ]
-      },
-      window('w2', [], [])
-    ];
+describe('terminals', () => {
+  const terminal = (id: string, home: boolean): TerminalSummary => ({
+    id,
+    name: 'zsh',
+    cwd: null,
+    shell: 'zsh',
+    agent: false,
+    sessionId: null,
+    command: null,
+    lastExitCode: null,
+    owned: true,
+    home,
+    exited: false
+  });
+  const windows = [
+    {
+      ...window('w1', [], []),
+      folders: [
+        { id: 'f1', name: 'app', repositoryKey: null, git: null },
+        { id: 'f2', name: 'lib', repositoryKey: null, git: null }
+      ],
+      terminals: [terminal('t1', false), terminal('t2', true)]
+    },
+    { ...window('w2', [], []), terminals: [terminal('t3', true)] }
+  ];
+
+  it('offers each folder of every window', () => {
     expect(terminalTargets(windows)).toEqual([
       { windowId: 'w1', windowName: 'w1', folderId: 'f1', name: 'app' },
-      { windowId: 'w1', windowName: 'w1', folderId: 'f2', name: 'lib' },
-      { windowId: 'w1', windowName: 'w1', folderId: null, name: 'Home folder' },
-      { windowId: 'w2', windowName: 'w2', folderId: null, name: 'Home folder' }
+      { windowId: 'w1', windowName: 'w1', folderId: 'f2', name: 'lib' }
     ]);
+  });
+
+  it('collects home terminals across windows', () => {
+    expect(homeTerminals(windows).map(({ windowId, terminal }) => [windowId, terminal.id])).toEqual(
+      [
+        ['w1', 't2'],
+        ['w2', 't3']
+      ]
+    );
   });
 });
 

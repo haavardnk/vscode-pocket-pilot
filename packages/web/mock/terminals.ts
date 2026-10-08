@@ -53,7 +53,8 @@ export class MockTerminals {
       if (command.folderId !== null && !folder) throw new Error('Folder is no longer open');
       const { summary, detail } = ownedTerminal(
         command.terminalId,
-        folder ? `~/Git/${folder.name}` : '~'
+        folder ? `~/Git/${folder.name}` : '~',
+        !folder
       );
       window.state.terminals.push(summary);
       window.terminals.set(detail.id, detail);

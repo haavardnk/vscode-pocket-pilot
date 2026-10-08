@@ -17,6 +17,7 @@ export const terminalSummarySchema = z.object({
   command: z.string().nullable(),
   lastExitCode: z.number().nullable(),
   owned: z.boolean(),
+  home: z.boolean(),
   exited: z.boolean()
 });
 

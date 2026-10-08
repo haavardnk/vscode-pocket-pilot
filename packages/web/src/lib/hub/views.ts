@@ -4,6 +4,7 @@ import type {
   Repository,
   SessionDetail,
   SessionSummary,
+  TerminalSummary,
   WindowState
 } from '@pocket-pilot/protocol';
 import { differenceInCalendarDays } from 'date-fns';
@@ -52,8 +53,13 @@ const GROUP_LABELS: Record<SessionGroupId, string> = {
 export interface TerminalTarget {
   windowId: string;
   windowName: string;
-  folderId: string | null;
+  folderId: string;
   name: string;
+}
+
+export interface HomeTerminal {
+  windowId: string;
+  terminal: TerminalSummary;
 }
 
 function lastActivity(window: WindowState): number {
@@ -177,10 +183,15 @@ export function windowsForRepository(
 }
 
 export function terminalTargets(windows: WindowState[]): TerminalTarget[] {
-  return windows.flatMap(({ windowId, name: windowName, folders }): TerminalTarget[] => [
-    ...folders.map((folder) => ({ windowId, windowName, folderId: folder.id, name: folder.name })),
-    { windowId, windowName, folderId: null, name: 'Home folder' }
-  ]);
+  return windows.flatMap(({ windowId, name: windowName, folders }) =>
+    folders.map((folder) => ({ windowId, windowName, folderId: folder.id, name: folder.name }))
+  );
+}
+
+export function homeTerminals(windows: WindowState[]): HomeTerminal[] {
+  return windows.flatMap(({ windowId, terminals }) =>
+    terminals.filter((terminal) => terminal.home).map((terminal) => ({ windowId, terminal }))
+  );
 }
 
 function basename(value: string): string {
