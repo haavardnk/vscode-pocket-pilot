@@ -16,7 +16,7 @@
 
   function open(tab: Tab): void {
     if (router.route.name === tab) {
-      document.querySelector(`[data-tab="${tab}"]`)?.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelector(`[data-tab="${tab}"] main`)?.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       router.openTab(tab);
     }

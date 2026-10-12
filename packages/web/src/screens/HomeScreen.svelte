@@ -5,6 +5,7 @@
   import FolderList from '../lib/components/code/FolderList.svelte';
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
   import RepositoryPicker from '../lib/components/RepositoryPicker.svelte';
+  import ScreenMain from '../lib/components/ScreenMain.svelte';
   import SessionList from '../lib/components/SessionList.svelte';
   import KillAllTerminals from '../lib/components/terminal/KillAllTerminals.svelte';
   import NewTerminalSheet from '../lib/components/terminal/NewTerminalSheet.svelte';
@@ -26,8 +27,8 @@
   let creating = $state(false);
 </script>
 
-<div class="flex flex-1 flex-col">
-  <header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">
+<div class="flex min-h-0 flex-1 flex-col">
+  <header class="min-h-0 overflow-hidden pt-safe">
     <div class="flex h-14 items-center gap-2 px-4">
       {#if tab === 'settings'}
         <h1 class="text-lg font-semibold">Settings</h1>
@@ -41,7 +42,7 @@
     <ConnectionBanner />
   </header>
 
-  <main class="flex-1">
+  <ScreenMain>
     {#if tab === 'chats'}
       <SessionList />
     {:else if tab === 'code'}
@@ -51,7 +52,7 @@
     {:else}
       <SettingsPanel {device} {connection} {onsignedout} />
     {/if}
-  </main>
+  </ScreenMain>
 
   {#if tab === 'chats' && hub.windows.length > 0}
     <button

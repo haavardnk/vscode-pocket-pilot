@@ -16,6 +16,7 @@
   import ConnectionBanner from '../lib/components/ConnectionBanner.svelte';
   import ModelSheet from '../lib/components/ModelSheet.svelte';
   import ModeSheet from '../lib/components/ModeSheet.svelte';
+  import ScreenMain from '../lib/components/ScreenMain.svelte';
   import { agentLabel, modelLabel, windowsForRepository } from '../lib/hub/views';
   import { hub } from '../lib/stores/hub.svelte';
   import { router } from '../lib/stores/router.svelte';
@@ -106,8 +107,8 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col">
-  <header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">
+<div class="flex min-h-0 flex-1 flex-col">
+  <header class="min-h-0 overflow-hidden pt-safe">
     <div class="flex h-14 items-center gap-1 px-2">
       <button
         class="btn btn-square btn-ghost"
@@ -121,44 +122,46 @@
     <ConnectionBanner />
   </header>
 
-  <main class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10 text-center">
-    {#if !target}
-      <MonitorOff class="size-10 text-base-content/40" />
-      <p class="text-base-content/70">No VS Code window is open for this repository.</p>
-    {:else if pending}
-      <span class="loading loading-spinner text-primary"></span>
-      <p class="text-base-content/70">Starting chat in {target.name}…</p>
-    {:else}
-      <div class="grid size-14 place-items-center rounded-full bg-primary/15 text-primary">
-        <MessageSquarePlus class="size-7" />
-      </div>
-      <div class="flex flex-col gap-1">
-        <h2 class="text-lg font-semibold">Start a chat</h2>
-        <p class="text-sm text-base-content/60">
-          Describe the task below. Pick the agent and model before you send.
-        </p>
-      </div>
-      {#if candidates.length > 1}
-        <label class="flex w-full max-w-xs flex-col gap-1 text-left">
-          <span class="text-sm text-base-content/60">Window</span>
-          <select
-            class="select w-full"
-            value={target.windowId}
-            onchange={(event) => selectWindow(event.currentTarget.value)}
-          >
-            {#each candidates as window (window.windowId)}
-              <option value={window.windowId}>{window.name}</option>
-            {/each}
-          </select>
-        </label>
+  <ScreenMain class="flex flex-col px-6 py-10">
+    <div class="my-auto flex flex-col items-center gap-4 text-center">
+      {#if !target}
+        <MonitorOff class="size-10 text-base-content/40" />
+        <p class="text-base-content/70">No VS Code window is open for this repository.</p>
+      {:else if pending}
+        <span class="loading loading-spinner text-primary"></span>
+        <p class="text-base-content/70">Starting chat in {target.name}…</p>
       {:else}
-        <p class="text-sm text-base-content/60">Starts in {target.name}</p>
+        <div class="grid size-14 place-items-center rounded-full bg-primary/15 text-primary">
+          <MessageSquarePlus class="size-7" />
+        </div>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-lg font-semibold">Start a chat</h2>
+          <p class="text-sm text-base-content/60">
+            Describe the task below. Pick the agent and model before you send.
+          </p>
+        </div>
+        {#if candidates.length > 1}
+          <label class="flex w-full max-w-xs flex-col gap-1 text-left">
+            <span class="text-sm text-base-content/60">Window</span>
+            <select
+              class="select w-full"
+              value={target.windowId}
+              onchange={(event) => selectWindow(event.currentTarget.value)}
+            >
+              {#each candidates as window (window.windowId)}
+                <option value={window.windowId}>{window.name}</option>
+              {/each}
+            </select>
+          </label>
+        {:else}
+          <p class="text-sm text-base-content/60">Starts in {target.name}</p>
+        {/if}
       {/if}
-    {/if}
-  </main>
+    </div>
+  </ScreenMain>
 
   {#if target && !pending}
-    <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
+    <footer class="border-t border-base-300">
       <div class="px-3 py-3">
         <Composer
           busy={false}

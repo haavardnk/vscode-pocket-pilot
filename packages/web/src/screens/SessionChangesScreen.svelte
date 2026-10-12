@@ -9,6 +9,7 @@
   import QueryView from '../lib/components/QueryView.svelte';
   import RefreshButton from '../lib/components/RefreshButton.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
+  import ScreenMain from '../lib/components/ScreenMain.svelte';
   import { inChat, parseRoute, routeHash } from '../lib/routing';
   import { clock } from '../lib/stores/clock.svelte';
   import { editDecisions } from '../lib/stores/editDecisions.svelte';
@@ -64,7 +65,7 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col">
+<div class="flex min-h-0 flex-1 flex-col">
   <ScreenHeader
     title={requestId ? 'Message changes' : 'Changes'}
     subtitle={summary?.title}
@@ -75,7 +76,7 @@
     {/snippet}
   </ScreenHeader>
 
-  <main class="flex-1">
+  <ScreenMain>
     <QueryView resource={changes}>
       {#snippet children(result)}
         <BaselineNote {baseline} />
@@ -113,10 +114,10 @@
         {/if}
       {/snippet}
     </QueryView>
-  </main>
+  </ScreenMain>
 
   {#if pending > 0}
-    <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
+    <footer class="border-t border-base-300">
       <div class="flex gap-2 p-3">
         <button
           class="btn flex-1"

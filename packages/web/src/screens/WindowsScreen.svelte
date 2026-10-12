@@ -6,6 +6,7 @@
   import { onDestroy } from 'svelte';
 
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
+  import ScreenMain from '../lib/components/ScreenMain.svelte';
   import SettingsGroup from '../lib/components/SettingsGroup.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
   import { activeChats } from '../lib/hub/views';
@@ -65,7 +66,7 @@
   Pocket Pilot runs inside VS Code, so the last open window cannot be closed from here.
 {/snippet}
 
-<div class="flex flex-1 flex-col">
+<div class="flex min-h-0 flex-1 flex-col">
   <ScreenHeader title="VS Code windows" back={{ name: 'settings' }}>
     {#snippet actions()}
       <a
@@ -78,7 +79,7 @@
     {/snippet}
   </ScreenHeader>
 
-  <main class="flex flex-col gap-6 p-4 pb-8">
+  <ScreenMain class="flex flex-col gap-6 p-4 pb-8">
     <SettingsGroup title="Open windows" caption={lastWindow ? lastWindowCaption : undefined}>
       {#each hub.windows as window (window.windowId)}
         <li class="list-row items-center py-3">
@@ -103,7 +104,7 @@
         </li>
       {/each}
     </SettingsGroup>
-  </main>
+  </ScreenMain>
 </div>
 
 <Sheet

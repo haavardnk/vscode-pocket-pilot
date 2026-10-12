@@ -33,6 +33,7 @@
   import PermissionSheet from '../lib/components/PermissionSheet.svelte';
   import QueuedMessages from '../lib/components/QueuedMessages.svelte';
   import RequestItem from '../lib/components/RequestItem.svelte';
+  import ScreenMain from '../lib/components/ScreenMain.svelte';
   import SendingEcho from '../lib/components/SendingEcho.svelte';
   import SessionActionsSheet from '../lib/components/SessionActionsSheet.svelte';
   import SessionHeader from '../lib/components/SessionHeader.svelte';
@@ -78,12 +79,13 @@
   let echo = $state<{ text: string; images: ImageUpload[]; after: string | null } | null>(null);
   let acting = $state<RequestView | null>(null);
   let editing = $state<MessageEdit | null>(null);
-  let root = $state<HTMLElement>();
+  let content = $state<HTMLElement>();
   let composer = $state<ReturnType<typeof Composer>>();
   let queuedMessages = $state<ReturnType<typeof QueuedMessages>>();
   let draft: Draft = { text: '', images: [], delivery: chatView.delivery };
   let followBottom = true;
   let scrolled = 0;
+  let height = 0;
 
   const hostWindow = $derived(hub.windows.find((candidate) => candidate.windowId === windowId));
   const summary = $derived(hostWindow?.sessions.find((candidate) => candidate.id === sessionId));
@@ -158,9 +160,9 @@
 
   $effect(() => {
     const element = pane.element;
-    if (!root || !element) return;
+    if (!content || !element) return;
     const observer = new ResizeObserver(followEnd);
-    observer.observe(root);
+    observer.observe(content);
     observer.observe(element);
     element.addEventListener('scroll', onscroll, { passive: true });
     return () => {
@@ -171,7 +173,9 @@
 
   function followEnd(): void {
     const element = pane.element;
-    if (!element || !hub.detail || !followBottom || router.tab !== 'chats') return;
+    if (!element) return;
+    height = element.clientHeight;
+    if (!hub.detail || !followBottom || router.tab !== 'chats') return;
     element.scrollTop = element.scrollHeight;
   }
 
@@ -179,7 +183,11 @@
     const element = pane.element;
     if (!element || router.tab !== 'chats') return;
     scrolled = element.scrollTop;
-    followBottom = element.clientHeight + element.scrollTop >= element.scrollHeight - 120;
+    if (element.clientHeight !== height) {
+      height = element.clientHeight;
+      return;
+    }
+    followBottom = element.clientHeight + scrolled >= element.scrollHeight - 120;
   }
 
   async function run(action: () => Promise<void>): Promise<boolean> {
@@ -415,7 +423,7 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col" bind:this={root}>
+<div class="flex min-h-0 flex-1 flex-col">
   <SessionHeader
     {windowId}
     {sessionId}
@@ -428,55 +436,57 @@
     onactions={summary && hostWindow?.canOrganize ? () => (sheet = 'actions') : null}
   />
 
-  <main class="flex flex-1 flex-col gap-6 px-4 py-4">
-    {#if hub.detailMissing || (hub.loaded && !hostWindow)}
-      <div class="flex flex-col items-center gap-3 p-10 text-center">
-        <p class="text-base-content/70">This chat is no longer available.</p>
-        <button class="btn btn-sm" onclick={() => router.go({ name: 'chats' })}
-          >Back to chats</button
-        >
-      </div>
-    {:else if !detail}
-      <Loading />
-    {:else}
-      {#if detail.totalRequests > detail.requests.length}
-        <button class="btn self-center btn-ghost btn-sm" onclick={() => hub.loadEarlier()}>
-          Load earlier ({detail.totalRequests - detail.requests.length})
-        </button>
-      {/if}
-      {#if detail.requests.length === 0 && !echoing}
-        <p class="p-10 text-center text-base-content/60">No messages yet.</p>
-      {/if}
-      {#each detail.requests as request, index (request.id)}
-        {#if request.disabled && !detail.requests[index - 1]?.disabled}
-          <CheckpointBar {windowId} {sessionId} disabled={!connected} />
+  <ScreenMain>
+    <div class="flex flex-col gap-6 px-4 py-4" bind:this={content}>
+      {#if hub.detailMissing || (hub.loaded && !hostWindow)}
+        <div class="flex flex-col items-center gap-3 p-10 text-center">
+          <p class="text-base-content/70">This chat is no longer available.</p>
+          <button class="btn btn-sm" onclick={() => router.go({ name: 'chats' })}
+            >Back to chats</button
+          >
+        </div>
+      {:else if !detail}
+        <Loading />
+      {:else}
+        {#if detail.totalRequests > detail.requests.length}
+          <button class="btn self-center btn-ghost btn-sm" onclick={() => hub.loadEarlier()}>
+            Load earlier ({detail.totalRequests - detail.requests.length})
+          </button>
         {/if}
-        <RequestItem
-          {request}
-          {windowId}
-          {sessionId}
-          sent={sentPhotos?.requestId === request.id ? sentPhotos.images : null}
-          disabled={!connected}
-          dimmed={editIndex >= 0 && index >= editIndex}
-          onmessage={editing ? null : () => (acting = request)}
-          onanswer={answer}
-          onconfirm={confirm}
-          onelicit={elicit}
-        />
-      {/each}
-      {#if echoing}
-        <SendingEcho text={echoing.text} images={echoing.images} />
+        {#if detail.requests.length === 0 && !echoing}
+          <p class="p-10 text-center text-base-content/60">No messages yet.</p>
+        {/if}
+        {#each detail.requests as request, index (request.id)}
+          {#if request.disabled && !detail.requests[index - 1]?.disabled}
+            <CheckpointBar {windowId} {sessionId} disabled={!connected} />
+          {/if}
+          <RequestItem
+            {request}
+            {windowId}
+            {sessionId}
+            sent={sentPhotos?.requestId === request.id ? sentPhotos.images : null}
+            disabled={!connected}
+            dimmed={editIndex >= 0 && index >= editIndex}
+            onmessage={editing ? null : () => (acting = request)}
+            onanswer={answer}
+            onconfirm={confirm}
+            onelicit={elicit}
+          />
+        {/each}
+        {#if echoing}
+          <SendingEcho text={echoing.text} images={echoing.images} />
+        {/if}
+        {#if status === 'running' || echoing}
+          <p class="flex items-center gap-2 text-sm text-base-content/60" role="status">
+            <span class="loading loading-xs loading-dots"></span>Working
+          </p>
+        {/if}
       {/if}
-      {#if status === 'running' || echoing}
-        <p class="flex items-center gap-2 text-sm text-base-content/60" role="status">
-          <span class="loading loading-xs loading-dots"></span>Working
-        </p>
-      {/if}
-    {/if}
-  </main>
+    </div>
+  </ScreenMain>
 
   {#if detail && hostWindow}
-    <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
+    <footer class="border-t border-base-300">
       <div class="flex flex-col gap-3 px-3 pt-3 pb-3">
         {#if todos}
           <TodoList {todos} />

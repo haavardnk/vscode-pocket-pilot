@@ -22,22 +22,53 @@ test('never scrolls a tab sideways', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings' }).click();
   for (const tab of ['chats', 'code', 'terminals', 'settings']) {
     const pane = page.locator(`[data-tab="${tab}"]`);
+    const main = pane.locator('main');
     await pane.evaluate((element: HTMLElement) => {
       element.hidden = false;
+    });
+    await main.evaluate((element) => {
       const wide = document.createElement('div');
       wide.style.width = '200vw';
       wide.style.height = '1px';
-      element.firstElementChild?.prepend(wide);
+      element.prepend(wide);
     });
-    await pane.hover({ position: { x: 100, y: 200 } });
+    await main.hover({ position: { x: 100, y: 50 } });
     await page.mouse.wheel(300, 0);
     await page.waitForTimeout(100);
-    expect(await pane.evaluate((element) => element.scrollLeft)).toBe(0);
+    expect(await main.evaluate((element) => element.scrollLeft)).toBe(0);
     await pane.evaluate((element: HTMLElement) => {
       element.hidden = true;
     });
   }
 });
+
+for (const [screen, chat, content] of [
+  ['chat list', null, 'section h2'],
+  ['chat', 'Build the phone app', '[data-request]']
+] as const) {
+  test(`scrolls the ${screen} only between its bars`, async ({ page }) => {
+    if (chat) await openSession(page, chat);
+    const item = page.locator('[data-tab="chats"]').locator(content).first();
+    await expect(item).toBeVisible();
+    const gaps = await item.evaluate((node) => {
+      let scroller = node.parentElement;
+      while (scroller && getComputedStyle(scroller).overflowY !== 'auto') {
+        scroller = scroller.parentElement;
+      }
+      const pane = node.closest('[data-tab]');
+      const area = scroller?.getBoundingClientRect();
+      const header = pane?.querySelector('header')?.getBoundingClientRect();
+      const below = (
+        pane?.querySelector('footer') ?? document.querySelector('nav')
+      )?.getBoundingClientRect();
+      return [
+        (area?.top ?? NaN) - (header?.bottom ?? NaN),
+        (below?.top ?? NaN) - (area?.bottom ?? NaN)
+      ].map(Math.round);
+    });
+    expect(gaps).toEqual([0, 0]);
+  });
+}
 
 test('opens one edit from the chat and returns to the same spot', async ({ page }) => {
   await openSession(page, 'Build the phone app');
@@ -46,7 +77,7 @@ test('opens one edit from the chat and returns to the same spot', async ({ page 
   await page.setViewportSize({ width: 412, height: 480 });
   const link = request.getByRole('link', { name: /App\.svelte/ });
   await expect(link).toContainText('+1 −0');
-  const pane = page.locator('[data-tab="chats"]');
+  const pane = page.locator('[data-tab="chats"] main');
   const bottom = (): Promise<number> =>
     pane.evaluate((element) => element.scrollHeight - element.clientHeight);
   expect(await bottom()).toBeGreaterThan(250);
@@ -78,7 +109,7 @@ for (const [where, spot] of [
     const request = page.locator('[data-request="r1"]');
     await request.getByText('Updated the app shell').click();
     await page.setViewportSize({ width: 412, height: 480 });
-    const pane = page.locator('[data-tab="chats"]');
+    const pane = page.locator('[data-tab="chats"] main');
     await pane.evaluate((element, top) => element.scrollTo({ top }), spot);
     await frames(page);
     if (spot === 100) expect(await scrollGap(pane)).toBeGreaterThan(150);
@@ -100,7 +131,7 @@ for (const [where, spot] of [
   test(`returns to ${where} after scrolling the chat's changes`, async ({ page }) => {
     await openSession(page, 'Build the phone app');
     await page.setViewportSize({ width: 412, height: 480 });
-    const pane = page.locator('[data-tab="chats"]');
+    const pane = page.locator('[data-tab="chats"] main');
     await frames(page);
     await pane.evaluate((element, top) => element.scrollTo({ top }), spot);
     await frames(page);
@@ -130,7 +161,7 @@ test('stays at the bottom while earlier messages grow', async ({ page }) => {
       spacer.style.height = `${px}px`;
       document.querySelector('[data-request="r1"]')?.append(spacer);
     }, height);
-  const pane = page.locator('[data-tab="chats"]');
+  const pane = page.locator('[data-tab="chats"] main');
   await grow(1500);
   await expect.poll(() => scrollGap(pane)).toBeLessThan(2);
   await pane.evaluate((element) => element.scrollTo({ top: 0 }));
