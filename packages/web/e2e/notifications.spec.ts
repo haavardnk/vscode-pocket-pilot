@@ -45,23 +45,30 @@ test('opens the chat when another window of the app is first in line', async ({
   await expect(planHeading(page)).toBeVisible();
 });
 
-test('opens the chat on return when the navigate message is lost', async ({ page, context }) => {
-  await page.addInitScript(() => {
-    const listen = ServiceWorkerContainer.prototype.addEventListener;
-    ServiceWorkerContainer.prototype.addEventListener = function (
-      this: ServiceWorkerContainer,
-      ...args: Parameters<typeof listen>
-    ) {
-      if (args[0] !== 'message') listen.apply(this, args);
+for (const shown of ['before', 'after'] as const) {
+  test(`opens the chat when the navigate message is lost and the app shows ${shown} the tap`, async ({
+    page,
+    context
+  }) => {
+    await page.addInitScript(() => {
+      const listen = ServiceWorkerContainer.prototype.addEventListener;
+      ServiceWorkerContainer.prototype.addEventListener = function (
+        this: ServiceWorkerContainer,
+        ...args: Parameters<typeof listen>
+      ) {
+        if (args[0] !== 'message') listen.apply(this, args);
+      };
+    });
+    await signInWithWorker(page);
+    await openSession(page, 'Fix flaky cluster test');
+    const show = async (): Promise<void> => {
+      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     };
+
+    if (shown === 'before') await show();
+    await tap(context, '/#/session/w1/s4');
+    if (shown === 'after') await show();
+
+    await expect(planHeading(page)).toBeVisible();
   });
-  await signInWithWorker(page);
-  await openSession(page, 'Fix flaky cluster test');
-
-  await tap(context, '/#/session/w1/s4');
-
-  await expect(async () => {
-    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await expect(planHeading(page)).toBeVisible({ timeout: 500 });
-  }).toPass();
-});
+}
