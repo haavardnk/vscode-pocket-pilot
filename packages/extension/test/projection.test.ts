@@ -301,6 +301,30 @@ describe('projection', () => {
   });
 
   it.each([
+    [{ kind: 'questionCarousel', questions: [] }, false],
+    [{ kind: 'questionCarousel', questions: [], isUsed: true }, true],
+    [{ kind: 'elicitationSerialized', title: 'Sign in', state: 'pending' }, false],
+    [{ kind: 'elicitationSerialized', title: 'Sign in', state: 'accepted' }, true]
+  ])('waits on a tool only when nothing else is open %#', (interaction, waiting) => {
+    const response = [
+      {
+        kind: 'toolInvocationSerialized',
+        toolCallId: 'c1',
+        toolId: 'run_in_terminal',
+        invocationMessage: 'Run in Terminal',
+        isComplete: true
+      },
+      interaction
+    ];
+    const root = snapshot([request('r1', 'go', 4, response)]);
+    const detail = projectDetail(root, projectSummary(root, 'file', 0), 1, quiet, []);
+    expect(detail.requests[0]?.parts[0]).toMatchObject({
+      callId: 'c1',
+      awaitingConfirmation: waiting
+    });
+  });
+
+  it.each([
     [[{ value: '\n```\n' }, { kind: 'undoStop' }, block, group, { value: '\n```\n' }], [edit]],
     [
       [{ value: 'Editing:\n```ts\n' }, block, group, { value: '\n```\nDone.' }],

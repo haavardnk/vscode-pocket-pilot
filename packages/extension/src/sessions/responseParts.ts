@@ -17,6 +17,7 @@ import { projectTool } from './toolParts';
 export interface PartContext {
   state: RequestState;
   latest: boolean;
+  toolWaiting: boolean;
   statuses: ReadonlyMap<string, ToolStatus>;
   stopId: string | null;
   callId: string | null;
@@ -72,6 +73,23 @@ function projectQuestion(value: unknown): Question | null {
   };
 }
 
+function openInteraction(part: JsonRecord): boolean {
+  switch (part.kind) {
+    case 'questionCarousel':
+    case 'confirmation':
+      return part.isUsed !== true;
+    case 'elicitation2':
+    case 'elicitationSerialized':
+      return part.state !== 'accepted' && part.state !== 'rejected';
+    default:
+      return false;
+  }
+}
+
+export function waitsOnTool(state: RequestState, response: readonly JsonRecord[]): boolean {
+  return state === 'needsInput' && !response.some(openInteraction);
+}
+
 function interactionState(part: JsonRecord, pending: boolean): InteractionState {
   if (part.isUsed === true) return 'done';
   return pending ? 'pending' : 'expired';
@@ -121,7 +139,7 @@ export function projectPart(part: JsonRecord, context: PartContext): ResponsePar
     case 'toolInvocationSerialized':
       return projectTool(
         part,
-        awaitingInput && part.isConfirmed == null,
+        context.toolWaiting && part.isConfirmed == null,
         context.statuses.get(asString(part.toolCallId) ?? '')
       );
     case 'textEditGroup':
