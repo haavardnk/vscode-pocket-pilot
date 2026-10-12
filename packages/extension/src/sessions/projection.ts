@@ -12,7 +12,13 @@ import { type Activity, withActivity } from './activityParts';
 import { withoutEditFences } from './editFences';
 import { requestImages } from './requestImages';
 import { mergeParts, type PartContext, projectPart, waitsOnTool } from './responseParts';
-import { type LogSummary, requestsOf, requestState, requestText } from './sessionSummary';
+import {
+  type LogSummary,
+  requestNotice,
+  requestsOf,
+  requestState,
+  requestText
+} from './sessionSummary';
 import { sessionTodos } from './todos';
 import { writtenPaths } from './toolParts';
 import { toolCallId } from './transcript';
@@ -49,15 +55,17 @@ function projectRequest(request: JsonRecord, latest: boolean, activity: Activity
   });
   const error = asRecord(asRecord(request.result).errorDetails);
   const id = asString(request.requestId) ?? '';
+  const notice = requestNotice(request);
   return {
     id,
     timestamp: asNumber(request.timestamp) ?? 0,
     message: requestText(request),
+    notice,
     modelId: asString(request.modelId),
     agentName: asString(asRecord(asRecord(request.modeInfo).modeInstructions).name),
     state,
     error: state === 'failed' ? (asString(error.message) ?? 'Request failed') : null,
-    editable: id !== '',
+    editable: id !== '' && notice === null,
     disabled: false,
     editedPaths: [],
     images: requestImages(request),

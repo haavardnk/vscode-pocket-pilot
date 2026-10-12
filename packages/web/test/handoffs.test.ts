@@ -41,6 +41,7 @@ const detail = (state: RequestState | null, agentName: string | null): SessionDe
           id: 'r',
           timestamp: 0,
           message: 'm',
+          notice: null,
           modelId: null,
           agentName,
           state,

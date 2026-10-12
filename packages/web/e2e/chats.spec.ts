@@ -49,6 +49,17 @@ test('links chats and folders to GitHub', async ({ page }) => {
   await expect(sheet.getByRole('link', { name: /^Commit/ })).toHaveCount(0);
 });
 
+test('shows a terminal notice as a system row', async ({ page }) => {
+  await expect(
+    page.getByRole('link', { name: /Fix flaky cluster test/ }).getByText('Why does the cluster')
+  ).toBeVisible();
+  await openSession(page, 'Fix flaky cluster test');
+  const main = page.getByRole('main');
+  await expect(main.getByText('npm test completed')).toBeVisible();
+  await expect(main.getByText('All cluster tests pass.')).toBeVisible();
+  await expect(main.getByText(/notification: command completed/)).toHaveCount(0);
+});
+
 test('approves a waiting tool', async ({ page }) => {
   await openSession(page, 'Build the phone app');
   await expect(page.getByText('Allow tool?')).toBeVisible();
@@ -73,7 +84,7 @@ test('copies code blocks, commands and responses', async ({ page, context }) => 
   await expect(main.getByRole('button', { name: 'Copy response' })).toHaveCount(0);
   await page.goBack();
   await openSession(page, 'Fix flaky cluster test');
-  await main.getByRole('button', { name: 'Copy response' }).click();
+  await main.getByRole('button', { name: 'Copy response' }).first().click();
   await expect
     .poll(clipboard)
     .toBe(

@@ -47,6 +47,7 @@ const detail = (ids: string[]): SessionDetail => ({
     id,
     timestamp: index,
     message: id,
+    notice: null,
     modelId: null,
     agentName: null,
     state: 'complete',

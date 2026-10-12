@@ -48,6 +48,7 @@ const detail = (parts: ResponsePart[]): SessionDetail => ({
       id: 'r',
       timestamp: 0,
       message: 'go',
+      notice: null,
       modelId: null,
       agentName: null,
       state: 'needsInput',

@@ -4,6 +4,7 @@ import { asRecord, asString } from '../json';
 
 const MAX_BUFFERED_EVENTS = 2000;
 const PROMPT_SKEW_MS = 15_000;
+const TERMINAL_NOTICE = /^\[Terminal [\w-]+ notification: ([^.\]—]+)/;
 
 export type TranscriptEvent =
   | { type: 'user'; id: string; at: number; content: string }
@@ -24,6 +25,11 @@ function text(value: unknown): string {
 
 export function toolCallId(raw: string): string {
   return raw.split('__vscode')[0] ?? raw;
+}
+
+export function transcriptNotice(content: string): string | null {
+  const phrase = TERMINAL_NOTICE.exec(content)?.[1]?.trim();
+  return phrase ? phrase.charAt(0).toUpperCase() + phrase.slice(1) : null;
 }
 
 function argumentsText(value: unknown): string | null {

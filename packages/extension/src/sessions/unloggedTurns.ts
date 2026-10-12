@@ -2,7 +2,7 @@ import type { RequestView, ToolStatus } from '@pocket-pilot/protocol';
 
 import { activityParts } from './activityParts';
 import { type LogSummary, previewText, titleText } from './sessionSummary';
-import type { TranscriptTurn } from './transcript';
+import { transcriptNotice, type TranscriptTurn } from './transcript';
 
 export interface LogMark {
   writtenAt: number;
@@ -23,6 +23,7 @@ export function withUnlogged(
   const [first] = turns;
   const last = turns.at(-1);
   if (!first || !last) return summary;
+  const prompt = turns.findLast((turn) => transcriptNotice(turn.content) === null);
   return {
     ...summary,
     title: summary.requestCount === 0 ? titleText(first.content) : summary.title,
@@ -30,7 +31,7 @@ export function withUnlogged(
     status: settled ? 'idle' : 'running',
     lastRequestState: settled ? 'complete' : 'pending',
     requestCount: summary.requestCount + turns.length,
-    preview: previewText(last.content) ?? summary.preview
+    preview: (prompt && previewText(prompt.content)) ?? summary.preview
   };
 }
 
@@ -45,6 +46,7 @@ export function pendingTurns(
     id: turn.id,
     timestamp: turn.at,
     message: turn.content,
+    notice: transcriptNotice(turn.content),
     modelId,
     agentName: null,
     state: turn === last && !settled ? 'pending' : 'complete',

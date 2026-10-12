@@ -7,6 +7,7 @@ const request = (id: string, paths: string[]): RequestView => ({
   id,
   timestamp: 0,
   message: id,
+  notice: null,
   modelId: null,
   agentName: null,
   state: 'complete',

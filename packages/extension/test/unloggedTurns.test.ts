@@ -110,4 +110,30 @@ describe('pending overlay', () => {
     ]);
     expect(pendingTurns(turns, null, statuses, true).at(-1)?.state).toBe('complete');
   });
+
+  it.each<[string, string | null]>([
+    [
+      '[Terminal 4a52-9f notification: command completed with exit code 1. The terminal has been cleaned up.]\nTerminal output:\nfail',
+      'Command completed with exit code 1'
+    ],
+    [
+      '[Terminal cb5a notification: command may be waiting for input — assess the output below.]',
+      'Command may be waiting for input'
+    ],
+    [
+      '[Terminal 4a52 notification: terminal exited. The terminal process ended.]',
+      'Terminal exited'
+    ],
+    ['Explain [Terminal x notification: y]', null]
+  ])('reads the notice of %s', (content, notice) => {
+    const notified = turnsOf(
+      transcriptLine('user.message', { content: 'phone task' }, 30),
+      transcriptLine('user.message', { content }, 31)
+    );
+    const statuses = toolStatuses([]);
+    expect(pendingTurns(notified, null, statuses, true).at(-1)?.notice).toBe(notice);
+    expect(withUnlogged(summary, notified, true).preview).toBe(
+      notice === null ? content : 'phone task'
+    );
+  });
 });

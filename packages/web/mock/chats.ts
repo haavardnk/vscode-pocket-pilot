@@ -262,6 +262,7 @@ export class MockChats {
       id: this.host.id(images.length > 0 ? 'turn' : 'request'),
       timestamp: Date.now(),
       message: text,
+      notice: null,
       modelId: detail.modelId,
       agentName:
         window.state.agents.find((agent) => agent.id === detail.modeId && agent.id !== 'agent')

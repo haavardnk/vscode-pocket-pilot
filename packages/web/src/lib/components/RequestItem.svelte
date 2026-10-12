@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Check from '@lucide/svelte/icons/check';
   import CircleHelp from '@lucide/svelte/icons/circle-help';
   import FileDiff from '@lucide/svelte/icons/file-diff';
   import ShieldAlert from '@lucide/svelte/icons/shield-alert';
@@ -80,7 +81,12 @@
   class={['flex flex-col gap-3', (request.disabled || dimmed) && 'opacity-50']}
   data-request={request.id}
 >
-  {#if request.message}
+  {#if request.notice !== null}
+    <div class="flex items-start gap-2 text-sm text-base-content/60">
+      <Check class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <div class="markdown min-w-0 flex-1" {@attach markdown(request.notice, chat)}></div>
+    </div>
+  {:else if request.message}
     <div class="chat-end chat">
       {#if onmessage && request.editable && !request.disabled}
         <button
