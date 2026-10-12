@@ -11,7 +11,7 @@ import { asArray, asNumber, asRecord, asString, type JsonRecord } from '../json'
 import { type Activity, withActivity } from './activityParts';
 import { withoutEditFences } from './editFences';
 import { requestImages } from './requestImages';
-import { mergeParts, type PartContext, projectPart } from './responseParts';
+import { mergeParts, type PartContext, projectPart, waitsOnTool } from './responseParts';
 import { type LogSummary, requestsOf, requestState, requestText } from './sessionSummary';
 import { sessionTodos } from './todos';
 import { writtenPaths } from './toolParts';
@@ -25,15 +25,17 @@ function sessionPermission(root: JsonRecord): PermissionLevel {
 function projectRequest(request: JsonRecord, latest: boolean, activity: Activity): RequestView {
   const logged = requestState(request);
   const state = latest && activity.settled && logged === 'pending' ? 'complete' : logged;
+  const response = asArray(request.response).map(asRecord);
   const context: PartContext = {
     state,
     latest,
+    toolWaiting: waitsOnTool(state, response),
     statuses: activity.statuses,
     stopId: null,
     callId: null,
     writers: new Map()
   };
-  const parts = withoutEditFences(asArray(request.response).map(asRecord)).flatMap((part) => {
+  const parts = withoutEditFences(response).flatMap((part) => {
     if (part.kind === 'undoStop') context.stopId = asString(part.id);
     const paths = part.kind === 'toolInvocationSerialized' ? writtenPaths(part) : null;
     const raw = asString(part.toolCallId);
