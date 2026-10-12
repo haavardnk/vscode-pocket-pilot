@@ -87,6 +87,7 @@ const turn = (id: string, parts: ResponsePart[]): RequestView => ({
   id,
   timestamp: 1,
   message: id,
+  notice: null,
   modelId: null,
   agentName: null,
   state: 'pending',

@@ -143,7 +143,7 @@ function summaryOf(detail: SessionDetail, updatedAt: number): WindowState['sessi
     modelId: detail.modelId,
     modeId: detail.modeId,
     requestCount: detail.totalRequests,
-    preview: last?.message ?? null,
+    preview: detail.requests.findLast((request) => request.notice === null)?.message ?? null,
     pinned: false,
     archived: false
   };
@@ -381,6 +381,7 @@ export function initialWindows(now: number): MockWindow[] {
               id: 'r1',
               timestamp: now - 3 * MINUTE,
               message: 'Build the phone app with a session list and composer.',
+              notice: null,
               modelId: 'copilot/claude-opus',
               agentName: null,
               state: 'pending',
@@ -450,12 +451,13 @@ export function initialWindows(now: number): MockWindow[] {
           permission: 'default',
           editedFiles: 0,
           todos: null,
-          totalRequests: 1,
+          totalRequests: 2,
           requests: [
             {
               id: 'r2',
               timestamp: now - 30 * MINUTE,
               message: 'Why does the cluster test time out?',
+              notice: null,
               modelId: 'copilot/gpt-5',
               agentName: 'Reviewer',
               state: 'complete',
@@ -562,6 +564,22 @@ export function initialWindows(now: number): MockWindow[] {
                   baseUri: 'file:///repo/'
                 }
               ]
+            },
+            {
+              id: 'r2n',
+              timestamp: now - 29 * MINUTE,
+              message:
+                '[Terminal 4a520fa1 notification: command completed. The terminal has been cleaned up.]\nTerminal output:\n12 passed',
+              notice: '`npm test` completed',
+              modelId: 'copilot/gpt-5',
+              agentName: 'Reviewer',
+              state: 'complete',
+              error: null,
+              editable: false,
+              disabled: false,
+              editedPaths: [],
+              images: [],
+              parts: [{ kind: 'markdown', text: 'All cluster tests pass.', baseUri: null }]
             }
           ],
           queued: []
@@ -581,6 +599,7 @@ export function initialWindows(now: number): MockWindow[] {
               id: 'r4',
               timestamp: now - 10 * MINUTE,
               message: 'Plan the 0.2 release.',
+              notice: null,
               modelId: 'copilot/claude-opus',
               agentName: null,
               state: 'needsInput',
@@ -687,6 +706,7 @@ export function initialWindows(now: number): MockWindow[] {
               id: 'r6',
               timestamp: now - 45 * MINUTE,
               message: 'Plan offline mode for the phone app.',
+              notice: null,
               modelId: 'copilot/claude-opus',
               agentName: 'Plan',
               state: 'complete',
@@ -721,6 +741,7 @@ export function initialWindows(now: number): MockWindow[] {
               id: 'r5',
               timestamp: now - 80 * MINUTE,
               message: 'Bump the web dependencies.',
+              notice: null,
               modelId: 'copilot/gpt-5',
               agentName: null,
               state: 'complete',
@@ -784,6 +805,7 @@ export function initialWindows(now: number): MockWindow[] {
               id: 'r3',
               timestamp: now - 60 * MINUTE,
               message: 'Speed up demosaic.',
+              notice: null,
               modelId: 'copilot/claude-opus',
               agentName: null,
               state: 'complete',
@@ -821,6 +843,7 @@ export function initialWindows(now: number): MockWindow[] {
               id: 'r7a',
               timestamp: now - 70 * MINUTE,
               message: 'Extract the JPEG encoder.',
+              notice: null,
               modelId: 'copilot/claude-opus',
               agentName: null,
               state: 'complete',
@@ -849,6 +872,7 @@ export function initialWindows(now: number): MockWindow[] {
               id: 'r7b',
               timestamp: now - 68 * MINUTE,
               message: 'Add a PNG encoder next to it.',
+              notice: null,
               modelId: 'copilot/gpt-5',
               agentName: null,
               state: 'complete',
@@ -873,6 +897,7 @@ export function initialWindows(now: number): MockWindow[] {
               id: 'r7c',
               timestamp: now - 66 * MINUTE,
               message: 'Summarise the export modules.',
+              notice: null,
               modelId: 'copilot/claude-opus',
               agentName: null,
               state: 'complete',

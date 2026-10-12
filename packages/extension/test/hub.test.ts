@@ -38,6 +38,7 @@ function detail(count: number): SessionDetail {
       id: `r${index}`,
       timestamp: index,
       message: `m${index}`,
+      notice: null,
       modelId: null,
       agentName: null,
       state: 'complete' as const,

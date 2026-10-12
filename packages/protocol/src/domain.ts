@@ -157,6 +157,7 @@ export const requestViewSchema = z.object({
   id: z.string(),
   timestamp: z.number(),
   message: z.string(),
+  notice: z.string().nullable(),
   modelId: z.string().nullable(),
   agentName: z.string().nullable(),
   state: requestStateSchema,

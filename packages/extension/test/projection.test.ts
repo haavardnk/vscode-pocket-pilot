@@ -447,6 +447,25 @@ describe('projection', () => {
     expect(detail.requests.map((item) => item.agentName)).toEqual(['Plan', null]);
   });
 
+  it.each([
+    [{}, null, true],
+    [
+      { isSystemInitiated: true, systemInitiatedLabel: '`npm test` completed' },
+      '`npm test` completed',
+      false
+    ],
+    [{ isSystemInitiated: true }, '[Terminal t1 notification: command completed.]', false]
+  ])('projects system notice %#', (extra, notice, editable) => {
+    const root = snapshot([
+      request('r1', 'go', 1),
+      { ...request('r2', '[Terminal t1 notification: command completed.]', 1), ...extra }
+    ]);
+    const summary = projectSummary(root, 'file', 0);
+    const view = projectDetail(root, summary, 2, quiet, []).requests[1];
+    expect([view?.notice, view?.editable]).toEqual([notice, editable]);
+    expect(summary.preview).toBe(notice === null ? view?.message : 'go');
+  });
+
   const carousel = (extra: object) => ({
     kind: 'questionCarousel',
     resolveId: 'q1',

@@ -265,6 +265,7 @@ describe('response parts', () => {
       id: 'r',
       timestamp: 0,
       message: 'm',
+      notice: null,
       modelId: null,
       agentName: null,
       state: 'pending' as const,

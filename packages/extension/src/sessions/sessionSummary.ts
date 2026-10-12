@@ -28,6 +28,11 @@ export function requestText(request: JsonRecord): string {
   return asString(asRecord(request.message).text) ?? '';
 }
 
+export function requestNotice(request: JsonRecord): string | null {
+  if (request.isSystemInitiated !== true) return null;
+  return asString(request.systemInitiatedLabel) ?? requestText(request);
+}
+
 export function requestState(request: JsonRecord): RequestState {
   const value = asNumber(asRecord(request.modelState).value);
   const error = asRecord(asRecord(request.result).errorDetails);
@@ -66,6 +71,7 @@ export function projectSummary(root: unknown, id: string, modifiedAt: number): L
   const session = asRecord(root);
   const requests = requestsOf(session);
   const last = requests.at(-1);
+  const prompt = requests.findLast((request) => requestNotice(request) === null);
   const created = asNumber(session.creationDate) ?? modifiedAt;
   const state = last ? requestState(last) : null;
   return {
@@ -78,6 +84,6 @@ export function projectSummary(root: unknown, id: string, modifiedAt: number): L
     modelId: sessionModel(session, last),
     modeId: sessionMode(session),
     requestCount: requests.length,
-    preview: last ? previewText(requestText(last)) : null
+    preview: prompt ? previewText(requestText(prompt)) : null
   };
 }

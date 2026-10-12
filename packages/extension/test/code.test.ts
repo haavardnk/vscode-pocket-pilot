@@ -121,6 +121,7 @@ describe('code queries', () => {
     id,
     timestamp,
     message,
+    notice: null,
     modelId: null,
     agentName: null,
     state: 'complete',
