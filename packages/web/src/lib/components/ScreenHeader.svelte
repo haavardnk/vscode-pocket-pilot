@@ -18,7 +18,7 @@
   const { title, subtitle = null, back, meta, actions, children }: Props = $props();
 </script>
 
-<header class="sticky top-0 z-20 bg-base-100/90 pt-safe backdrop-blur">
+<header class="min-h-0 overflow-hidden pt-safe">
   <div class="flex h-14 items-center gap-1 px-2">
     <button class="btn btn-square btn-ghost" aria-label="Back" onclick={() => router.go(back)}>
       <ChevronLeft class="size-6" />

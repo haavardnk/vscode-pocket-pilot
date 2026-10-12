@@ -82,7 +82,7 @@ for (const { screen, tab, heading, open, input, follows, latest } of KEYBOARD_SC
         })
       )
       .toBeLessThan(2);
-    if (follows) await expect.poll(() => scrollGap(pane)).toBeLessThan(2);
+    if (follows) await expect.poll(() => scrollGap(pane.locator('main'))).toBeLessThan(2);
     if (latest) {
       const shown = pane.getByText(latest).evaluate((node) => {
         const pane = node.closest('[data-tab]');

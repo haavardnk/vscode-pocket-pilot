@@ -16,6 +16,7 @@
 
   const { tab, route, active, device, connection, onsignedout }: Props = $props();
 
+  let container = $state<HTMLElement>();
   let element = $state<HTMLElement>();
   let top = 0;
   let shownHash = '';
@@ -23,33 +24,40 @@
   setPane({
     get element() {
       return element;
+    },
+    scroller: (node) => {
+      element = node;
+      const save = (): void => {
+        if (active) top = node.scrollTop;
+      };
+      node.addEventListener('scroll', save, { passive: true });
+      return () => {
+        node.removeEventListener('scroll', save);
+        if (element === node) element = undefined;
+      };
     }
   });
 
   $effect(() => {
     const hash = routeHash(route);
-    if (!element) return;
     if (!active) {
-      element
-        .querySelectorAll<HTMLDialogElement>('dialog[open]')
+      container
+        ?.querySelectorAll<HTMLDialogElement>('dialog[open]')
         .forEach((dialog) => dialog.close());
       return;
     }
-    element.scrollTop = hash === shownHash ? top : 0;
+    if (!element) return;
+    if (hash !== shownHash) top = 0;
+    element.scrollTop = top;
     shownHash = hash;
   });
 </script>
 
 <div
-  class="h-full overflow-x-hidden overflow-y-auto overscroll-contain"
+  class="flex h-full flex-col overflow-hidden pb-(--dock-height)"
   hidden={!active}
   data-tab={tab}
-  bind:this={element}
-  onscroll={(event) => {
-    if (active) top = event.currentTarget.scrollTop;
-  }}
+  bind:this={container}
 >
-  <div class="flex min-h-full flex-col pb-(--dock-height)">
-    <RouteView {route} {device} {connection} {onsignedout} />
-  </div>
+  <RouteView {route} {device} {connection} {onsignedout} />
 </div>

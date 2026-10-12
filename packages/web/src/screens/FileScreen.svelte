@@ -7,6 +7,7 @@
   import QueryView from '../lib/components/QueryView.svelte';
   import RefreshButton from '../lib/components/RefreshButton.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
+  import ScreenMain from '../lib/components/ScreenMain.svelte';
   import { routeHash } from '../lib/routing';
   import { hub } from '../lib/stores/hub.svelte';
   import { QueryResource } from '../lib/stores/query.svelte';
@@ -31,7 +32,7 @@
   });
 </script>
 
-<div class="flex flex-1 flex-col">
+<div class="flex min-h-0 flex-1 flex-col">
   <ScreenHeader
     title={baseName(path)}
     subtitle={parentPath(path) || folder?.name}
@@ -52,7 +53,7 @@
     {/snippet}
   </ScreenHeader>
 
-  <main class="flex-1">
+  <ScreenMain>
     <QueryView resource={file}>
       {#snippet children(result)}
         <FileContentView
@@ -63,5 +64,5 @@
         />
       {/snippet}
     </QueryView>
-  </main>
+  </ScreenMain>
 </div>

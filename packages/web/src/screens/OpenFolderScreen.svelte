@@ -12,6 +12,7 @@
   import QueryView from '../lib/components/QueryView.svelte';
   import RefreshButton from '../lib/components/RefreshButton.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
+  import ScreenMain from '../lib/components/ScreenMain.svelte';
   import { repositoryGroups } from '../lib/hub/views';
   import { hub } from '../lib/stores/hub.svelte';
   import { QueryResource } from '../lib/stores/query.svelte';
@@ -110,7 +111,7 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col">
+<div class="flex min-h-0 flex-1 flex-col">
   <ScreenHeader
     title="Open folder"
     subtitle="Opens in a new VS Code window"
@@ -123,7 +124,7 @@
     {/snippet}
   </ScreenHeader>
 
-  <main class="flex-1">
+  <ScreenMain>
     {#if pending}
       <div class="flex flex-col items-center gap-3 px-8 py-16 text-center">
         <span class="loading loading-spinner text-primary"></span>
@@ -234,5 +235,5 @@
         {/snippet}
       </QueryView>
     {/if}
-  </main>
+  </ScreenMain>
 </div>

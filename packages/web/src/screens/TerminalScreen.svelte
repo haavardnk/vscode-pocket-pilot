@@ -7,6 +7,7 @@
 
   import Loading from '../lib/components/Loading.svelte';
   import ScreenHeader from '../lib/components/ScreenHeader.svelte';
+  import ScreenMain from '../lib/components/ScreenMain.svelte';
   import Sheet from '../lib/components/Sheet.svelte';
   import TerminalExecutions from '../lib/components/terminal/TerminalExecutions.svelte';
   import TerminalStream from '../lib/components/terminal/TerminalStream.svelte';
@@ -134,7 +135,7 @@
   }
 </script>
 
-<div class="flex flex-1 flex-col">
+<div class="flex min-h-0 flex-1 flex-col">
   <ScreenHeader
     title={summary?.name ?? 'Terminal'}
     subtitle={summary?.cwd ?? hostWindow?.name}
@@ -163,7 +164,7 @@
     {/snippet}
   </ScreenHeader>
 
-  <main class="flex flex-1 flex-col gap-4 px-4 py-4">
+  <ScreenMain class="flex flex-col gap-4 px-4 py-4">
     {#if hub.terminalMissing || (hub.loaded && !summary)}
       <div class="flex flex-col items-center gap-3 p-10 text-center">
         <p class="text-base-content/70">This terminal is closed.</p>
@@ -190,10 +191,10 @@
         <TerminalExecutions {detail} />
       {/if}
     {/if}
-  </main>
+  </ScreenMain>
 
   {#if summary && !hub.terminalMissing}
-    <footer class="sticky bottom-(--dock-height) z-20 border-t border-base-300 bg-base-100">
+    <footer class="border-t border-base-300">
       <div class="flex flex-col gap-2 px-3 pt-2 pb-3">
         <div class="flex gap-1 overflow-x-auto">
           {#each KEYS as key (key.label)}
