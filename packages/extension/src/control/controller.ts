@@ -173,6 +173,7 @@ export class Controller {
         const model = command.modelId ? await this.inputs.requireModel(command.modelId) : null;
         const images = await this.sources.images.write(command.images);
         await vscode.commands.executeCommand('workbench.action.openChat');
+        await vscode.commands.executeCommand('workbench.action.chat.newLocalChat');
         if (command.modeId) {
           await vscode.commands.executeCommand('workbench.action.chat.toggleAgentMode', {
             modeId: command.modeId

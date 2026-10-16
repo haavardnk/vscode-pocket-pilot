@@ -26,6 +26,10 @@ tunnel. It works with GitHub Copilot Chat in VS Code; other agents and editors a
 ## Requirements
 
 - VS Code 1.136 or newer with GitHub Copilot Chat
+- Chats must use the **Local** harness. Copilot harness (Agent Host) chats don't show up in the app.
+  VS Code 1.142 started rolling out the Copilot harness as the default for new chats; set
+  `"chat.defaultToCopilotHarness": false` to keep Local as the default. Chats started from the app
+  always use the Local harness.
 - A Cloudflare account, only for a permanent address
 
 ## Installation
